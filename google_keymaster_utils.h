@@ -38,7 +38,7 @@ template <typename T, size_t N> inline size_t array_length(const T (&)[N]) { ret
  * array_length() on the original array to discover the size.
  */
 template <typename T, size_t N> inline T* dup_array(const T (&a)[N]) {
-    T* dup = static_cast<T*>(malloc(array_size(a)));
+    T* dup = new T[N];
     if (dup != NULL) {
         memcpy(dup, &a, array_size(a));
     }
