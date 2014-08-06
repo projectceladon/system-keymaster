@@ -17,10 +17,10 @@
 #ifndef EXTERNAL_KEYMASTER_AUTHORIZATION_SET_H_
 #define EXTERNAL_KEYMASTER_AUTHORIZATION_SET_H_
 
-#include <hardware/keymaster_defs.h>
 
 #include <UniquePtr.h>
 
+#include "keymaster_defs.h"
 #include "keymaster_tags.h"
 #include "serializable.h"
 
