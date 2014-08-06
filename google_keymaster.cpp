@@ -17,16 +17,16 @@
 #include <assert.h>
 #include <string.h>
 
-#include <openssl/rsa.h>
-#include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
 #include <openssl/sha.h>
 
 #include <UniquePtr.h>
 
+#include "ae.h"
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
-#include "ae.h"
 
 // We need placement new, but we don't want to pull in any standard C++ libs at the moment.
 // Luckily, it's trivial to just implement it.

@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "authorization_set.h"
+#include "google_keymaster_utils.h"
 
 namespace keymaster {
 
