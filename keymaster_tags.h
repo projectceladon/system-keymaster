@@ -57,7 +57,7 @@
  * is no longer zero.
  */
 
-#include <hardware/keymaster_defs.h>
+#include "keymaster_defs.h"
 
 namespace keymaster {
 
