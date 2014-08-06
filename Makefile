@@ -11,10 +11,14 @@ CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Wmissing-declarations -std=c++0x -fprofile-arcs -ftest-coverage \
 	-Wno-deprecated-declarations -fno-exceptions
-LDLIBS=-lpthread
+LDLIBS=-lcrypto -lpthread
 
 CPPSRCS=authorization_set.cpp \
 	authorization_set_test.cpp \
+	google_keymaster.cpp \
+	google_keymaster_test.cpp \
+	google_keymaster_messages.cpp \
+	google_keymaster_messages_test.cpp \
 	serializable.cpp
 CCSRCS=$(BASE)/external/gtest/src/gtest-all.cc
 CSRCS=ocb.c
@@ -24,7 +28,9 @@ DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
 
 LINK.o=$(LINK.cc)
 
-BINARIES=authorization_set_test
+BINARIES=authorization_set_test \
+	google_keymaster_test \
+	google_keymaster_messages_test
 
 .PHONY: coverage valgrind clean run
 
@@ -49,7 +55,6 @@ coverage.info: run
 #UNINIT_OPTS=--track-origins=yes
 UNINIT_OPTS=--undef-value-errors=no
 
-
 VALGRIND_OPTS=--leak-check=full \
 	--show-reachable=yes \
 	--vgdb=full \
@@ -67,7 +72,21 @@ authorization_set_test: authorization_set_test.o \
 	serializable.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
-$(BASE)/external/gtest/src/gtest-all.o: CXXFLAGS=-Wall
+google_keymaster_test: google_keymaster_test.o \
+	google_keymaster.o \
+	google_keymaster_messages.o \
+	authorization_set.o \
+	serializable.o \
+	ocb.o \
+	$(BASE)/external/gtest/src/gtest-all.o
+
+google_keymaster_messages_test: google_keymaster_messages_test.o \
+	google_keymaster_messages.o \
+	authorization_set.o \
+	serializable.o \
+	$(BASE)/external/gtest/src/gtest-all.o
+
+$(BASE)/external/gtest/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
 
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) $(BINARIES:=.run) $(BINARIES:=.valgrind) \
