@@ -1,5 +1,5 @@
-#ifndef EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
-#define EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
+#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
+#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 
 namespace keymaster {
 
@@ -69,4 +69,4 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
 
 }  // namespace keymaster
 
-#endif  // EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
+#endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_

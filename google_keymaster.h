@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_H_
-#define EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_H_
+#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
+#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
 
 #include "authorization_set.h"
 #include "google_keymaster_messages.h"
@@ -93,4 +93,4 @@ class GoogleKeymaster {
 
 }  // namespace keymaster
 
-#endif  //  EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_H_
+#endif  //  SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
