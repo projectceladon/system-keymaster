@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_AUTHORIZATION_SET_H_
-#define EXTERNAL_KEYMASTER_AUTHORIZATION_SET_H_
+#ifndef SYSTEM_KEYMASTER_AUTHORIZATION_SET_H_
+#define SYSTEM_KEYMASTER_AUTHORIZATION_SET_H_
 
 
 #include <UniquePtr.h>
@@ -270,4 +270,4 @@ const keymaster_key_param_t* find(keymaster_tag_t tag, const AuthorizationSet& s
 
 }  // namespace keymaster
 
-#endif  // EXTERNAL_KEYMASTER_KEY_AUTHORIZATION_SET_H_
+#endif  // SYSTEM_KEYMASTER_KEY_AUTHORIZATION_SET_H_

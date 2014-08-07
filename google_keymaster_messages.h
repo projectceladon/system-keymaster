@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
-#define EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
+#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
+#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
 
 #include <stdlib.h>
 #include <string.h>
@@ -105,4 +105,4 @@ struct GetKeyCharacteristicsResponse {
 
 }  // namespace keymaster
 
-#endif  // EXTERNAL_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
+#endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_

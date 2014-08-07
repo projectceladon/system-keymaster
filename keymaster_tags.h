@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_KEYMASTER_TAGS_H_
-#define EXTERNAL_KEYMASTER_KEYMASTER_TAGS_H_
+#ifndef SYSTEM_KEYMASTER_KEYMASTER_TAGS_H_
+#define SYSTEM_KEYMASTER_KEYMASTER_TAGS_H_
 
 /**
  * This header contains various definitions that make working with keymaster tags safer and easier.
@@ -245,4 +245,4 @@ inline keymaster_key_param_t Authorization(TypedEnumTag<KM_ENUM_REP, Tag, Keymas
 
 }  // namespace keymaster
 
-#endif  // EXTERNAL_KEYMASTER_KEYMASTER_TAGS_H_
+#endif  // SYSTEM_KEYMASTER_KEYMASTER_TAGS_H_
