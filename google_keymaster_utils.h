@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 #define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 
@@ -66,6 +82,32 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
     }
     return false;
 }
+
+/**
+ * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
+ * it is zeroed.
+ */
+class Eraser {
+  public:
+    /* Not implemented.  If this gets used, we want a link error. */
+    template <typename T> explicit Eraser(T* t);
+
+    template <typename T>
+    explicit Eraser(T& t)
+        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {}
+
+    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {}
+
+    Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {}
+    ~Eraser() {
+        while (size_-- > 0)
+            *buf_++ = 0;
+    }
+
+  private:
+    uint8_t* buf_;
+    size_t size_;
+};
 
 }  // namespace keymaster
 

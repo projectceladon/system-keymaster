@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_KEYMASTER_DEFS_H
 
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 
 #if defined(__cplusplus)
@@ -501,6 +502,7 @@ static inline bool keymaster_tag_repeatable(keymaster_tag_t tag) {
 inline keymaster_key_param_t keymaster_param_enum(keymaster_tag_t tag, uint32_t value) {
     // assert(keymaster_tag_get_type(tag) == KM_ENUM || keymaster_tag_get_type(tag) == KM_ENUM_REP);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.enumerated = value;
     return param;
@@ -509,6 +511,7 @@ inline keymaster_key_param_t keymaster_param_enum(keymaster_tag_t tag, uint32_t 
 inline keymaster_key_param_t keymaster_param_int(keymaster_tag_t tag, uint32_t value) {
     // assert(keymaster_tag_get_type(tag) == KM_INT || keymaster_tag_get_type(tag) == KM_INT_REP);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.integer = value;
     return param;
@@ -517,6 +520,7 @@ inline keymaster_key_param_t keymaster_param_int(keymaster_tag_t tag, uint32_t v
 inline keymaster_key_param_t keymaster_param_long(keymaster_tag_t tag, uint64_t value) {
     // assert(keymaster_tag_get_type(tag) == KM_LONG);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.long_integer = value;
     return param;
@@ -526,6 +530,7 @@ inline keymaster_key_param_t keymaster_param_blob(keymaster_tag_t tag, const uin
                                                   size_t bytes_len) {
     // assert(keymaster_tag_get_type(tag) == KM_BYTES || keymaster_tag_get_type(tag) == KM_BIGNUM);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.blob.data = bytes;
     param.blob.data_length = bytes_len;
@@ -535,6 +540,7 @@ inline keymaster_key_param_t keymaster_param_blob(keymaster_tag_t tag, const uin
 inline keymaster_key_param_t keymaster_param_bool(keymaster_tag_t tag) {
     // assert(keymaster_tag_get_type(tag) == KM_BOOL);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.boolean = true;
     return param;
@@ -543,6 +549,7 @@ inline keymaster_key_param_t keymaster_param_bool(keymaster_tag_t tag) {
 inline keymaster_key_param_t keymaster_param_date(keymaster_tag_t tag, uint64_t value) {
     // assert(keymaster_tag_get_type(tag) == KM_DATE);
     keymaster_key_param_t param;
+    memset(&param, 0, sizeof(param));
     param.tag = tag;
     param.date_time = value;
     return param;

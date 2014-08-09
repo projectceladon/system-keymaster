@@ -49,11 +49,11 @@ TEST(GenerateKeyRequest, RoundTrip) {
     EXPECT_EQ(182U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, req.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, req.Serialize(buf.get(), buf.get() + size));
 
     GenerateKeyRequest deserialized1;
-    uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized1.DeserializeInPlace(&p, p + size));
+    const uint8_t* p = buf.get();
+    EXPECT_TRUE(deserialized1.Deserialize(&p, p + size));
     EXPECT_EQ(7U, deserialized1.key_description.size());
 
     // Check a few entries.
@@ -70,7 +70,7 @@ TEST(GenerateKeyRequest, RoundTrip) {
 
     GenerateKeyRequest deserialized2;
     const uint8_t* p2 = buf.get();
-    EXPECT_TRUE(deserialized2.DeserializeToCopy(&p2, p2 + size));
+    EXPECT_TRUE(deserialized2.Deserialize(&p2, p2 + size));
     EXPECT_EQ(7U, deserialized2.key_description.size());
 
     // Check a few entries.
@@ -105,16 +105,11 @@ TEST(GenerateKeyResponse, RoundTrip) {
     EXPECT_EQ(217U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get(), buf.get() + size));
 
     GenerateKeyResponse deserialized;
-    uint8_t* p = buf.get();
-
-    // DeserializeInPlace is not implemented.
-    EXPECT_FALSE(deserialized.DeserializeInPlace(&p, p + size));
-
-    const uint8_t* p2 = buf.get();
-    EXPECT_TRUE(deserialized.DeserializeToCopy(&p2, p2 + size));
+    const uint8_t* p = buf.get();
+    EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
     EXPECT_EQ(7U, deserialized.enforced.size());
 
     EXPECT_EQ(0U, deserialized.unenforced.size());
@@ -153,11 +148,11 @@ TEST(GenerateKeyResponse, Error) {
     EXPECT_EQ(4U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get(), buf.get() + size));
 
     GenerateKeyResponse deserialized;
     const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized.DeserializeToCopy(&p, p + size));
+    EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, deserialized.error);
     EXPECT_EQ(0U, deserialized.enforced.size());
     EXPECT_EQ(0U, deserialized.unenforced.size());

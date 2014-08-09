@@ -17,7 +17,6 @@
 #ifndef SYSTEM_KEYMASTER_AUTHORIZATION_SET_H_
 #define SYSTEM_KEYMASTER_AUTHORIZATION_SET_H_
 
-
 #include <UniquePtr.h>
 
 #include "keymaster_defs.h"
@@ -32,8 +31,6 @@ namespace keymaster {
  */
 class AuthorizationSet : public Serializable {
   public:
-    ~AuthorizationSet();
-
     /**
      * Construct an empty, dynamically-allocated, growable AuthorizationSet.  Does not actually
      * allocate any storage until elements are added, so there is no cost to creating an
@@ -42,8 +39,7 @@ class AuthorizationSet : public Serializable {
      */
     AuthorizationSet()
         : elems_(NULL), elems_size_(0), elems_capacity_(0), indirect_data_(NULL),
-          indirect_data_size_(0), indirect_data_capacity_(0), owns_data_(true),
-          error_(OK_GROWABLE) {}
+          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {}
 
     /**
      * Construct an AuthorizationSet from the provided array.  The AuthorizationSet copies the data
@@ -52,29 +48,18 @@ class AuthorizationSet : public Serializable {
      * return ALLOCATION_FAILURE. It is the responsibility of the caller to check before using the
      * set, if allocations might fail.
      */
-    AuthorizationSet(const keymaster_key_param_t* elems, size_t count) : owns_data_(false) {
+    AuthorizationSet(const keymaster_key_param_t* elems, size_t count)
+        : elems_(NULL), indirect_data_(NULL) {
         Reinitialize(elems, count);
     }
 
-    /**
-     * Construct an AuthorizationSet which accesses serialized data IN PLACE.  \p serialized_set
-     * must point to a buffer full of data produced by Serialize() and must exist as long as the
-     * AuthorizationSet exists.  The input isn't strongly validated, but it is thoroughly
-     * bounds-checked.  The caller must check is_valid() to verify there were no bounds checking
-     * errors before using the set.
-     */
-    AuthorizationSet(uint8_t* serialized_set, size_t length);
-
-    /**
-     * Construct an empty, growable AuthorizationSet in the provided storage.  \p push_back() will
-     * add an element into the element array, copying any indirect data into the indirect data
-     * buffer provided.
-     */
-    AuthorizationSet(keymaster_key_param_t* elems_array, size_t elems_buf_count,
-                     uint8_t* indirect_data_buf, size_t indirect_data_buf_size)
-        : owns_data_(false) {
-        Reinitialize(elems_array, elems_buf_count, indirect_data_buf, indirect_data_buf_size);
+    AuthorizationSet(const uint8_t* serialized_set, size_t serialized_size)
+        : elems_(NULL), indirect_data_(NULL) {
+        Deserialize(&serialized_set, serialized_set + serialized_size);
     }
+
+    // Copy constructor.
+    AuthorizationSet(const AuthorizationSet&);
 
     /**
      * Reinitialize an AuthorizationSet as a dynamically-allocated, growable copy of the data in the
@@ -84,15 +69,10 @@ class AuthorizationSet : public Serializable {
      */
     bool Reinitialize(const keymaster_key_param_t* elems, size_t count);
 
-    /**
-     * Reinitialize an AuthorizationSet as an empty, growable set in the provided storage.
-     */
-    void Reinitialize(keymaster_key_param_t* elems_array, size_t elems_buf_count,
-                      uint8_t* indirect_data_buf, size_t indirect_data_buf_size);
+    ~AuthorizationSet();
 
     enum Error {
-        OK_FULL,     /* Set is valid, but cannot accept additional elements */
-        OK_GROWABLE, /* Set is valid, and can accept additional data */
+        OK,
         ALLOCATION_FAILURE,
         BOUNDS_CHECKING_FAILURE,
         MALFORMED_DATA,
@@ -221,23 +201,15 @@ class AuthorizationSet : public Serializable {
         return push_back(Authorization(tag, bytes, bytes_len));
     }
 
-    /**
-     * Returns the size of the buffer needed for serializing this set.
-     */
-    size_t SerializedSize() const {
-        return sizeof(uint32_t) * 2 + sizeof(*elems_) * elems_size_ + indirect_data_size_;
-    }
-
-    /**
-     * Writes the serialized set into \p serialized_set, which must be at least \p SerializedSize()
-     * bytes in length.  Returns buf, advandeced by the bytes written.
-     */
-    uint8_t* Serialize(uint8_t* serialized_set) const;
-
-    bool DeserializeInPlace(uint8_t** buf, const uint8_t* end);
-    bool DeserializeToCopy(const uint8_t** buf, const uint8_t* end);
+    /* Virtual methods from Serializable */
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* serialized_set, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf, const uint8_t* end);
 
   private:
+    // Disallow assignment
+    void operator=(const AuthorizationSet&);
+
     void FreeData();
     void set_invalid(Error err);
 
@@ -261,12 +233,10 @@ class AuthorizationSet : public Serializable {
     uint8_t* indirect_data_;
     size_t indirect_data_size_;
     size_t indirect_data_capacity_;
-    bool owns_data_;
     Error error_;
 };
 
-const keymaster_key_param_t* find(keymaster_tag_t tag, const AuthorizationSet& set1,
-                                  const AuthorizationSet& set2);
+bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
 
 }  // namespace keymaster
 

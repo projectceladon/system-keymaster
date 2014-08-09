@@ -195,19 +195,6 @@ void store_bignum(Message* message, void (Message::*set)(const void* value, size
     (message->*set)(buf.get(), bytes_written);
 }
 
-class Eraser {
-  public:
-    Eraser(uint8_t* buf, size_t size) : buf_(buf), size_(size) {}
-    ~Eraser() {
-        while (size_-- > 0)
-            *buf_++ = 0;
-    }
-
-  private:
-    uint8_t* buf_;
-    size_t size_;
-};
-
 void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                   GenerateKeyResponse* response) {
     if (response == NULL)
@@ -266,8 +253,8 @@ class KeyBlob {
     KeyBlob(AuthorizationSet& enforced_set, AuthorizationSet& unenforced_set, size_t key_len)
         : enforced_length_(enforced_set.SerializedSize()),
           unenforced_length_(unenforced_set.SerializedSize()), key_length_(key_len) {
-        enforced_set.Serialize(enforced());
-        unenforced_set.Serialize(unenforced());
+        enforced_set.Serialize(enforced(), enforced() + enforced_length());
+        unenforced_set.Serialize(unenforced(), unenforced() + unenforced_length());
     }
 
     uint32_t enforced_length_;
@@ -397,8 +384,7 @@ bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths,
 
 static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
     switch (set.is_valid()) {
-    case AuthorizationSet::OK_FULL:
-    case AuthorizationSet::OK_GROWABLE:
+    case AuthorizationSet::OK:
         return KM_ERROR_OK;
     case AuthorizationSet::ALLOCATION_FAILURE:
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
