@@ -29,11 +29,14 @@ class GoogleSoftKeymaster : public GoogleKeymaster {
   private:
     static uint8_t master_key_[];
 
-    uint8_t* MasterKey() { return master_key_; }
+    keymaster_key_blob_t MasterKey() {
+        keymaster_key_blob_t blob;
+        blob.key_material = master_key_;
+        blob.key_material_size = 16;
+        return blob;
+    }
 
-    size_t MasterKeyLength() { return 16; }
-
-    void GetNonce(uint8_t* nonce, size_t length) {
+    void GenerateNonce(uint8_t* nonce, size_t length) {
         for (size_t i = 0; i < length; ++i)
             nonce[i] = 0;
     }
