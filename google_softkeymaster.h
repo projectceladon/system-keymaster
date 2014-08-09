@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
-#define EXTERNAL_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
+#ifndef SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
+#define SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
 
 #include "google_keymaster.h"
 
@@ -43,4 +43,4 @@ uint8_t GoogleSoftKeymaster::master_key_[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 
 }  // namespace
 
-#endif  // EXTERNAL_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
+#endif  // SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
