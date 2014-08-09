@@ -290,7 +290,6 @@ static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
         return KM_ERROR_OK;
     case AuthorizationSet::ALLOCATION_FAILURE:
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    case AuthorizationSet::BOUNDS_CHECKING_FAILURE:
     case AuthorizationSet::MALFORMED_DATA:
         return KM_ERROR_UNKNOWN_ERROR;
     }

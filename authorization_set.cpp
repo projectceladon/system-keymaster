@@ -294,6 +294,13 @@ bool AuthorizationSet::Deserialize(const uint8_t** buf, const uint8_t* end) {
         return false;
     }
 
+    // Note that the following validation of elements_count is weak, but it prevents allocation of
+    // elems_ arrays which are clearly too large to be reasonable.
+    if (elements_size > end - *buf || elements_count * sizeof(uint32_t) > elements_size) {
+        set_invalid(MALFORMED_DATA);
+        return false;
+    }
+
     elems_ = new keymaster_key_param_t[elements_count];
     if (elems_ == NULL) {
         set_invalid(ALLOCATION_FAILURE);
