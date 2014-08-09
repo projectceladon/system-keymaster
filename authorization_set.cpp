@@ -52,13 +52,20 @@ AuthorizationSet::AuthorizationSet(const AuthorizationSet& set)
             return;
         }
         memcpy(indirect_data_, set.indirect_data_, set.indirect_data_size_);
+        for (size_t i = 0; i < elems_size_; ++i) {
+            if (is_blob_tag(elems_[i].tag))
+                elems_[i].blob.data = indirect_data_ + (elems_[i].blob.data - set.indirect_data_);
+        }
+
         indirect_data_size_ = set.indirect_data_size_;
         indirect_data_capacity_ = indirect_data_size_;
     }
     error_ = OK;
 }
 
-AuthorizationSet::~AuthorizationSet() { FreeData(); }
+AuthorizationSet::~AuthorizationSet() {
+    FreeData();
+}
 
 bool AuthorizationSet::Reinitialize(const keymaster_key_param_t* elems, const size_t count) {
     FreeData();
@@ -78,7 +85,6 @@ bool AuthorizationSet::Reinitialize(const keymaster_key_param_t* elems, const si
 
     memcpy(elems_, elems, sizeof(keymaster_key_param_t) * elems_size_);
     CopyIndirectData();
-    ConvertPointersToOffsets(elems_, elems_size_, indirect_data_);
     return true;
 }
 
@@ -89,8 +95,8 @@ void AuthorizationSet::set_invalid(Error error) {
 
 int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
     int i = ++begin;
-    for (; i < (int)elems_size_ && elems_[i].tag != tag; ++i) {
-    }
+    while (i < (int)elems_size_ && elems_[i].tag != tag)
+        ++i;
     if (i == (int)elems_size_)
         return -1;
     else
@@ -101,12 +107,7 @@ keymaster_key_param_t empty;
 
 keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     if (at < (int)elems_size_) {
-        keymaster_key_param_t retval = elems_[at];
-        if (is_blob_tag(elems_[at].tag)) {
-            // Data "pointer" is actually an offset.  Convert it to a pointer.
-            retval.blob.data = indirect_data_ + reinterpret_cast<ptrdiff_t>(retval.blob.data);
-        }
-        return retval;
+        return elems_[at];
     }
     memset(&empty, 0, sizeof(empty));
     return empty;
@@ -135,13 +136,18 @@ bool AuthorizationSet::push_back(keymaster_key_param_t elem) {
                 return false;
             }
             memcpy(new_data, indirect_data_, indirect_data_size_);
+            // Fix up the data pointers to point into the new region.
+            for (size_t i = 0; i < elems_size_; ++i) {
+                if (is_blob_tag(elems_[i].tag))
+                    elems_[i].blob.data = new_data + (elems_[i].blob.data - indirect_data_);
+            }
             delete[] indirect_data_;
             indirect_data_ = new_data;
             indirect_data_capacity_ = new_capacity;
         }
 
         memcpy(indirect_data_ + indirect_data_size_, elem.blob.data, elem.blob.data_length);
-        elem.blob.data = reinterpret_cast<uint8_t*>(indirect_data_size_);
+        elem.blob.data = indirect_data_ + indirect_data_size_;
         indirect_data_size_ += elem.blob.data_length;
     }
 
@@ -149,60 +155,171 @@ bool AuthorizationSet::push_back(keymaster_key_param_t elem) {
     return true;
 }
 
-size_t AuthorizationSet::SerializedSize() const {
-    return sizeof(uint32_t) +                 // Length of elems_
-           (sizeof(*elems_) * elems_size_) +  // elems_
-           sizeof(uint32_t) +                 // Length of indirect data
-           indirect_data_size_;               // Indirect data
+static size_t serialized_size(const keymaster_key_param_t& param) {
+    switch (keymaster_tag_get_type(param.tag)) {
+    case KM_INVALID:
+    default:
+        return sizeof(uint32_t);
+    case KM_ENUM:
+    case KM_ENUM_REP:
+    case KM_INT:
+    case KM_INT_REP:
+        return sizeof(uint32_t) * 2;
+    case KM_LONG:
+    case KM_DATE:
+        return sizeof(uint32_t) + sizeof(uint64_t);
+    case KM_BOOL:
+        return sizeof(uint32_t) + 1;
+        break;
+    case KM_BIGNUM:
+    case KM_BYTES:
+        return sizeof(uint32_t) * 3;
+    }
 }
 
-uint8_t* AuthorizationSet::Serialize(uint8_t* serialized_set, const uint8_t* end) const {
-    serialized_set =
-        append_size_and_data_to_buf(serialized_set, end, elems_, elems_size_ * sizeof(*elems_));
-    return append_size_and_data_to_buf(serialized_set, end, indirect_data_, indirect_data_size_);
+static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, const uint8_t* end,
+                          const uint8_t* indirect_base) {
+    buf = append_to_buf(buf, end, static_cast<uint32_t>(param.tag));
+    switch (keymaster_tag_get_type(param.tag)) {
+    case KM_INVALID:
+        break;
+    case KM_ENUM:
+    case KM_ENUM_REP:
+        buf = append_to_buf(buf, end, param.enumerated);
+        break;
+    case KM_INT:
+    case KM_INT_REP:
+        buf = append_to_buf(buf, end, param.integer);
+        break;
+    case KM_LONG:
+        buf = append_to_buf(buf, end, param.long_integer);
+        break;
+    case KM_DATE:
+        buf = append_to_buf(buf, end, param.date_time);
+        break;
+    case KM_BOOL:
+        if (buf < end)
+            *buf = static_cast<uint8_t>(param.boolean);
+        buf++;
+        break;
+    case KM_BIGNUM:
+    case KM_BYTES:
+        buf = append_to_buf(buf, end, static_cast<uint32_t>(param.blob.data_length));
+        buf = append_to_buf(buf, end, static_cast<uint32_t>(param.blob.data - indirect_base));
+        break;
+    }
+    return buf;
+}
+
+static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf, const uint8_t* end,
+                        const uint8_t* indirect_base, const uint8_t* indirect_end) {
+    uint32_t tag_val;
+    if (!copy_from_buf(buf, end, &tag_val))
+        return false;
+    param->tag = static_cast<keymaster_tag_t>(tag_val);
+
+    switch (keymaster_tag_get_type(param->tag)) {
+    default:
+    case KM_INVALID:
+        return false;
+    case KM_ENUM:
+    case KM_ENUM_REP:
+        return copy_from_buf(buf, end, &param->enumerated);
+    case KM_INT:
+    case KM_INT_REP:
+        return copy_from_buf(buf, end, &param->integer);
+    case KM_LONG:
+        return copy_from_buf(buf, end, &param->long_integer);
+    case KM_DATE:
+        return copy_from_buf(buf, end, &param->date_time);
+        break;
+    case KM_BOOL:
+        if (*buf < end) {
+            param->boolean = static_cast<bool>(**buf);
+            (*buf)++;
+            return true;
+        }
+        return false;
+
+    case KM_BIGNUM:
+    case KM_BYTES: {
+        uint32_t length;
+        uint32_t offset;
+        if (!copy_from_buf(buf, end, &length) || !copy_from_buf(buf, end, &offset))
+            return false;
+        if (static_cast<ptrdiff_t>(offset) > indirect_end - indirect_base ||
+            static_cast<ptrdiff_t>(offset + length) > indirect_end - indirect_base)
+            return false;
+        param->blob.data_length = length;
+        param->blob.data = indirect_base + offset;
+        return true;
+    }
+    }
+}
+
+size_t AuthorizationSet::SerializedSizeOfElements() const {
+    size_t size = 0;
+    for (size_t i = 0; i < elems_size_; ++i) {
+        size += serialized_size(elems_[i]);
+    }
+    return size;
+}
+
+size_t AuthorizationSet::SerializedSize() const {
+    return sizeof(uint32_t) +           // Size of indirect_data_
+           indirect_data_size_ +        // indirect_data_
+           sizeof(uint32_t) +           // Number of elems_
+           sizeof(uint32_t) +           // Size of elems_
+           SerializedSizeOfElements();  // elems_
+}
+
+uint8_t* AuthorizationSet::Serialize(uint8_t* buf, const uint8_t* end) const {
+    buf = append_size_and_data_to_buf(buf, end, indirect_data_, indirect_data_size_);
+    buf = append_to_buf(buf, end, static_cast<uint32_t>(elems_size_));
+    buf = append_to_buf(buf, end, static_cast<uint32_t>(SerializedSizeOfElements()));
+    for (size_t i = 0; i < elems_size_; ++i) {
+        buf = serialize(elems_[i], buf, end, indirect_data_);
+    }
+    return buf;
 }
 
 bool AuthorizationSet::Deserialize(const uint8_t** buf, const uint8_t* end) {
     FreeData();
 
-    uint32_t elems_buf_size;
-    if (!copy_from_buf(buf, end, &elems_buf_size) ||
-        (elems_buf_size % sizeof(keymaster_key_param_t)) != 0 || end < (*buf + elems_buf_size)) {
+    uint32_t elements_count;
+    uint32_t elements_size;
+    if (!copy_size_and_data_from_buf(buf, end, &indirect_data_size_, &indirect_data_) ||
+        !copy_from_buf(buf, end, &elements_count) || !copy_from_buf(buf, end, &elements_size)) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
 
-    elems_ = new keymaster_key_param_t[elems_buf_size / sizeof(keymaster_key_param_t)];
+    elems_ = new keymaster_key_param_t[elements_count];
     if (elems_ == NULL) {
         set_invalid(ALLOCATION_FAILURE);
         return false;
     }
-    memcpy(elems_, *buf, elems_buf_size);
-    *buf += elems_buf_size;
 
-    uint32_t indirect_size;
-    if (!copy_from_buf(buf, end, &indirect_size) ||
-        indirect_size !=
-            ComputeIndirectDataSize(elems_, elems_buf_size / sizeof(keymaster_key_param_t))) {
+    uint8_t* indirect_end = indirect_data_ + indirect_data_size_;
+    const uint8_t* elements_end = *buf + elements_size;
+    for (size_t i = 0; i < elements_count; ++i) {
+        if (!deserialize(elems_ + i, buf, elements_end, indirect_data_, indirect_end)) {
+            set_invalid(MALFORMED_DATA);
+            return false;
+        }
+    }
+
+    if (indirect_data_size_ != ComputeIndirectDataSize(elems_, elements_count)) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
 
-    indirect_data_ = new uint8_t[indirect_size];
-    if (indirect_data_ == NULL) {
-        set_invalid(ALLOCATION_FAILURE);
-        return false;
-    }
-    memcpy(indirect_data_, *buf, indirect_size);
-    *buf += indirect_size;
-
-    elems_size_ = elems_buf_size / sizeof(keymaster_key_param_t);
-    elems_capacity_ = elems_size_;
-    indirect_data_size_ = indirect_size;
-    indirect_data_capacity_ = indirect_size;
+    elems_size_ = elements_count;
+    elems_capacity_ = elements_count;
+    indirect_data_capacity_ = indirect_data_size_;
     error_ = OK;
 
-    return CheckIndirectDataOffsets();
+    return true;
 }
 
 void AuthorizationSet::FreeData() {
@@ -246,44 +363,6 @@ void AuthorizationSet::CopyIndirectData() {
         }
     }
     assert(indirect_data_pos == indirect_data_ + indirect_data_size_);
-}
-
-/* static */
-void AuthorizationSet::ConvertPointersToOffsets(keymaster_key_param_t* elems, size_t count,
-                                                const uint8_t* indirect_base) {
-    for (size_t i = 0; i < count; ++i) {
-        if (is_blob_tag(elems[i].tag)) {
-            elems[i].blob.data = reinterpret_cast<uint8_t*>(elems[i].blob.data - indirect_base);
-        }
-    }
-}
-
-bool AuthorizationSet::CheckIndirectDataOffsets() {
-    // TODO(swillden): Find an efficient way to test for overlaps. Verifying that the total size of
-    // the indirect blobs found matches the size of the indirect data buffer and that all of the
-    // offsets fall into the correct region precludes most sorts of indirect data table
-    // malformation, but it doesn't prevent overlaps which are accompanied by unused regions whose
-    // total size exactly offsets the overlaps.
-    size_t computed_indirect_data_size = 0;
-
-    for (size_t i = 0; i < elems_size_; ++i) {
-        if (is_blob_tag(elems_[i].tag)) {
-            computed_indirect_data_size += elems_[i].blob.data_length;
-            ptrdiff_t offset = reinterpret_cast<ptrdiff_t>(elems_[i].blob.data);
-            if (offset < 0 || offset > (ptrdiff_t)indirect_data_size_ ||
-                offset + elems_[i].blob.data_length > indirect_data_size_) {
-                set_invalid(BOUNDS_CHECKING_FAILURE);
-                return false;
-            }
-        }
-    }
-
-    if (computed_indirect_data_size != indirect_data_size_) {
-        set_invalid(MALFORMED_DATA);
-        return false;
-    }
-
-    return true;
 }
 
 bool AuthorizationSet::GetTagValueEnum(keymaster_tag_t tag, uint32_t* val) const {

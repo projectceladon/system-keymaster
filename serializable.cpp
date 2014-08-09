@@ -18,6 +18,12 @@
 
 namespace keymaster {
 
+uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, const void* data, size_t data_len) {
+    if (buf + data_len <= end)
+        memcpy(buf, data, data_len);
+    return buf + data_len;
+}
+
 bool copy_from_buf(const uint8_t** buf, const uint8_t* end, void* dest, size_t size) {
     if (end < *buf + size)
         return false;
@@ -29,11 +35,13 @@ bool copy_from_buf(const uint8_t** buf, const uint8_t* end, void* dest, size_t s
 bool copy_size_and_data_from_buf(const uint8_t** buf, const uint8_t* end, size_t* size,
                                  uint8_t** dest) {
     uint32_t data_len;
-    if (!copy_from_buf(buf, end, &data_len)) {
+    if (!copy_from_buf(buf, end, &data_len) || *buf + data_len > end) {
         return false;
     }
     *size = data_len;
     *dest = new uint8_t[*size];
+    if (*dest == NULL)
+        return false;
     return copy_from_buf(buf, end, *dest, *size);
 }
 

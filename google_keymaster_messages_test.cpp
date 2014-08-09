@@ -46,7 +46,7 @@ TEST(GenerateKeyRequest, RoundTrip) {
     req.key_description.Reinitialize(params, array_length(params));
 
     size_t size = req.SerializedSize();
-    EXPECT_EQ(182U, size);
+    EXPECT_EQ(78U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
     EXPECT_EQ(buf.get() + size, req.Serialize(buf.get(), buf.get() + size));
@@ -102,7 +102,7 @@ TEST(GenerateKeyResponse, RoundTrip) {
     rsp.enforced.Reinitialize(params, array_length(params));
 
     size_t size = rsp.SerializedSize();
-    EXPECT_EQ(217U, size);
+    EXPECT_EQ(117U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
     EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get(), buf.get() + size));
