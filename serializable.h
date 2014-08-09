@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef EXTERNAL_KEYMASTER_SERIALIZABLE_H_
-#define EXTERNAL_KEYMASTER_SERIALIZABLE_H_
+#ifndef SYSTEM_KEYMASTER_SERIALIZABLE_H_
+#define SYSTEM_KEYMASTER_SERIALIZABLE_H_
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -80,4 +80,4 @@ template <typename T> inline bool copy_from_buf(uint8_t** buf, const uint8_t* en
 
 }  // namespace keymaster
 
-#endif  // EXTERNAL_KEYMASTER_SERIALIZABLE_H_
+#endif  // SYSTEM_KEYMASTER_SERIALIZABLE_H_
