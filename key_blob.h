@@ -55,8 +55,8 @@ class KeyBlob : public Serializable {
      * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.
      */
     KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenforced,
-            const keymaster_key_blob_t& key, const keymaster_key_blob_t& master_key,
-            uint8_t nonce[NONCE_LENGTH]);
+            const AuthorizationSet& hidden, const keymaster_key_blob_t& key,
+            const keymaster_key_blob_t& master_key, uint8_t nonce[NONCE_LENGTH]);
 
     /**
      * Create a KeyBlob, reconstituting it from the encrypted material in \p encrypted_key,
@@ -68,7 +68,8 @@ class KeyBlob : public Serializable {
      *
      * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.
      */
-    KeyBlob(const keymaster_key_blob_t& encrypted_key, const keymaster_key_blob_t& master_key);
+    KeyBlob(const keymaster_key_blob_t& encrypted_key, const AuthorizationSet& hidden,
+            const keymaster_key_blob_t& master_key);
 
     ~KeyBlob() {
         memset(nonce_, 0, NONCE_LENGTH);
@@ -94,16 +95,35 @@ class KeyBlob : public Serializable {
      * error code should be checked after constructing or deserializing/decrypting, and if it does
      * not return KM_ERROR_OK, then don't call any other methods.
      */
-    inline keymaster_error_t error() { return error_; }
+    inline keymaster_error_t error() {
+        return error_;
+    }
 
-    inline const uint8_t* nonce() const { return nonce_; }
-    inline const uint8_t* key_material() const { return key_material_.get(); }
-    inline const uint8_t* encrypted_key_material() const { return encrypted_key_material_.get(); }
-    inline size_t key_material_length() const { return key_material_length_; }
-    inline const uint8_t* tag() const { return tag_; }
+    inline const uint8_t* nonce() const {
+        return nonce_;
+    }
+    inline const uint8_t* key_material() const {
+        return key_material_.get();
+    }
+    inline const uint8_t* encrypted_key_material() const {
+        return encrypted_key_material_.get();
+    }
+    inline size_t key_material_length() const {
+        return key_material_length_;
+    }
+    inline const uint8_t* tag() const {
+        return tag_;
+    }
 
-    inline const AuthorizationSet& enforced() const { return enforced_; }
-    inline const AuthorizationSet& unenforced() const { return unenforced_; }
+    inline const AuthorizationSet& enforced() const {
+        return enforced_;
+    }
+    inline const AuthorizationSet& unenforced() const {
+        return unenforced_;
+    }
+    inline const AuthorizationSet& hidden() const {
+        return hidden_;
+    }
 
   private:
     void EncryptKey(const keymaster_key_blob_t& master_key);
@@ -115,7 +135,7 @@ class KeyBlob : public Serializable {
     ae_ctx* InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
                                          keymaster_error_t* error) const;
 
-    const uint8_t* BuildAuthData(size_t* auth_data_len) const;
+    const uint8_t* BuildDerivationData(size_t* derivation_data_len) const;
 
     keymaster_error_t error_;
     uint8_t nonce_[NONCE_LENGTH];
@@ -125,6 +145,7 @@ class KeyBlob : public Serializable {
     uint8_t tag_[TAG_LENGTH];
     AuthorizationSet enforced_;
     AuthorizationSet unenforced_;
+    AuthorizationSet hidden_;
 };
 
 }  // namespace keymaster

@@ -36,9 +36,9 @@ const size_t KeyBlob::NONCE_LENGTH;
 const size_t KeyBlob::TAG_LENGTH;
 
 KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenforced,
-                 const keymaster_key_blob_t& key, const keymaster_key_blob_t& master_key,
-                 uint8_t nonce[NONCE_LENGTH])
-    : error_(KM_ERROR_OK), enforced_(enforced), unenforced_(unenforced) {
+                 const AuthorizationSet& hidden, const keymaster_key_blob_t& key,
+                 const keymaster_key_blob_t& master_key, uint8_t nonce[NONCE_LENGTH])
+    : error_(KM_ERROR_OK), enforced_(enforced), unenforced_(unenforced), hidden_(hidden) {
     if (enforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         unenforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE) {
         error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -66,7 +66,9 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
     EncryptKey(master_key);
 }
 
-KeyBlob::KeyBlob(const keymaster_key_blob_t& key, const keymaster_key_blob_t& master_key) {
+KeyBlob::KeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& hidden,
+                 const keymaster_key_blob_t& master_key)
+    : hidden_(hidden) {
     if (!Deserialize(const_cast<const uint8_t**>(&(key.key_material)),
                      key.key_material + key.key_material_size))
         return;
@@ -97,7 +99,7 @@ bool KeyBlob::Deserialize(const uint8_t** buf, const uint8_t* end) {
         !copy_from_buf(buf, end, tag_, TAG_LENGTH) || !enforced_.Deserialize(buf, end) ||
         !unenforced_.Deserialize(buf, end)) {
         if (tmp_key_ptr != NULL)
-            delete [] tmp_key_ptr;
+            delete[] tmp_key_ptr;
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return false;
     }
@@ -147,9 +149,9 @@ void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
 
 ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
                                               keymaster_error_t* error) const {
-    size_t auth_data_length;
-    UniquePtr<const uint8_t[]> auth_data(BuildAuthData(&auth_data_length));
-    if (auth_data.get() == NULL) {
+    size_t derivation_data_length;
+    UniquePtr<const uint8_t[]> derivation_data(BuildDerivationData(&derivation_data_length));
+    if (derivation_data.get() == NULL) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return NULL;
     }
@@ -172,7 +174,7 @@ ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master
 
     // Hash derivation data.
     SHA256_Init(&sha256_ctx);
-    SHA256_Update(&sha256_ctx, auth_data.get(), auth_data_length);
+    SHA256_Update(&sha256_ctx, derivation_data.get(), derivation_data_length);
     SHA256_Final(hash_buf.get(), &sha256_ctx);
 
     // Encrypt hash with master key to build derived key.
@@ -195,18 +197,18 @@ ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master
     }
 }
 
-const uint8_t* KeyBlob::BuildAuthData(size_t* auth_data_length) const {
-    *auth_data_length = enforced_.SerializedSize() + unenforced_.SerializedSize();
-    uint8_t* auth_data = new uint8_t[*auth_data_length];
-    if (auth_data == NULL)
-        return NULL;
-
-    uint8_t* end = auth_data + *auth_data_length;
-    uint8_t* buf = auth_data;
-    buf = enforced_.Serialize(buf, end);
-    buf = unenforced_.Serialize(buf, end);
-
-    return auth_data;
+const uint8_t* KeyBlob::BuildDerivationData(size_t* derivation_data_length) const {
+    *derivation_data_length =
+        hidden_.SerializedSize() + enforced_.SerializedSize() + unenforced_.SerializedSize();
+    uint8_t* derivation_data = new uint8_t[*derivation_data_length];
+    if (derivation_data != NULL) {
+        uint8_t* buf = derivation_data;
+        uint8_t* end = derivation_data + *derivation_data_length;
+        buf = hidden_.Serialize(buf, end);
+        buf = enforced_.Serialize(buf, end);
+        buf = unenforced_.Serialize(buf, end);
+    }
+    return derivation_data;
 }
 
 }  // namespace keymaster
