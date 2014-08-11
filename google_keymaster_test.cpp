@@ -15,12 +15,14 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <openssl/engine.h>
 
 #define KEYMASTER_NAME_TAGS
-#include "keymaster_tags.h"
+#include "google_keymaster_test_utils.h"
 #include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"
+#include "keymaster_tags.h"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
@@ -181,10 +183,11 @@ TEST_F(NewKeyGeneration, Rsa) {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
         Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
         Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+        Authorization(TAG_KEY_SIZE, 256),
         Authorization(TAG_USER_ID, 7),
         Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, reinterpret_cast<const uint8_t*>("app_id"), 6),
-        Authorization(TAG_APPLICATION_DATA, reinterpret_cast<const uint8_t*>("app_data"), 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6),
+        Authorization(TAG_APPLICATION_DATA, "app_data", 8),
         Authorization(TAG_AUTH_TIMEOUT, 300),
     };
     GenerateKeyRequest req;
@@ -206,7 +209,7 @@ TEST_F(NewKeyGeneration, Rsa) {
 
     EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_ID, 7));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_AUTH_ID, 8));
-    EXPECT_TRUE(contains(rsp.unenforced, TAG_KEY_SIZE, 2048));
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_KEY_SIZE, 256));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_AUTH_TIMEOUT, 300));
 
     // Verify that App ID, App data and ROT are NOT included.
@@ -224,6 +227,40 @@ TEST_F(NewKeyGeneration, Rsa) {
     EXPECT_TRUE(contains(rsp.unenforced, TAG_RSA_PUBLIC_EXPONENT, 65537));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
     EXPECT_TRUE(contains(rsp.unenforced, KM_TAG_CREATION_DATETIME));
+}
+
+typedef KeymasterTest GetKeyCharacteristics;
+TEST_F(GetKeyCharacteristics, SimpleRsa) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+        Authorization(TAG_KEY_SIZE, 256),
+        Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, reinterpret_cast<const uint8_t*>("app_id"), 6),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+
+    GenerateKeyRequest gen_req;
+    gen_req.key_description.Reinitialize(params, array_length(params));
+    GenerateKeyResponse gen_rsp;
+
+    device.GenerateKey(gen_req, &gen_rsp);
+
+    GetKeyCharacteristicsRequest req;
+    req.key_blob = gen_rsp.key_blob;
+    req.client_id.data = reinterpret_cast<const uint8_t*>("app_id");
+    req.client_id.data_length = 6;
+    req.app_data.data = NULL;
+    req.app_data.data_length = 0;
+
+    GetKeyCharacteristicsResponse rsp;
+    device.GetKeyCharacteristics(req, &rsp);
+    ASSERT_EQ(KM_ERROR_OK, rsp.error);
+
+    EXPECT_EQ(gen_rsp.enforced, rsp.enforced);
+    EXPECT_EQ(gen_rsp.unenforced, rsp.unenforced);
 }
 
 }  // namespace test

@@ -39,7 +39,8 @@ class AuthorizationSet : public Serializable {
      */
     AuthorizationSet()
         : elems_(NULL), elems_size_(0), elems_capacity_(0), indirect_data_(NULL),
-          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {}
+          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {
+    }
 
     /**
      * Construct an AuthorizationSet from the provided array.  The AuthorizationSet copies the data
@@ -69,6 +70,10 @@ class AuthorizationSet : public Serializable {
      */
     bool Reinitialize(const keymaster_key_param_t* elems, size_t count);
 
+    bool Reinitialize(const AuthorizationSet& set) {
+        return Reinitialize(set.elems_, set.elems_size_);
+    }
+
     ~AuthorizationSet();
 
     enum Error {
@@ -77,12 +82,21 @@ class AuthorizationSet : public Serializable {
         MALFORMED_DATA,
     };
 
-    Error is_valid() const { return error_; }
+    Error is_valid() const {
+        return error_;
+    }
 
     /**
      * Returns the size of the set.
      */
-    size_t size() const { return elems_size_; }
+    size_t size() const {
+        return elems_size_;
+    }
+
+    /**
+     * Returns the data in the set, directly. Be careful with this.
+     */
+    const keymaster_key_param_t* data() const;
 
     /**
      * Returns the offset of the next entry that matches \p tag, starting from the element after \p
@@ -188,6 +202,16 @@ class AuthorizationSet : public Serializable {
 
     template <keymaster_tag_t Tag> bool push_back(TypedTag<KM_BOOL, Tag> tag) {
         return push_back(Authorization(tag));
+    }
+
+    template <keymaster_tag_t Tag>
+    bool push_back(TypedTag<KM_BYTES, Tag> tag, const void* bytes, size_t bytes_len) {
+        return push_back(keymaster_param_blob(tag, static_cast<const uint8_t*>(bytes), bytes_len));
+    }
+
+    template <keymaster_tag_t Tag>
+    bool push_back(TypedTag<KM_BIGNUM, Tag> tag, const void* bytes, size_t bytes_len) {
+        return push_back(keymaster_param_blob(tag, static_cast<const uint8_t*>(bytes), bytes_len));
     }
 
     template <keymaster_tag_t Tag, keymaster_tag_type_t Type>

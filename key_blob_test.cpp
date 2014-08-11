@@ -37,20 +37,6 @@ int main(int argc, char** argv) {
 
 namespace keymaster {
 
-bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
-bool operator==(const AuthorizationSet& a, const AuthorizationSet& b) {
-    if (a.size() != b.size())
-        return false;
-
-    for (size_t i = 0; i < a.size(); ++i) {
-        if (a[i].tag != b[i].tag)
-            return false;
-        // TODO(check value)
-    }
-
-    return true;
-}
-
 namespace test {
 
 class KeyBlobTest : public testing::Test {

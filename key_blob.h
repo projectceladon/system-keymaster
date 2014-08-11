@@ -69,7 +69,7 @@ class KeyBlob : public Serializable {
      *
      * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.
      */
-    KeyBlob(const keymaster_key_blob_t& encrypted_key, const AuthorizationSet& hidden,
+    KeyBlob(const keymaster_key_blob_t& keymaster_blob, const AuthorizationSet& hidden,
             const keymaster_key_blob_t& master_key);
 
     ~KeyBlob() {
