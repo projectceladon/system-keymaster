@@ -79,16 +79,17 @@ class GoogleKeymaster {
     virtual keymaster_key_origin_t origin() = 0;
 
   private:
-    virtual uint8_t* MasterKey() = 0;
-    virtual size_t MasterKeyLength() = 0;
-    virtual void GetNonce(uint8_t* nonce, size_t length) = 0;
+    virtual keymaster_key_blob_t MasterKey() = 0;
+    virtual void GenerateNonce(uint8_t* nonce, size_t length) = 0;
 
     bool CreateKeyBlob(GenerateKeyResponse* response, uint8_t* key_material, size_t key_length);
 
     bool CopyAuthorizations(const AuthorizationSet& key_description, GenerateKeyResponse* response);
     void AddAuthorization(const keymaster_key_param_t& auth, GenerateKeyResponse* response);
     bool GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response);
-    keymaster_error_t WrapKey(uint8_t* key_data, size_t key_length, KeyBlob* blob);
+    keymaster_error_t WrapKey(const uint8_t* key_material, size_t key_material_length,
+                              KeyBlob* blob);
+    keymaster_error_t UnwrapKey(const KeyBlob* blob, uint8_t* key, size_t key_length);
 };
 
 }  // namespace keymaster

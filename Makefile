@@ -19,7 +19,9 @@ CPPSRCS=authorization_set.cpp \
 	google_keymaster_test.cpp \
 	google_keymaster_messages.cpp \
 	google_keymaster_messages_test.cpp \
-	serializable.cpp
+	serializable.cpp \
+	key_blob.cpp \
+	key_blob_test.cpp
 CCSRCS=$(BASE)/external/gtest/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -30,7 +32,8 @@ LINK.o=$(LINK.cc)
 
 BINARIES=authorization_set_test \
 	google_keymaster_test \
-	google_keymaster_messages_test
+	google_keymaster_messages_test \
+	key_blob_test
 
 .PHONY: coverage valgrind clean run
 
@@ -72,17 +75,25 @@ authorization_set_test: authorization_set_test.o \
 	serializable.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
-google_keymaster_test: google_keymaster_test.o \
-	google_keymaster.o \
-	google_keymaster_messages.o \
+key_blob_test: key_blob_test.o \
+	key_blob.o \
 	authorization_set.o \
-	serializable.o \
 	ocb.o \
+	serializable.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
 google_keymaster_messages_test: google_keymaster_messages_test.o \
 	google_keymaster_messages.o \
 	authorization_set.o \
+	serializable.o \
+	$(BASE)/external/gtest/src/gtest-all.o
+
+google_keymaster_test: google_keymaster_test.o \
+	google_keymaster.o \
+	authorization_set.o \
+	google_keymaster_messages.o \
+	key_blob.o \
+	ocb.o \
 	serializable.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 

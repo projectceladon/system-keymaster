@@ -320,7 +320,7 @@ typedef struct {
         bool boolean;          /* KM_BOOL */
         uint32_t integer;      /* KM_INT and KM_INT_REP */
         uint64_t long_integer; /* KM_LONG */
-        time_t date_time;      /* KM_DATE */
+        uint64_t date_time;    /* KM_DATE */
         keymaster_blob_t blob; /* KM_BIGNUM and KM_BYTES*/
     };
 } keymaster_key_param_t;

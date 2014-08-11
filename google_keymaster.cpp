@@ -17,37 +17,26 @@
 #include <assert.h>
 #include <string.h>
 
+#include <cstddef>
+
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
-#include <openssl/sha.h>
 
 #include <UniquePtr.h>
 
 #include "ae.h"
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
-
-// We need placement new, but we don't want to pull in any standard C++ libs at the moment.
-// Luckily, it's trivial to just implement it.
-inline void* operator new(size_t /* size */, void* here) { return here; }
+#include "key_blob.h"
 
 namespace keymaster {
 
-const int NONCE_LENGTH = 12;
-const int TAG_LENGTH = 128 / 8;
-#define REQUIRED_ALIGNMENT_FOR_AES_OCB 16
-
 GoogleKeymaster::GoogleKeymaster() {}
-
 GoogleKeymaster::~GoogleKeymaster() {}
 
 const int RSA_DEFAULT_KEY_SIZE = 2048;
 const int RSA_DEFAULT_EXPONENT = 65537;
-
-#define CHECK_ERR(err)                                                                             \
-    if ((err) != OK)                                                                               \
-        return err;
 
 struct BIGNUM_Delete {
     void operator()(BIGNUM* p) const { BN_free(p); }
@@ -72,9 +61,6 @@ typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 struct ByteArray_Delete {
     void operator()(void* p) const { delete[] reinterpret_cast<uint8_t*>(p); }
 };
-
-// Context buffer used for AES OCB encryptions.
-uint8_t aes_ocb_ctx_buf[896];
 
 /**
  * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
@@ -220,117 +206,33 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     }
 }
 
-class KeyBlob {
-  public:
-    static KeyBlob* AllocAndInit(GenerateKeyResponse* response, size_t key_len) {
-        size_t blob_length = get_size(response->enforced, response->unenforced, key_len);
-        KeyBlob* blob(reinterpret_cast<KeyBlob*>(new uint8_t[blob_length]));
-        return new (blob) KeyBlob(response->enforced, response->unenforced, key_len);
-    }
-
-    inline size_t length() {
-        return get_size(enforced_length(), unenforced_length(), key_length());
-    }
-    inline uint8_t* nonce() { return nonce_; }
-    inline size_t nonce_length() { return NONCE_LENGTH; }
-    inline uint8_t* key_data() { return key_data_; }
-    inline size_t key_length() { return key_length_; }
-    inline size_t key_data_length() { return key_length_ + TAG_LENGTH; }
-    inline uint8_t* enforced() {
-        return key_data_ + key_length_ + TAG_LENGTH + padding(key_length_ + TAG_LENGTH);
-    }
-    inline size_t enforced_length() { return enforced_length_; }
-    inline uint32_t* enforced_length_copy() {
-        return reinterpret_cast<uint32_t*>(enforced() + enforced_length());
-    }
-    inline uint8_t* unenforced() { return enforced() + enforced_length_ + sizeof(uint32_t); }
-    inline size_t unenforced_length() { return unenforced_length_; }
-    inline uint8_t* end() { return unenforced() + unenforced_length_; }
-    inline uint8_t* auth_data() { return enforced(); }
-    inline size_t auth_data_length() { return end() - enforced(); }
-
-  private:
-    KeyBlob(AuthorizationSet& enforced_set, AuthorizationSet& unenforced_set, size_t key_len)
-        : enforced_length_(enforced_set.SerializedSize()),
-          unenforced_length_(unenforced_set.SerializedSize()), key_length_(key_len) {
-        enforced_set.Serialize(enforced(), enforced() + enforced_length());
-        unenforced_set.Serialize(unenforced(), unenforced() + unenforced_length());
-    }
-
-    uint32_t enforced_length_;
-    uint32_t unenforced_length_;
-    uint32_t key_length_;
-    uint8_t nonce_[NONCE_LENGTH];
-    uint8_t key_data_[] __attribute__((aligned(REQUIRED_ALIGNMENT_FOR_AES_OCB)));
-    // Actual structure will also include:
-    //    uint8_t enforced[] at key_data + key_length
-    //    uint32_t enforced_length at key_data + key_length + enforced_length
-    //    uint8_t unenforced[] at key_data + key_length + enforced_length.
-
-    static size_t get_size(AuthorizationSet& enforced_set, AuthorizationSet& unenforced_set,
-                           size_t key_len) {
-        return get_size(enforced_set.SerializedSize(), unenforced_set.SerializedSize(), key_len);
-    }
-
-    static size_t get_size(size_t enforced_len, size_t unenforced_len, size_t key_len) {
-        size_t pad_len = padding(key_len + TAG_LENGTH);
-        return sizeof(KeyBlob) +   // includes lengths and nonce
-               key_len +           // key in key_data_
-               TAG_LENGTH +        // authentication tag in key_data_
-               pad_len +           // padding to align authorization data
-               enforced_len +      // enforced authorization data
-               sizeof(uint32_t) +  // size of enforced authorization data.  This is also in
-                                   // enforced_length_ but it's duplicated here to ensure that it's
-                                   // included in the OCB-authenticated data, to enforce the
-                                   // boundary between enforced and unenforced authorizations.
-               unenforced_len;     // size of unenforced authorization data.
-    }
-
-    /**
-     * Return the number of padding bytes needed to round up to the next alignment boundary.
-     * boundary.
-     */
-    static size_t padding(size_t size) {
-        return REQUIRED_ALIGNMENT_FOR_AES_OCB - (size % REQUIRED_ALIGNMENT_FOR_AES_OCB);
-    }
-};
-
-keymaster_error_t GoogleKeymaster::WrapKey(uint8_t* key_data, size_t key_length, KeyBlob* blob) {
-    assert(ae_ctx_sizeof() == (int)array_size(aes_ocb_ctx_buf));
-    Eraser ctx_eraser(aes_ocb_ctx_buf, array_size(aes_ocb_ctx_buf));
-    ae_ctx* ctx = reinterpret_cast<ae_ctx*>(aes_ocb_ctx_buf);
-    int ae_err = ae_init(ctx, MasterKey(), MasterKeyLength(), blob->nonce_length(), TAG_LENGTH);
-    if (ae_err != AE_SUCCESS) {
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-
-    GetNonce(blob->nonce(), blob->nonce_length());
-    ae_err = ae_encrypt(ctx, blob->nonce(), key_data, key_length, blob->auth_data(),
-                        blob->auth_data_length(), blob->key_data(), NULL, 1 /* final */);
-    if (ae_err < 0) {
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-    assert(ae_err == (int)key_length + TAG_LENGTH);
-    return KM_ERROR_OK;
-}
-
 bool GoogleKeymaster::CreateKeyBlob(GenerateKeyResponse* response, uint8_t* key_bytes,
                                     size_t key_length) {
-    UniquePtr<KeyBlob, ByteArray_Delete> blob(KeyBlob::AllocAndInit(response, key_length));
+    uint8_t nonce[KeyBlob::NONCE_LENGTH];
+    GenerateNonce(nonce, array_size(nonce));
+
+    keymaster_key_blob_t key_data = {key_bytes, key_length};
+    UniquePtr<KeyBlob> blob(
+        new KeyBlob(response->enforced, response->unenforced, key_data, MasterKey(), nonce));
     if (blob.get() == NULL) {
         response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return false;
     }
 
-    keymaster_error_t err = WrapKey(key_bytes, key_length, blob.get());
-    if (err != KM_ERROR_OK) {
-        response->error = err;
+    if (blob->error() != KM_ERROR_OK) {
+        return blob->error();
         return false;
     }
 
-    response->key_blob.key_material_size = blob->length();
-    response->key_blob.key_material = reinterpret_cast<uint8_t*>(blob.release());
-
+    size_t size = blob->SerializedSize();
+    UniquePtr<uint8_t[]> blob_bytes(new uint8_t[size]);
+    if (blob_bytes.get() == NULL) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return false;
+    }
+    blob->Serialize(blob_bytes.get(), blob_bytes.get() + size);
+    response->key_blob.key_material_size = size;
+    response->key_blob.key_material = blob_bytes.release();
     return true;
 }
 
