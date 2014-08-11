@@ -35,12 +35,11 @@ struct GenerateKeyRequest : public Serializable {
     AuthorizationSet key_description;
 
     size_t SerializedSize() const { return key_description.SerializedSize(); }
-    uint8_t* Serialize(uint8_t* buf) const { return key_description.Serialize(buf); }
-    bool DeserializeInPlace(uint8_t** buf, const uint8_t* end) {
-        return key_description.DeserializeInPlace(buf, end);
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
+        return key_description.Serialize(buf, end);
     }
-    bool DeserializeToCopy(const uint8_t** buf, const uint8_t* end) {
-        return key_description.DeserializeToCopy(buf, end);
+    bool Deserialize(const uint8_t** buf, const uint8_t* end) {
+        return key_description.Deserialize(buf, end);
     }
 };
 
@@ -58,9 +57,8 @@ struct GenerateKeyResponse : public Serializable {
     AuthorizationSet unenforced;
 
     size_t SerializedSize() const;
-    uint8_t* Serialize(uint8_t* buf) const;
-    bool DeserializeInPlace(uint8_t** /* buf */, const uint8_t* /* end */) { return false; }
-    bool DeserializeToCopy(const uint8_t** buf, const uint8_t* end);
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf, const uint8_t* end);
 };
 
 struct SupportedAlgorithmsResponse {

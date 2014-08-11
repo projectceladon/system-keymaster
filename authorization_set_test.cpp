@@ -140,10 +140,10 @@ TEST(Serialization, RoundTrip) {
     EXPECT_TRUE(size > 0);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get(), buf.get() + size));
     AuthorizationSet deserialized(buf.get(), size);
 
-    EXPECT_EQ(AuthorizationSet::OK_FULL, deserialized.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, deserialized.is_valid());
 
     EXPECT_EQ(set.size(), deserialized.size());
     for (size_t i = 0; i < set.size(); ++i) {
@@ -157,7 +157,7 @@ TEST(Serialization, RoundTrip) {
     EXPECT_EQ(0, memcmp(deserialized[pos].blob.data, "my_app", 6));
 }
 
-TEST(Deserialization, DeserializeToCopy) {
+TEST(Deserialization, Deserialize) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
         Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
@@ -174,13 +174,13 @@ TEST(Deserialization, DeserializeToCopy) {
     EXPECT_TRUE(size > 0);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get(), buf.get() + size));
     AuthorizationSet deserialized;
     const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized.DeserializeToCopy(&p, p + size));
+    EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
     EXPECT_EQ(p, buf.get() + size);
 
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, deserialized.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, deserialized.is_valid());
 
     EXPECT_EQ(set.size(), deserialized.size());
     for (size_t i = 0; i < set.size(); ++i) {
@@ -200,7 +200,7 @@ TEST(Deserialization, TooShortBuffer) {
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized.is_valid());
 
     const uint8_t* p = buf;
-    EXPECT_FALSE(deserialized.DeserializeToCopy(&p, p + array_length(buf)));
+    EXPECT_FALSE(deserialized.Deserialize(&p, p + array_length(buf)));
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized.is_valid());
 }
 
@@ -221,14 +221,14 @@ TEST(Deserialization, InvalidLengthField) {
     EXPECT_TRUE(size > 0);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get(), buf.get() + size));
     *reinterpret_cast<uint32_t*>(buf.get()) = 9;
 
     AuthorizationSet deserialized(buf.get(), size);
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized.is_valid());
 
     const uint8_t* p = buf.get();
-    EXPECT_FALSE(deserialized.DeserializeToCopy(&p, p + size));
+    EXPECT_FALSE(deserialized.Deserialize(&p, p + size));
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized.is_valid());
 }
 
@@ -241,7 +241,7 @@ TEST(Deserialization, MalformedIndirectData) {
     size_t size = set.SerializedSize();
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get()));
+    EXPECT_EQ(buf.get() + size, set.Serialize(buf.get(), buf.get() + size));
 
     keymaster_key_param_t* ptr =
         reinterpret_cast<keymaster_key_param_t*>(buf.get() + sizeof(uint32_t));
@@ -255,11 +255,11 @@ TEST(Deserialization, MalformedIndirectData) {
 
     // Check that deserialization works.
     AuthorizationSet deserialized1(buf.get(), size);
-    EXPECT_EQ(AuthorizationSet::OK_FULL, deserialized1.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, deserialized1.is_valid());
 
     const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized1.DeserializeToCopy(&p, p + size));
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, deserialized1.is_valid());
+    EXPECT_TRUE(deserialized1.Deserialize(&p, p + size));
+    EXPECT_EQ(AuthorizationSet::OK, deserialized1.is_valid());
 
     //
     // Now mess them up in various ways:
@@ -269,11 +269,11 @@ TEST(Deserialization, MalformedIndirectData) {
     (*reinterpret_cast<long*>(&(ptr[1].blob.data)))++;
     AuthorizationSet deserialized2;
     p = buf.get();
-    deserialized2.DeserializeInPlace(const_cast<uint8_t**>(&p), p + size);
+    deserialized2.Deserialize(&p, p + size);
     EXPECT_EQ(AuthorizationSet::BOUNDS_CHECKING_FAILURE, deserialized2.is_valid());
 
     p = buf.get();
-    EXPECT_FALSE(deserialized2.DeserializeToCopy(&p, p + size));
+    EXPECT_FALSE(deserialized2.Deserialize(&p, p + size));
     EXPECT_EQ(AuthorizationSet::BOUNDS_CHECKING_FAILURE, deserialized2.is_valid());
 
     (*reinterpret_cast<long*>(&(ptr[1].blob.data)))--;
@@ -284,7 +284,7 @@ TEST(Deserialization, MalformedIndirectData) {
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized3.is_valid());
 
     p = buf.get();
-    deserialized3.DeserializeToCopy(&p, p + size);
+    deserialized3.Deserialize(&p, p + size);
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized3.is_valid());
 
     ptr[0].blob.data_length++;
@@ -294,72 +294,7 @@ TEST(Deserialization, MalformedIndirectData) {
     (*reinterpret_cast<long*>(&(ptr[1].blob.data)))--;
     ptr[1].blob.data_length--;
     AuthorizationSet deserialized4(buf.get(), size);
-    EXPECT_EQ(AuthorizationSet::OK_FULL, deserialized4.is_valid());
-}
-
-TEST(InPlaceGrowable, SuccessfulRoundTrip) {
-    keymaster_key_param_t elems_buf[20];
-    uint8_t data_buf[200];
-
-    AuthorizationSet growable(elems_buf, array_length(elems_buf), data_buf, array_length(data_buf));
-    EXPECT_TRUE(growable.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA));
-    EXPECT_EQ(1U, growable.size());
-
-    EXPECT_TRUE(growable.push_back(TAG_SINGLE_USE_PER_BOOT));
-    EXPECT_EQ(2U, growable.size());
-
-    EXPECT_TRUE(growable.push_back(TAG_PURPOSE, KM_PURPOSE_SIGN));
-    EXPECT_EQ(3U, growable.size());
-
-    EXPECT_TRUE(growable.push_back(TAG_APPLICATION_ID, "data", 4));
-    EXPECT_EQ(4U, growable.size());
-
-    size_t serialize_size = growable.SerializedSize();
-    UniquePtr<uint8_t[]> serialized(new uint8_t[serialize_size]);
-    EXPECT_EQ(serialized.get() + serialize_size, growable.Serialize(serialized.get()));
-}
-
-TEST(InplaceGrowable, InsufficientElemBuf) {
-    keymaster_key_param_t elems_buf[1];
-    uint8_t data_buf[200];
-
-    AuthorizationSet growable(elems_buf, array_length(elems_buf), data_buf, array_length(data_buf));
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
-
-    // First insertion fits, but set is now full.
-    EXPECT_TRUE(growable.push_back(TAG_USER_ID, 10));
-    EXPECT_EQ(1U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_FULL, growable.is_valid());
-
-    // Second does not.
-    EXPECT_FALSE(growable.push_back(Authorization(TAG_RSA_PUBLIC_EXPONENT, 3)));
-    EXPECT_EQ(1U, growable.size());
-}
-
-TEST(InplaceGrowable, InsufficientIndirectBuf) {
-    keymaster_key_param_t elems_buf[3];
-    uint8_t data_buf[10];
-
-    AuthorizationSet growable(elems_buf, array_length(elems_buf), data_buf, array_length(data_buf));
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
-
-    EXPECT_TRUE(growable.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)));
-    EXPECT_EQ(1U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
-
-    EXPECT_TRUE(growable.push_back(Authorization(TAG_APPLICATION_ID, "1234567890", 10)));
-    EXPECT_EQ(2U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
-
-    // Adding more indirect data should fail, even a single byte, though the set isn't full.
-    EXPECT_FALSE(growable.push_back(Authorization(TAG_APPLICATION_DATA, "1", 1)));
-    EXPECT_EQ(2U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
-
-    // Can still add another entry without indirect data.  Now it's full.
-    EXPECT_TRUE(growable.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)));
-    EXPECT_EQ(3U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_FULL, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, deserialized4.is_valid());
 }
 
 TEST(Growable, SuccessfulRoundTrip) {
@@ -381,7 +316,8 @@ TEST(Growable, SuccessfulRoundTrip) {
 
     size_t serialize_size = growable.SerializedSize();
     UniquePtr<uint8_t[]> serialized(new uint8_t[serialize_size]);
-    EXPECT_EQ(serialized.get() + serialize_size, growable.Serialize(serialized.get()));
+    EXPECT_EQ(serialized.get() + serialize_size,
+              growable.Serialize(serialized.get(), serialized.get() + serialize_size));
 }
 
 TEST(Growable, InsufficientElemBuf) {
@@ -389,12 +325,12 @@ TEST(Growable, InsufficientElemBuf) {
     uint8_t data_buf[200];
 
     AuthorizationSet growable;
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     // First insertion fits.
     EXPECT_TRUE(growable.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)));
     EXPECT_EQ(1U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     // Second does too.
     EXPECT_TRUE(growable.push_back(Authorization(TAG_RSA_PUBLIC_EXPONENT, 3)));
@@ -406,24 +342,24 @@ TEST(Growable, InsufficientIndirectBuf) {
     uint8_t data_buf[10];
 
     AuthorizationSet growable;
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     EXPECT_TRUE(growable.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)));
     EXPECT_EQ(1U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     EXPECT_TRUE(growable.push_back(Authorization(TAG_APPLICATION_ID, "1234567890", 10)));
     EXPECT_EQ(2U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     EXPECT_TRUE(growable.push_back(Authorization(TAG_APPLICATION_DATA, "1", 1)));
     EXPECT_EQ(3U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
     // Can still add another entry without indirect data.  Now it's full.
     EXPECT_TRUE(growable.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)));
     EXPECT_EQ(4U, growable.size());
-    EXPECT_EQ(AuthorizationSet::OK_GROWABLE, growable.is_valid());
+    EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 }
 
 TEST(GetValue, GetInt) {

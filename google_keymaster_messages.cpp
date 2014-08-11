@@ -31,19 +31,20 @@ size_t GenerateKeyResponse::SerializedSize() const {
     }
 }
 
-uint8_t* GenerateKeyResponse::Serialize(uint8_t* buf) const {
-    buf = append_to_buf(buf, static_cast<int32_t>(error));
+uint8_t* GenerateKeyResponse::Serialize(uint8_t* buf, const uint8_t* end) const {
+    buf = append_to_buf(buf, end, static_cast<int32_t>(error));
     if (error == KM_ERROR_OK) {
-        buf = append_size_and_data_to_buf(buf, key_blob.key_material, key_blob.key_material_size);
-        buf = append_to_buf(buf, static_cast<uint32_t>(enforced.SerializedSize()));
-        buf = enforced.Serialize(buf);
-        buf = append_to_buf(buf, static_cast<uint32_t>(unenforced.SerializedSize()));
-        buf = unenforced.Serialize(buf);
+        buf = append_size_and_data_to_buf(buf, end, key_blob.key_material,
+                                          key_blob.key_material_size);
+        buf = append_to_buf(buf, end, static_cast<uint32_t>(enforced.SerializedSize()));
+        buf = enforced.Serialize(buf, end);
+        buf = append_to_buf(buf, end, static_cast<uint32_t>(unenforced.SerializedSize()));
+        buf = unenforced.Serialize(buf, end);
     };
     return buf;
 }
 
-bool GenerateKeyResponse::DeserializeToCopy(const uint8_t** buf, const uint8_t* end) {
+bool GenerateKeyResponse::Deserialize(const uint8_t** buf, const uint8_t* end) {
     delete[] key_blob.key_material;
 
     if (!copy_from_buf(buf, end, &error))
@@ -66,12 +67,12 @@ bool GenerateKeyResponse::DeserializeToCopy(const uint8_t** buf, const uint8_t* 
 
     uint32_t enforced_size;
     if (!copy_from_buf(buf, end, &enforced_size) || end - *buf < enforced_size ||
-        !enforced.DeserializeToCopy(buf, *buf + enforced_size))
+        !enforced.Deserialize(buf, *buf + enforced_size))
         return false;
 
     uint32_t unenforced_size;
     if (!copy_from_buf(buf, end, &unenforced_size) || end - *buf < unenforced_size ||
-        !unenforced.DeserializeToCopy(buf, *buf + unenforced_size))
+        !unenforced.Deserialize(buf, *buf + unenforced_size))
         return false;
 
     return true;

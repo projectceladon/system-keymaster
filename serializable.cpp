@@ -26,4 +26,15 @@ bool copy_from_buf(const uint8_t** buf, const uint8_t* end, void* dest, size_t s
     return true;
 }
 
+bool copy_size_and_data_from_buf(const uint8_t** buf, const uint8_t* end, size_t* size,
+                                 uint8_t** dest) {
+    uint32_t data_len;
+    if (!copy_from_buf(buf, end, &data_len)) {
+        return false;
+    }
+    *size = data_len;
+    *dest = new uint8_t[*size];
+    return copy_from_buf(buf, end, *dest, *size);
+}
+
 }  // namespace keymaster
