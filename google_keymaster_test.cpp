@@ -184,6 +184,7 @@ TEST_F(NewKeyGeneration, Rsa) {
         Authorization(TAG_USER_ID, 7),
         Authorization(TAG_USER_AUTH_ID, 8),
         Authorization(TAG_APPLICATION_ID, reinterpret_cast<const uint8_t*>("app_id"), 6),
+        Authorization(TAG_APPLICATION_DATA, reinterpret_cast<const uint8_t*>("app_data"), 8),
         Authorization(TAG_AUTH_TIMEOUT, 300),
     };
     GenerateKeyRequest req;
@@ -205,9 +206,13 @@ TEST_F(NewKeyGeneration, Rsa) {
 
     EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_ID, 7));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_AUTH_ID, 8));
-    EXPECT_TRUE(contains(rsp.unenforced, TAG_APPLICATION_ID, "app_id"));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_KEY_SIZE, 2048));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_AUTH_TIMEOUT, 300));
+
+    // Verify that App ID, App data and ROT are NOT included.
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_ROOT_OF_TRUST));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_APPLICATION_ID));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_APPLICATION_DATA));
 
     // Just for giggles, check that some unexpected tags/values are NOT present.
     EXPECT_FALSE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
@@ -219,7 +224,6 @@ TEST_F(NewKeyGeneration, Rsa) {
     EXPECT_TRUE(contains(rsp.unenforced, TAG_RSA_PUBLIC_EXPONENT, 65537));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
     EXPECT_TRUE(contains(rsp.unenforced, KM_TAG_CREATION_DATETIME));
-    EXPECT_TRUE(contains(rsp.unenforced, TAG_ROOT_OF_TRUST, "SW"));
 }
 
 }  // namespace test
