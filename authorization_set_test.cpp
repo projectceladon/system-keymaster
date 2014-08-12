@@ -232,6 +232,19 @@ TEST(Deserialization, InvalidLengthField) {
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized.is_valid());
 }
 
+static uint32_t read_uint32(const uint8_t* buf) {
+    uint32_t val;
+    memcpy(&val, buf, sizeof(val));
+    return val;
+}
+
+static void add_to_uint32(uint8_t* buf, int delta) {
+    uint32_t val;
+    memcpy(&val, buf, sizeof(val));
+    val += delta;
+    memcpy(buf, &val, sizeof(val));
+}
+
 TEST(Deserialization, MalformedIndirectData) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_APPLICATION_ID, "my_app", 6),
@@ -243,15 +256,36 @@ TEST(Deserialization, MalformedIndirectData) {
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
     EXPECT_EQ(buf.get() + size, set.Serialize(buf.get(), buf.get() + size));
 
-    keymaster_key_param_t* ptr =
-        reinterpret_cast<keymaster_key_param_t*>(buf.get() + sizeof(uint32_t));
+    // This sucks.  This test, as written, requires intimate knowledge of the serialized layout of
+    // this particular set, which means it's brittle.  But it's important to test that we handle
+    // broken serialized data and I can't think of a better way to write this.
+    //
+    // The contents of buf are:
+    //
+    // Bytes:   Content:
+    // 0-3      Length of string data, which is 9.
+    // 4-9      "my_app"
+    // 10-12    "foo"
+    // 13-16    Number of elements, which is 2.
+    // 17-20    Length of elements, which is 24.
+    // 21-24    First tag, TAG_APPLICATION_ID
+    // 25-28    Length of string "my_app", 6
+    // 29-32    Offset of string "my_app", 0
+    // 33-36    Second tag, TAG_APPLICATION_DATA
+    // 37-40    Length of string "foo", 3
+    // 41-44    Offset of string "foo", 6
 
-    // Check that the offsets we expect are present.
-    EXPECT_EQ(0, ptr[0].blob.data);
-    EXPECT_EQ(6U, ptr[0].blob.data_length);
-    EXPECT_EQ(6, reinterpret_cast<ptrdiff_t>(ptr[1].blob.data));
-    EXPECT_EQ(3U, ptr[1].blob.data_length);
-    EXPECT_EQ(9U, size - sizeof(uint32_t) * 2 - sizeof(*ptr) * 2);
+    // Check that stuff is where we think.
+    EXPECT_EQ('m', buf[4]);
+    EXPECT_EQ('f', buf[10]);
+    // Length of "my_app"
+    EXPECT_EQ(6U, read_uint32(buf.get() + 25));
+    // Offset of "my_app"
+    EXPECT_EQ(0U, read_uint32(buf.get() + 29));
+    // Length of "foo"
+    EXPECT_EQ(3U, read_uint32(buf.get() + 37));
+    // Offset of "foo"
+    EXPECT_EQ(6U, read_uint32(buf.get() + 41));
 
     // Check that deserialization works.
     AuthorizationSet deserialized1(buf.get(), size);
@@ -265,34 +299,23 @@ TEST(Deserialization, MalformedIndirectData) {
     // Now mess them up in various ways:
     //
 
-    // Make one point past the end.
-    (*reinterpret_cast<long*>(&(ptr[1].blob.data)))++;
-    AuthorizationSet deserialized2;
-    p = buf.get();
-    deserialized2.Deserialize(&p, p + size);
-    EXPECT_EQ(AuthorizationSet::BOUNDS_CHECKING_FAILURE, deserialized2.is_valid());
+    // Move "foo" offset so offset + length goes off the end
+    add_to_uint32(buf.get() + 41, 1);
+    AuthorizationSet deserialized2(buf.get(), size);
+    EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized2.is_valid());
+    add_to_uint32(buf.get() + 41, -1);
 
-    p = buf.get();
-    EXPECT_FALSE(deserialized2.Deserialize(&p, p + size));
-    EXPECT_EQ(AuthorizationSet::BOUNDS_CHECKING_FAILURE, deserialized2.is_valid());
-
-    (*reinterpret_cast<long*>(&(ptr[1].blob.data)))--;
-
-    // Make a gap between the blobs.
-    ptr[0].blob.data_length--;
+    // Shorten the "my_app" length to make a gap between the blobs.
+    add_to_uint32(buf.get() + 25, -1);
     AuthorizationSet deserialized3(buf.get(), size);
     EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized3.is_valid());
+    add_to_uint32(buf.get() + 25, 1);
 
-    p = buf.get();
-    deserialized3.Deserialize(&p, p + size);
-    EXPECT_EQ(AuthorizationSet::MALFORMED_DATA, deserialized3.is_valid());
-
-    ptr[0].blob.data_length++;
-
-    // Make them overlap.  We don't currently detect this.  We should.
-    ptr[0].blob.data_length++;
-    (*reinterpret_cast<long*>(&(ptr[1].blob.data)))--;
-    ptr[1].blob.data_length--;
+    // Extend the "my_app" length to make them overlap, and decrease the "foo" length to keep the
+    // total length the same.  We don't detect this but should.
+    // TODO(swillden): Detect overlaps and holes that leave total size correct.
+    add_to_uint32(buf.get() + 25, 1);
+    add_to_uint32(buf.get() + 37, -1);
     AuthorizationSet deserialized4(buf.get(), size);
     EXPECT_EQ(AuthorizationSet::OK, deserialized4.is_valid());
 }

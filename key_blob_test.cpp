@@ -114,7 +114,7 @@ TEST_F(KeyBlobTest, WrongKeyLength) {
     UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
     blob.Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
-    // Find the nonce, then modify it.
+    // Modify the key length
     serialized_blob[KeyBlob::NONCE_LENGTH]++;
 
     // Decrypting with wrong nonce should fail.
@@ -219,20 +219,22 @@ TEST_F(KeyBlobTest, WrongEnforced) {
     uint8_t* begin = serialized_blob.get();
     uint8_t* end = begin + size;
 
-    // Find one element of enforced_ serialization and modify it.
-    keymaster_key_param_t entry = enforced_[0];
-    uint8_t* entry_begin = reinterpret_cast<uint8_t*>(&entry);
-    uint8_t* entry_end = entry_begin + sizeof(entry);
-    auto entry_ptr = std::search(begin, end, entry_begin, entry_end);
-    ASSERT_NE(end, entry_ptr);
-    EXPECT_EQ(end, std::search(entry_ptr + 1, end, entry_begin, entry_end));
-    reinterpret_cast<keymaster_key_param_t*>(entry_ptr)->integer++;
+    // Find enforced serialization data and modify it.
+    size_t enforced_size = enforced_.SerializedSize();
+    UniquePtr<uint8_t[]> enforced_data(new uint8_t[enforced_size]);
+    enforced_.Serialize(enforced_data.get(), enforced_data.get() + enforced_size);
+
+    auto enforced_ptr =
+        std::search(begin, end, enforced_data.get(), enforced_data.get() + enforced_size);
+    ASSERT_NE(end, enforced_ptr);
+    EXPECT_EQ(end, std::search(enforced_ptr + 1, end, enforced_data.get(),
+                               enforced_data.get() + enforced_size));
+    (*(enforced_ptr + enforced_size - 1))++;
 
     // Decrypting with wrong unenforced data should fail.
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, master_key_);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
 }
 
 TEST_F(KeyBlobTest, WrongUnenforced) {
@@ -244,20 +246,22 @@ TEST_F(KeyBlobTest, WrongUnenforced) {
     uint8_t* begin = serialized_blob.get();
     uint8_t* end = begin + size;
 
-    // Find one element of unenforced_ serialization and modify it.
-    keymaster_key_param_t entry = unenforced_[0];
-    uint8_t* entry_begin = reinterpret_cast<uint8_t*>(&entry);
-    uint8_t* entry_end = entry_begin + sizeof(entry);
-    auto entry_ptr = std::search(begin, end, entry_begin, entry_end);
-    ASSERT_NE(end, entry_ptr);
-    EXPECT_EQ(end, std::search(entry_ptr + 1, end, entry_begin, entry_end));
-    reinterpret_cast<keymaster_key_param_t*>(entry_ptr)->integer++;
+    // Find unenforced serialization data and modify it.
+    size_t unenforced_size = unenforced_.SerializedSize();
+    UniquePtr<uint8_t[]> unenforced_data(new uint8_t[unenforced_size]);
+    unenforced_.Serialize(unenforced_data.get(), unenforced_data.get() + unenforced_size);
+
+    auto unenforced_ptr =
+        std::search(begin, end, unenforced_data.get(), unenforced_data.get() + unenforced_size);
+    ASSERT_NE(end, unenforced_ptr);
+    EXPECT_EQ(end, std::search(unenforced_ptr + 1, end, unenforced_data.get(),
+                               unenforced_data.get() + unenforced_size));
+    (*(unenforced_ptr + unenforced_size - 1))++;
 
     // Decrypting with wrong unenforced data should fail.
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, master_key_);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
 }
 
 }  // namespace test

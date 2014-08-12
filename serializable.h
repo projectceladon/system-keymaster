@@ -27,7 +27,8 @@ namespace keymaster {
 
 class Serializable {
   public:
-    virtual ~Serializable() {}
+    virtual ~Serializable() {
+    }
     virtual size_t SerializedSize() const = 0;
     virtual uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const = 0;
 
@@ -36,19 +37,13 @@ class Serializable {
     virtual bool Deserialize(const uint8_t** buf, const uint8_t* end) = 0;
 };
 
+uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, const void* data, size_t data_len);
+
 // Don't implement this, so that accidentally passing a pointer arg causes link error.
 template <typename T> uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, T* ptr);
 
 template <typename T> inline uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, T value) {
-    if (buf + sizeof(value) <= end)
-        memcpy(buf, &value, sizeof(value));
-    return buf + sizeof(value);
-}
-
-inline uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, const void* data, size_t data_len) {
-    if (buf + data_len <= end)
-        memcpy(buf, data, data_len);
-    return buf + data_len;
+    return append_to_buf(buf, end, &value, sizeof(value));
 }
 
 inline uint8_t* append_size_and_data_to_buf(uint8_t* buf, const uint8_t* end, const void* data,

@@ -206,6 +206,8 @@ class AuthorizationSet : public Serializable {
     uint8_t* Serialize(uint8_t* serialized_set, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf, const uint8_t* end);
 
+    size_t SerializedSizeOfElements() const;
+
   private:
     // Disallow assignment
     void operator=(const AuthorizationSet&);
@@ -214,10 +216,8 @@ class AuthorizationSet : public Serializable {
     void set_invalid(Error err);
 
     static size_t ComputeIndirectDataSize(const keymaster_key_param_t* elems, size_t count);
-    static void ConvertPointersToOffsets(keymaster_key_param_t* elems, size_t count,
-                                         const uint8_t* indirect_base);
     void CopyIndirectData();
-    bool CheckIndirectDataOffsets();
+    bool CheckIndirectData();
 
     bool GetTagValueEnum(keymaster_tag_t tag, uint32_t* val) const;
     bool GetTagValueEnumRep(keymaster_tag_t tag, size_t instance, uint32_t* val) const;

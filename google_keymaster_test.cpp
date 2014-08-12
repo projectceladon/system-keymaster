@@ -194,8 +194,8 @@ TEST_F(NewKeyGeneration, Rsa) {
 
     ASSERT_EQ(KM_ERROR_OK, rsp.error);
     EXPECT_EQ(0U, rsp.enforced.size());
-    EXPECT_EQ(8U, rsp.enforced.SerializedSize());
-    EXPECT_GT(rsp.unenforced.SerializedSize(), 8U);
+    EXPECT_EQ(12U, rsp.enforced.SerializedSize());
+    EXPECT_GT(rsp.unenforced.SerializedSize(), 12U);
 
     // Check specified tags are all present in unenforced characteristics
     EXPECT_TRUE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_SIGN));
