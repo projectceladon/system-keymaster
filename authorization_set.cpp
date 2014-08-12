@@ -21,6 +21,7 @@
 #include <assert.h>
 
 #include "authorization_set.h"
+#include "google_keymaster_utils.h"
 
 namespace keymaster {
 
@@ -331,9 +332,9 @@ bool AuthorizationSet::Deserialize(const uint8_t** buf, const uint8_t* end) {
 
 void AuthorizationSet::FreeData() {
     if (elems_ != NULL)
-        memset(elems_, 0, elems_size_ * sizeof(keymaster_key_param_t));
+        memset_s(elems_, 0, elems_size_ * sizeof(keymaster_key_param_t));
     if (indirect_data_ != NULL)
-        memset(indirect_data_, 0, indirect_data_size_);
+        memset_s(indirect_data_, 0, indirect_data_size_);
 
     delete[] elems_;
     delete[] indirect_data_;

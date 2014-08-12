@@ -18,8 +18,8 @@
 #define ANDROID_HARDWARE_KEYMASTER_DEFS_H
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #if defined(__cplusplus)
 extern "C" {

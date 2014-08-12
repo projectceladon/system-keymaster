@@ -136,7 +136,7 @@ void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
     if (ae_err == AE_INVALID) {
         // Authentication failed!  Decryption probably succeeded(ish), but we don't want to return
         // any data when the authentication fails, so clear it.
-        memset(key_material_.get(), 0, key_material_length());
+        memset_s(key_material_.get(), 0, key_material_length());
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return;
     } else if (ae_err < 0) {
@@ -192,7 +192,7 @@ ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master
         AE_SUCCESS)
         return ctx.release();
     else {
-        memset(ctx.get(), 0, ae_ctx_sizeof());
+        memset_s(ctx.get(), 0, ae_ctx_sizeof());
         return NULL;
     }
 }

@@ -25,6 +25,7 @@
 
 #include "ae.h"
 #include "authorization_set.h"
+#include "google_keymaster_utils.h"
 #include "keymaster_defs.h"
 #include "serializable.h"
 
@@ -72,10 +73,10 @@ class KeyBlob : public Serializable {
             const keymaster_key_blob_t& master_key);
 
     ~KeyBlob() {
-        memset(nonce_, 0, NONCE_LENGTH);
-        memset(tag_, 0, TAG_LENGTH);
+        memset_s(nonce_, 0, NONCE_LENGTH);
+        memset_s(tag_, 0, TAG_LENGTH);
         if (key_material_.get() != NULL)
-            memset(key_material_.get(), 0, key_material_length_);
+            memset_s(key_material_.get(), 0, key_material_length_);
         // Encrypted key material doesn't matter, and AuthorizationSets clear themselves.
     }
 

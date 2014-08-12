@@ -17,6 +17,8 @@
 #ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 #define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 
+#include <time.h>  // for time_t.
+
 namespace keymaster {
 
 /**
@@ -41,12 +43,16 @@ inline int64_t java_time(time_t time) {
 /**
  * Return the size in bytes of the array \p a.
  */
-template <typename T, size_t N> inline size_t array_size(const T (&a)[N]) { return sizeof(a); }
+template <typename T, size_t N> inline size_t array_size(const T (&a)[N]) {
+    return sizeof(a);
+}
 
 /**
  * Return the number of elements in array \p a.
  */
-template <typename T, size_t N> inline size_t array_length(const T (&)[N]) { return N; }
+template <typename T, size_t N> inline size_t array_length(const T (&)[N]) {
+    return N;
+}
 
 /**
  * Duplicate the array \p a.  The memory for the new array is malloced and the caller takes
@@ -84,6 +90,18 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
 }
 
 /**
+ * Variant of memset() that uses GCC-specific pragmas to disable optimizations, so effect is not
+ * optimized away.  This is important because we often need to wipe blocks of sensitive data from
+ * memory.
+ */
+#pragma GCC push_options
+#pragma GCC optimize("O0")
+inline void* memset_s(void* s, int c, size_t n) {
+    return memset(s, c, n);
+}
+#pragma GCC pop_options
+
+/**
  * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
  * it is zeroed.
  */
@@ -94,14 +112,16 @@ class Eraser {
 
     template <typename T>
     explicit Eraser(T& t)
-        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {}
+        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {
+    }
 
-    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {}
+    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {
+    }
 
-    Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {}
+    Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {
+    }
     ~Eraser() {
-        while (size_-- > 0)
-            *buf_++ = 0;
+        memset_s(buf_, 0, size_);
     }
 
   private:
