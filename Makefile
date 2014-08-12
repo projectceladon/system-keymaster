@@ -35,7 +35,7 @@ BINARIES=authorization_set_test \
 	google_keymaster_messages_test \
 	key_blob_test
 
-.PHONY: coverage valgrind clean run
+.PHONY: coverage memcheck massif clean run
 
 %.run: %
 	./$<
@@ -58,17 +58,25 @@ coverage.info: run
 #UNINIT_OPTS=--track-origins=yes
 UNINIT_OPTS=--undef-value-errors=no
 
-VALGRIND_OPTS=--leak-check=full \
+MEMCHECK_OPTS=--leak-check=full \
 	--show-reachable=yes \
 	--vgdb=full \
 	$(UNINIT_OPTS) \
 	--error-exitcode=1
 
-%.valgrind : %
-	valgrind $(VALGRIND_OPTS) ./$< && \
+MASSIF_OPTS=--tool=massif \
+	--stacks=yes
+
+%.memcheck : %
+	valgrind $(MEMCHECK_OPTS) ./$< && \
 	touch $@
 
-valgrind: $(BINARIES:=.valgrind)
+%.massif : %
+	valgrind $(MASSIF_OPTS) --massif-out-file=$@ ./$<
+
+memcheck: $(BINARIES:=.memcheck)
+
+massif: $(BINARIES:=.massif)
 
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
@@ -100,7 +108,8 @@ google_keymaster_test: google_keymaster_test.o \
 $(BASE)/external/gtest/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(BINARIES) $(BINARIES:=.run) $(BINARIES:=.valgrind) \
+	rm -f $(OBJS) $(DEPS) $(BINARIES) \
+		$(BINARIES:=.run) $(BINARIES:=.memcheck) $(BINARIES:=massif) \
 		*gcno *gcda coverage.info
 	rm -rf coverage
 

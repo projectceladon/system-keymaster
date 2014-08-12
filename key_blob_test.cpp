@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
 
 namespace keymaster {
 
+bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
 bool operator==(const AuthorizationSet& a, const AuthorizationSet& b) {
     if (a.size() != b.size())
         return false;

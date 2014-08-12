@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#define KEYMASTER_NAME_TAGS
+
 #include "authorization_set.h"
 #include "google_keymaster_utils.h"
 
@@ -25,7 +27,87 @@ int main(int argc, char** argv) {
     return result;
 }
 
+static bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) {
+    if (a.tag != b.tag) {
+        return false;
+    }
+
+    switch (keymaster_tag_get_type(a.tag)) {
+    default:
+        return false;
+    case KM_INVALID:
+        return true;
+    case KM_INT_REP:
+    case KM_INT:
+        return a.integer == b.integer;
+    case KM_ENUM_REP:
+    case KM_ENUM:
+        return a.enumerated == b.enumerated;
+    case KM_LONG:
+        return a.long_integer == b.long_integer;
+    case KM_DATE:
+        return a.date_time == b.date_time;
+    case KM_BOOL:
+        return a.boolean == b.boolean;
+    case KM_BIGNUM:
+    case KM_BYTES:
+        if ((a.blob.data == NULL || b.blob.data == NULL) && a.blob.data != b.blob.data)
+            return false;
+        return a.blob.data_length == b.blob.data_length &&
+               (memcmp(a.blob.data, b.blob.data, a.blob.data_length) == 0);
+    }
+}
+
+static std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
+    os << "Tag: " << keymaster_tag_mask_type(param.tag);
+    switch (keymaster_tag_get_type(param.tag)) {
+    case KM_INVALID:
+        os << " Invalid";
+        break;
+    case KM_INT_REP:
+        os << " (Rep) ";
+    /* Falls through */
+    case KM_INT:
+        os << " Int: " << param.integer;
+        break;
+    case KM_ENUM_REP:
+        os << " (Rep) ";
+    /* Falls through */
+    case KM_ENUM:
+        os << " Enum: " << param.enumerated;
+        break;
+    case KM_LONG:
+        os << " Long: " << param.long_integer;
+        break;
+    case KM_DATE:
+        os << " Date: " << param.date_time;
+        break;
+    case KM_BOOL:
+        os << " Bool: " << param.boolean;
+        break;
+    case KM_BIGNUM:
+        os << " Bignum: ";
+        break;
+    case KM_BYTES:
+        os << " Bytes: ";
+        break;
+    }
+    os << std::endl;
+    return os;
+}
+
 namespace keymaster {
+
+static bool operator==(const AuthorizationSet& a, const AuthorizationSet& b) {
+    if (a.size() != b.size())
+        return false;
+
+    for (size_t i = 0; i < a.size(); ++i)
+        if (!(a[i] == b[i]))
+            return false;
+    return true;
+}
+
 namespace test {
 
 TEST(Construction, ListProvided) {
@@ -41,6 +123,24 @@ TEST(Construction, ListProvided) {
     };
     AuthorizationSet set(params, array_length(params));
     EXPECT_EQ(8U, set.size());
+}
+
+TEST(Construction, Copy) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+        Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "my_app", 6),
+        Authorization(TAG_KEY_SIZE, 256),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set2(set);
+    ASSERT_EQ(set.size(), set2.size());
+    for (size_t i = 0; i < set.size(); ++i)
+        EXPECT_EQ(set[i], set2[i]);
 }
 
 TEST(Lookup, NonRepeated) {
@@ -133,6 +233,9 @@ TEST(Serialization, RoundTrip) {
         Authorization(TAG_APPLICATION_ID, "my_app", 6),
         Authorization(TAG_KEY_SIZE, 256),
         Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_ALL_USERS),
+        Authorization(TAG_RSA_PUBLIC_EXPONENT, 3),
+        Authorization(TAG_ACTIVE_DATETIME, 10),
     };
     AuthorizationSet set(params, array_length(params));
 
@@ -147,7 +250,7 @@ TEST(Serialization, RoundTrip) {
 
     EXPECT_EQ(set.size(), deserialized.size());
     for (size_t i = 0; i < set.size(); ++i) {
-        EXPECT_EQ(set[i].tag, deserialized[i].tag);
+        EXPECT_EQ(set[i], deserialized[i]);
     }
 
     int pos = deserialized.find(TAG_APPLICATION_ID);
@@ -337,10 +440,16 @@ TEST(Growable, SuccessfulRoundTrip) {
     EXPECT_TRUE(growable.push_back(Authorization(TAG_APPLICATION_ID, "data", 4)));
     EXPECT_EQ(4U, growable.size());
 
+    EXPECT_TRUE(growable.push_back(Authorization(TAG_APPLICATION_DATA, "some more data", 14)));
+    EXPECT_EQ(5U, growable.size());
+
     size_t serialize_size = growable.SerializedSize();
     UniquePtr<uint8_t[]> serialized(new uint8_t[serialize_size]);
     EXPECT_EQ(serialized.get() + serialize_size,
               growable.Serialize(serialized.get(), serialized.get() + serialize_size));
+
+    AuthorizationSet deserialized(serialized.get(), serialize_size);
+    EXPECT_EQ(growable, deserialized);
 }
 
 TEST(Growable, InsufficientElemBuf) {

@@ -74,7 +74,6 @@ class AuthorizationSet : public Serializable {
     enum Error {
         OK,
         ALLOCATION_FAILURE,
-        BOUNDS_CHECKING_FAILURE,
         MALFORMED_DATA,
     };
 
@@ -235,8 +234,6 @@ class AuthorizationSet : public Serializable {
     size_t indirect_data_capacity_;
     Error error_;
 };
-
-bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
 
 }  // namespace keymaster
 
