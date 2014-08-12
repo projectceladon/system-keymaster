@@ -21,7 +21,8 @@ CPPSRCS=authorization_set.cpp \
 	google_keymaster_messages_test.cpp \
 	serializable.cpp \
 	key_blob.cpp \
-	key_blob_test.cpp
+	key_blob_test.cpp \
+	google_keymaster_test_utils.cpp
 CCSRCS=$(BASE)/external/gtest/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -81,6 +82,7 @@ massif: $(BINARIES:=.massif)
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
 	serializable.o \
+	google_keymaster_test_utils.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
 key_blob_test: key_blob_test.o \
@@ -88,6 +90,7 @@ key_blob_test: key_blob_test.o \
 	authorization_set.o \
 	ocb.o \
 	serializable.o \
+	google_keymaster_test_utils.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
 google_keymaster_messages_test: google_keymaster_messages_test.o \
@@ -103,6 +106,7 @@ google_keymaster_test: google_keymaster_test.o \
 	key_blob.o \
 	ocb.o \
 	serializable.o \
+	google_keymaster_test_utils.o \
 	$(BASE)/external/gtest/src/gtest-all.o
 
 $(BASE)/external/gtest/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))

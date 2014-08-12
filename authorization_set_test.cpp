@@ -19,6 +19,7 @@
 #define KEYMASTER_NAME_TAGS
 
 #include "authorization_set.h"
+#include "google_keymaster_test_utils.h"
 #include "google_keymaster_utils.h"
 
 int main(int argc, char** argv) {
@@ -27,86 +28,7 @@ int main(int argc, char** argv) {
     return result;
 }
 
-static bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) {
-    if (a.tag != b.tag) {
-        return false;
-    }
-
-    switch (keymaster_tag_get_type(a.tag)) {
-    default:
-        return false;
-    case KM_INVALID:
-        return true;
-    case KM_INT_REP:
-    case KM_INT:
-        return a.integer == b.integer;
-    case KM_ENUM_REP:
-    case KM_ENUM:
-        return a.enumerated == b.enumerated;
-    case KM_LONG:
-        return a.long_integer == b.long_integer;
-    case KM_DATE:
-        return a.date_time == b.date_time;
-    case KM_BOOL:
-        return a.boolean == b.boolean;
-    case KM_BIGNUM:
-    case KM_BYTES:
-        if ((a.blob.data == NULL || b.blob.data == NULL) && a.blob.data != b.blob.data)
-            return false;
-        return a.blob.data_length == b.blob.data_length &&
-               (memcmp(a.blob.data, b.blob.data, a.blob.data_length) == 0);
-    }
-}
-
-static std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
-    os << "Tag: " << keymaster_tag_mask_type(param.tag);
-    switch (keymaster_tag_get_type(param.tag)) {
-    case KM_INVALID:
-        os << " Invalid";
-        break;
-    case KM_INT_REP:
-        os << " (Rep) ";
-    /* Falls through */
-    case KM_INT:
-        os << " Int: " << param.integer;
-        break;
-    case KM_ENUM_REP:
-        os << " (Rep) ";
-    /* Falls through */
-    case KM_ENUM:
-        os << " Enum: " << param.enumerated;
-        break;
-    case KM_LONG:
-        os << " Long: " << param.long_integer;
-        break;
-    case KM_DATE:
-        os << " Date: " << param.date_time;
-        break;
-    case KM_BOOL:
-        os << " Bool: " << param.boolean;
-        break;
-    case KM_BIGNUM:
-        os << " Bignum: ";
-        break;
-    case KM_BYTES:
-        os << " Bytes: ";
-        break;
-    }
-    os << std::endl;
-    return os;
-}
-
 namespace keymaster {
-
-static bool operator==(const AuthorizationSet& a, const AuthorizationSet& b) {
-    if (a.size() != b.size())
-        return false;
-
-    for (size_t i = 0; i < a.size(); ++i)
-        if (!(a[i] == b[i]))
-            return false;
-    return true;
-}
 
 namespace test {
 
@@ -138,9 +60,7 @@ TEST(Construction, Copy) {
     };
     AuthorizationSet set(params, array_length(params));
     AuthorizationSet set2(set);
-    ASSERT_EQ(set.size(), set2.size());
-    for (size_t i = 0; i < set.size(); ++i)
-        EXPECT_EQ(set[i], set2[i]);
+    EXPECT_EQ(set, set2);
 }
 
 TEST(Lookup, NonRepeated) {
@@ -247,11 +167,7 @@ TEST(Serialization, RoundTrip) {
     AuthorizationSet deserialized(buf.get(), size);
 
     EXPECT_EQ(AuthorizationSet::OK, deserialized.is_valid());
-
-    EXPECT_EQ(set.size(), deserialized.size());
-    for (size_t i = 0; i < set.size(); ++i) {
-        EXPECT_EQ(set[i], deserialized[i]);
-    }
+    EXPECT_EQ(set, deserialized);
 
     int pos = deserialized.find(TAG_APPLICATION_ID);
     ASSERT_NE(-1, pos);

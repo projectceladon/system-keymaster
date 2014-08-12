@@ -96,7 +96,6 @@ struct GetKeyCharacteristicsRequest {
 
 struct GetKeyCharacteristicsResponse {
     keymaster_error_t error;
-    keymaster_key_blob_t key_blob;
     AuthorizationSet enforced;
     AuthorizationSet unenforced;
 };

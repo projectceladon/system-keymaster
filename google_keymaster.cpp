@@ -199,8 +199,12 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
         return;
     response->error = KM_ERROR_OK;
 
+    if (!CopyAuthorizations(request.key_description, response))
+        return;
+
     AuthorizationSet hidden_auths;
-    if (!CopyAuthorizations(request.key_description, response, &hidden_auths))
+    response->error = BuildHiddenAuthorizations(request.key_description, &hidden_auths);
+    if (response->error != KM_ERROR_OK)
         return;
 
     keymaster_algorithm_t algorithm;
@@ -219,16 +223,33 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     }
 }
 
+void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
+                                            GetKeyCharacteristicsResponse* response) {
+    AuthorizationSet hidden;
+    hidden.push_back(TAG_APPLICATION_ID, request.client_id.data, request.client_id.data_length);
+    if (request.app_data.data != NULL)
+        hidden.push_back(TAG_APPLICATION_DATA, request.app_data.data, request.app_data.data_length);
+    hidden.push_back(RootOfTrustTag());
+
+    KeyBlob blob(request.key_blob, hidden, MasterKey());
+    if (blob.error() != KM_ERROR_OK) {
+        response->error = blob.error();
+        return;
+    }
+    response->enforced.Reinitialize(blob.enforced());
+    response->unenforced.Reinitialize(blob.unenforced());
+    response->error = KM_ERROR_OK;
+}
+
 bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
                                   AuthorizationSet* hidden_auths) {
     uint64_t public_exponent = RSA_DEFAULT_EXPONENT;
     if (!key_auths.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent))
-        AddAuthorization(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent), response,
-                         hidden_auths);
+        AddAuthorization(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent), response);
 
     uint32_t key_size = RSA_DEFAULT_KEY_SIZE;
     if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
-        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response, hidden_auths);
+        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
 
     Unique_BIGNUM exponent(BN_new());
     Unique_RSA rsa_key(RSA_new());
@@ -312,8 +333,7 @@ static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
 }
 
 bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description,
-                                         GenerateKeyResponse* response,
-                                         AuthorizationSet* hidden_auths) {
+                                         GenerateKeyResponse* response) {
     for (size_t i = 0; i < key_description.size(); ++i) {
         switch (key_description[i].tag) {
         case KM_TAG_ROOT_OF_TRUST:
@@ -325,15 +345,13 @@ bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description
             response->error = KM_ERROR_UNSUPPORTED_TAG;
             return false;
         default:
-            AddAuthorization(key_description[i], response, hidden_auths);
+            AddAuthorization(key_description[i], response);
             break;
         }
     }
 
-    AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), response,
-                     hidden_auths);
-    AddAuthorization(Authorization(TAG_ORIGIN, origin()), response, hidden_auths);
-    AddAuthorization(Authorization(TAG_ROOT_OF_TRUST, "SW", 2), response, hidden_auths);
+    AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), response);
+    AddAuthorization(Authorization(TAG_ORIGIN, origin()), response);
 
     response->error = CheckAuthorizationSet(response->enforced);
     if (response->error != KM_ERROR_OK)
@@ -341,21 +359,29 @@ bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description
     response->error = CheckAuthorizationSet(response->unenforced);
     if (response->error != KM_ERROR_OK)
         return false;
-    response->error = CheckAuthorizationSet(*hidden_auths);
-    if (response->error != KM_ERROR_OK)
-        return false;
 
     return true;
 }
 
+keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                AuthorizationSet* hidden) {
+    keymaster_blob_t entry;
+    if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
+        hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
+    if (input_set.GetTagValue(TAG_APPLICATION_DATA, &entry))
+        hidden->push_back(TAG_APPLICATION_DATA, entry.data, entry.data_length);
+    hidden->push_back(RootOfTrustTag());
+
+    return CheckAuthorizationSet(*hidden);
+}
+
 void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
-                                       GenerateKeyResponse* response,
-                                       AuthorizationSet* hidden_auths) {
+                                       GenerateKeyResponse* response) {
     switch (auth.tag) {
     case KM_TAG_ROOT_OF_TRUST:
     case KM_TAG_APPLICATION_ID:
     case KM_TAG_APPLICATION_DATA:
-        hidden_auths->push_back(auth);
+        // Skip.  We handle these tags separately.
         break;
     default:
         if (is_enforced(auth.tag))
