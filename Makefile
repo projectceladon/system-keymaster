@@ -7,11 +7,19 @@ INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
 	-I $(BASE)/system/core/include/utils \
 	-I $(BASE)/external/gtest
 
+ifdef USE_CLANG
+CC=/usr/bin/clang
+CXX=/usr/bin/clang
+COMPILER_SPECIFIC_ARGS=-std=c++11 -DKEYMASTER_CLANG_TEST_BUILD
+else
+COMPILER_SPECIFIC_ARGS=-std=c++0x
+endif
+
 CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
-	-Wmissing-declarations -std=c++0x -fprofile-arcs -ftest-coverage \
-	-Wno-deprecated-declarations -fno-exceptions
-LDLIBS=-lcrypto -lpthread
+	-Wmissing-declarations -fprofile-arcs -ftest-coverage \
+	-Wno-deprecated-declarations -fno-exceptions $(COMPILER_SPECIFIC_ARGS)
+LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=authorization_set.cpp \
 	authorization_set_test.cpp \

@@ -39,16 +39,17 @@ namespace keymaster {
 
 namespace test {
 
+const uint8_t master_key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const uint8_t key_data[5] = {21, 22, 23, 24, 25};
+const uint8_t nonce[KeyBlob::NONCE_LENGTH]{12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+
 class KeyBlobTest : public testing::Test {
   protected:
-    KeyBlobTest()
-        : key_data_({21, 22, 23, 24, 25}),
-          master_key_data_({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
-          nonce_({12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}) {
-        key_.key_material = const_cast<uint8_t*>(key_data_);
-        key_.key_material_size = array_size(key_data_);
-        master_key_.key_material = const_cast<uint8_t*>(master_key_data_);
-        master_key_.key_material_size = array_size(master_key_data_);
+    KeyBlobTest() {
+        key_.key_material = const_cast<uint8_t*>(key_data);
+        key_.key_material_size = array_size(key_data);
+        master_key_.key_material = const_cast<uint8_t*>(master_key_data);
+        master_key_.key_material_size = array_size(master_key_data);
 
         enforced_.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
         enforced_.push_back(TAG_KEY_SIZE, 256);
@@ -66,7 +67,7 @@ class KeyBlobTest : public testing::Test {
         hidden_.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
         hidden_.push_back(TAG_APPLICATION_ID, "my_app", 6);
 
-        blob_.reset(new KeyBlob(enforced_, unenforced_, hidden_, key_, master_key_, nonce_));
+        blob_.reset(new KeyBlob(enforced_, unenforced_, hidden_, key_, master_key_, nonce));
     }
 
     AuthorizationSet enforced_;
@@ -76,10 +77,7 @@ class KeyBlobTest : public testing::Test {
     UniquePtr<KeyBlob> blob_;
 
     keymaster_key_blob_t key_;
-    const uint8_t key_data_[5];
     keymaster_key_blob_t master_key_;
-    const uint8_t master_key_data_[16];
-    uint8_t nonce_[KeyBlob::NONCE_LENGTH];
 };
 
 TEST_F(KeyBlobTest, EncryptDecrypt) {
@@ -90,13 +88,13 @@ TEST_F(KeyBlobTest, EncryptDecrypt) {
     // key_data shouldn't be anywhere in the blob.
     uint8_t* begin = serialized_blob.get();
     uint8_t* end = begin + size;
-    EXPECT_EQ(end, std::search(begin, end, key_data_, key_data_ + array_size(key_data_)));
+    EXPECT_EQ(end, std::search(begin, end, key_data, key_data + array_size(key_data)));
 
     // Recover the key material.
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, hidden_, master_key_);
     EXPECT_EQ(KM_ERROR_OK, deserialized.error());
-    EXPECT_EQ(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
+    EXPECT_EQ(0, memcmp(deserialized.key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongKeyLength) {
@@ -121,16 +119,16 @@ TEST_F(KeyBlobTest, WrongNonce) {
     // Find the nonce, then modify it.
     uint8_t* begin = serialized_blob.get();
     uint8_t* end = begin + size;
-    auto nonce_ptr = std::search(begin, end, nonce_, nonce_ + array_size(nonce_));
+    auto nonce_ptr = std::search(begin, end, nonce, nonce + array_size(nonce));
     ASSERT_NE(nonce_ptr, end);
-    EXPECT_EQ(end, std::search(nonce_ptr + 1, end, nonce_, nonce_ + array_size(nonce_)));
+    EXPECT_EQ(end, std::search(nonce_ptr + 1, end, nonce, nonce + array_size(nonce)));
     (*nonce_ptr)++;
 
     // Decrypting with wrong nonce should fail.
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, hidden_, master_key_);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
+    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongTag) {
@@ -150,7 +148,7 @@ TEST_F(KeyBlobTest, WrongTag) {
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, hidden_, master_key_);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
+    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongCiphertext) {
@@ -173,7 +171,7 @@ TEST_F(KeyBlobTest, WrongCiphertext) {
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, hidden_, master_key_);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
+    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongMasterKey) {
@@ -190,7 +188,7 @@ TEST_F(KeyBlobTest, WrongMasterKey) {
     keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
     KeyBlob deserialized(encrypted_blob, hidden_, wrong_master);
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
-    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data_, array_size(key_data_)));
+    EXPECT_NE(0, memcmp(deserialized.key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongEnforced) {

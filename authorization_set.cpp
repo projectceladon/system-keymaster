@@ -157,7 +157,7 @@ bool AuthorizationSet::push_back(keymaster_key_param_t elem) {
         if (indirect_data_capacity_ - indirect_data_size_ < elem.blob.data_length) {
             size_t new_capacity = 2 * (indirect_data_capacity_ + elem.blob.data_length);
             uint8_t* new_data = new uint8_t[new_capacity];
-            if (new_data == false) {
+            if (new_data == NULL) {
                 set_invalid(ALLOCATION_FAILURE);
                 return false;
             }
@@ -403,7 +403,7 @@ bool AuthorizationSet::GetTagValueEnum(keymaster_tag_t tag, uint32_t* val) const
     if (pos == -1) {
         return false;
     }
-    *val = (*this)[pos].enumerated;
+    *val = elems_[pos].enumerated;
     return true;
 }
 
@@ -418,7 +418,7 @@ bool AuthorizationSet::GetTagValueEnumRep(keymaster_tag_t tag, size_t instance,
         }
         ++count;
     }
-    *val = (*this)[pos].enumerated;
+    *val = elems_[pos].enumerated;
     return true;
 }
 
@@ -427,7 +427,7 @@ bool AuthorizationSet::GetTagValueInt(keymaster_tag_t tag, uint32_t* val) const 
     if (pos == -1) {
         return false;
     }
-    *val = (*this)[pos].integer;
+    *val = elems_[pos].integer;
     return true;
 }
 
@@ -442,7 +442,7 @@ bool AuthorizationSet::GetTagValueIntRep(keymaster_tag_t tag, size_t instance,
         }
         ++count;
     }
-    *val = (*this)[pos].integer;
+    *val = elems_[pos].integer;
     return true;
 }
 
@@ -451,7 +451,7 @@ bool AuthorizationSet::GetTagValueLong(keymaster_tag_t tag, uint64_t* val) const
     if (pos == -1) {
         return false;
     }
-    *val = (*this)[pos].long_integer;
+    *val = elems_[pos].long_integer;
     return true;
 }
 
@@ -460,7 +460,7 @@ bool AuthorizationSet::GetTagValueDate(keymaster_tag_t tag, uint64_t* val) const
     if (pos == -1) {
         return false;
     }
-    *val = (*this)[pos].date_time;
+    *val = elems_[pos].date_time;
     return true;
 }
 
@@ -469,7 +469,7 @@ bool AuthorizationSet::GetTagValueBlob(keymaster_tag_t tag, keymaster_blob_t* va
     if (pos == -1) {
         return false;
     }
-    *val = (*this)[pos].blob;
+    *val = elems_[pos].blob;
     return true;
 }
 
