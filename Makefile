@@ -18,7 +18,8 @@ endif
 CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Wmissing-declarations -fprofile-arcs -ftest-coverage \
-	-Wno-deprecated-declarations -fno-exceptions $(COMPILER_SPECIFIC_ARGS)
+	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
+	$(COMPILER_SPECIFIC_ARGS) 
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=authorization_set.cpp \

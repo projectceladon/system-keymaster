@@ -54,7 +54,8 @@
  * name() method which returns a string equal to the tame of the tag (e.g. TAG_PURPOSE).  Activating
  * this option means the classes _do_ contain a data member, a pointer to the string, and also
  * causes static data space to be allocated for the strings.  So the run-time cost of these classes
- * is no longer zero.
+ * is no longer zero.  Note that it can cause problems if KEYMASTER_NAME_TAGS is defined for some
+ * compilation units and not others.
  */
 
 #include "keymaster_defs.h"

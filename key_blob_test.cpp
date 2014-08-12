@@ -20,7 +20,6 @@
 
 #include <openssl/engine.h>
 
-#define KEYMASTER_NAME_TAGS
 #include "authorization_set.h"
 #include "google_keymaster_utils.h"
 #include "keymaster_tags.h"
