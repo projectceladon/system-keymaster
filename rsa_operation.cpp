@@ -66,7 +66,7 @@ RsaOperation::RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key)
 
     // Since we're not using a digest function, we just need to store the text, up to the key
     // size, until Finish is called, so we allocate a place to put it.
-    if (!data_to_sign_.Reinitialize(RSA_size(rsa_key_))) {
+    if (!data_.Reinitialize(RSA_size(rsa_key_))) {
         error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return;
     }
@@ -78,36 +78,53 @@ RsaOperation::~RsaOperation() {
         RSA_free(rsa_key_);
 }
 
-keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* output) {
+keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */) {
     switch (purpose()) {
     default:
         return KM_ERROR_UNIMPLEMENTED;
     case KM_PURPOSE_SIGN:
-        return Sign(input, output);
+    case KM_PURPOSE_VERIFY:
+        return StoreData(input);
     }
 }
 
-keymaster_error_t RsaOperation::Sign(const Buffer& input, Buffer* /* output */) {
-    if (!data_to_sign_.write(input.peek_read(), input.available_read()))
+keymaster_error_t RsaOperation::StoreData(const Buffer& input) {
+    if (!data_.write(input.peek_read(), input.available_read()))
         return KM_ERROR_INVALID_INPUT_LENGTH;
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaOperation::Finish(Buffer* signature, Buffer* /* output */) {
+keymaster_error_t RsaOperation::Finish(const Buffer& signature, Buffer* output) {
     switch (purpose()) {
     case KM_PURPOSE_SIGN: {
-        signature->Reinitialize(RSA_size(rsa_key_));
-        if (data_to_sign_.available_read() != signature->buffer_size())
+        output->Reinitialize(RSA_size(rsa_key_));
+        if (data_.available_read() != output->buffer_size())
             return KM_ERROR_INVALID_INPUT_LENGTH;
 
-        int bytes_encrypted =
-            RSA_private_encrypt(data_to_sign_.available_read(), data_to_sign_.peek_read(),
-                                signature->peek_write(), rsa_key_, RSA_NO_PADDING);
+        int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
+                                                  output->peek_write(), rsa_key_, RSA_NO_PADDING);
         if (bytes_encrypted < 0)
             return KM_ERROR_UNKNOWN_ERROR;
         assert(bytes_encrypted == RSA_size(rsa_key_));
-        signature->advance_write(bytes_encrypted);
+        output->advance_write(bytes_encrypted);
         return KM_ERROR_OK;
+    }
+    case KM_PURPOSE_VERIFY: {
+        if ((int)data_.available_read() != RSA_size(rsa_key_))
+            return KM_ERROR_INVALID_INPUT_LENGTH;
+        if (data_.available_read() != signature.available_read())
+            return KM_ERROR_VERIFICATION_FAILED;
+
+        UniquePtr<uint8_t[]> decrypted_data(new uint8_t[RSA_size(rsa_key_)]);
+        int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
+                                                 decrypted_data.get(), rsa_key_, RSA_NO_PADDING);
+        if (bytes_decrypted < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+        assert(bytes_decrypted == RSA_size(rsa_key_));
+
+        if (memcmp_s(decrypted_data.get(), data_.peek_read(), data_.available_read()) == 0)
+            return KM_ERROR_OK;
+        return KM_ERROR_VERIFICATION_FAILED;
     }
     default:
         return KM_ERROR_UNIMPLEMENTED;

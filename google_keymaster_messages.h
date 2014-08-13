@@ -127,9 +127,13 @@ struct UpdateOperationResponse {
     Buffer output;
 };
 
+struct FinishOperationRequest {
+    keymaster_operation_handle_t op_handle;
+    Buffer signature;
+};
+
 struct FinishOperationResponse {
     keymaster_error_t error;
-    Buffer signature;
     Buffer output;
 };
 

@@ -42,7 +42,7 @@ class Operation {
 
     virtual keymaster_error_t Begin() = 0;
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output) = 0;
-    virtual keymaster_error_t Finish(Buffer* signature, Buffer* output) = 0;
+    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output) = 0;
     virtual keymaster_error_t Abort() = 0;
 
   private:
