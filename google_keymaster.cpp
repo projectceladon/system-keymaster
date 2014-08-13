@@ -22,6 +22,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
+#include <openssl/rand.h>
 
 #include <UniquePtr.h>
 
@@ -29,12 +30,20 @@
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
 #include "key_blob.h"
+#include "rsa_operation.h"
 
 namespace keymaster {
 
-GoogleKeymaster::GoogleKeymaster() {
+GoogleKeymaster::GoogleKeymaster(size_t operation_table_size)
+    : operation_table_(new OpTableEntry[operation_table_size]),
+      operation_table_size_(operation_table_size) {
+    if (operation_table_.get() == NULL)
+        operation_table_size_ = 0;
 }
 GoogleKeymaster::~GoogleKeymaster() {
+    for (size_t i = 0; i < operation_table_size_; ++i)
+        if (operation_table_[i].operation != NULL)
+            delete operation_table_[i].operation;
 }
 
 const int RSA_DEFAULT_KEY_SIZE = 2048;
@@ -197,7 +206,7 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                   GenerateKeyResponse* response) {
     if (response == NULL)
         return;
-    response->error = KM_ERROR_OK;
+    response->error = KM_ERROR_UNKNOWN_ERROR;
 
     if (!CopyAuthorizations(request.key_description, response))
         return;
@@ -221,24 +230,92 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return;
     }
+
+    response->error = KM_ERROR_OK;
 }
 
 void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                             GetKeyCharacteristicsResponse* response) {
-    AuthorizationSet hidden;
-    hidden.push_back(TAG_APPLICATION_ID, request.client_id.data, request.client_id.data_length);
-    if (request.app_data.data != NULL)
-        hidden.push_back(TAG_APPLICATION_DATA, request.app_data.data, request.app_data.data_length);
-    hidden.push_back(RootOfTrustTag());
+    if (response == NULL)
+        return;
+    response->error = KM_ERROR_UNKNOWN_ERROR;
 
-    KeyBlob blob(request.key_blob, hidden, MasterKey());
-    if (blob.error() != KM_ERROR_OK) {
-        response->error = blob.error();
+    UniquePtr<KeyBlob> blob(
+        LoadKeyBlob(request.key_blob, request.additional_params, &(response->error)));
+    if (blob.get() == NULL)
+        return;
+
+    response->enforced.Reinitialize(blob->enforced());
+    response->unenforced.Reinitialize(blob->unenforced());
+    response->error = KM_ERROR_OK;
+}
+
+void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
+                                     BeginOperationResponse* response) {
+    if (response == NULL)
+        return;
+    response->error = KM_ERROR_UNKNOWN_ERROR;
+    response->op_handle = 0;
+
+    UniquePtr<KeyBlob> key(
+        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
+    if (key.get() == NULL)
+        return;
+
+    UniquePtr<Operation> operation;
+    switch (key->algorithm()) {
+    case KM_ALGORITHM_RSA:
+        operation.reset(new RsaOperation(request.purpose, *key));
+        break;
+    default:
+        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        break;
+    }
+
+    if (operation.get() == NULL) {
         return;
     }
-    response->enforced.Reinitialize(blob.enforced());
-    response->unenforced.Reinitialize(blob.unenforced());
-    response->error = KM_ERROR_OK;
+
+    response->error = operation->Begin();
+    if (response->error != KM_ERROR_OK)
+        return;
+
+    response->error = AddOperation(operation.release(), &response->op_handle);
+}
+
+void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
+                                      UpdateOperationResponse* response) {
+    OpTableEntry* entry = FindOperation(request.op_handle);
+    if (entry == NULL) {
+        response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
+        return;
+    }
+
+    response->error = entry->operation->Update(request.input, &response->output);
+    if (response->error != KM_ERROR_OK) {
+        // Any error invalidates the operation.
+        DeleteOperation(entry);
+    }
+}
+
+void GoogleKeymaster::FinishOperation(const keymaster_operation_handle_t op_handle,
+                                      FinishOperationResponse* response) {
+    OpTableEntry* entry = FindOperation(op_handle);
+    if (entry == NULL) {
+        response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
+        return;
+    }
+
+    response->error = entry->operation->Finish(&response->signature, &response->output);
+    DeleteOperation(entry);
+}
+
+keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_handle_t op_handle) {
+    OpTableEntry* entry = FindOperation(op_handle);
+    if (entry == NULL)
+        return KM_ERROR_INVALID_OPERATION_HANDLE;
+    DeleteOperation(entry);
+    return KM_ERROR_OK;
 }
 
 bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
@@ -320,6 +397,22 @@ bool GoogleKeymaster::CreateKeyBlob(GenerateKeyResponse* response,
     return true;
 }
 
+KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
+                                      const AuthorizationSet& client_params,
+                                      keymaster_error_t* error) {
+    AuthorizationSet hidden;
+    BuildHiddenAuthorizations(client_params, &hidden);
+    UniquePtr<KeyBlob> blob(new KeyBlob(key, hidden, MasterKey()));
+    if (blob.get() == NULL) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return NULL;
+    } else if (blob->error() != KM_ERROR_OK) {
+        *error = blob->error();
+        return NULL;
+    }
+    return blob.release();
+}
+
 static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
     switch (set.is_valid()) {
     case AuthorizationSet::OK:
@@ -364,7 +457,7 @@ bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description
 }
 
 keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                AuthorizationSet* hidden) {
+                                                             AuthorizationSet* hidden) {
     keymaster_blob_t entry;
     if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
         hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
@@ -390,6 +483,44 @@ void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
             response->unenforced.push_back(auth);
         break;
     }
+}
+
+keymaster_error_t GoogleKeymaster::AddOperation(Operation* operation,
+                                                keymaster_operation_handle_t* op_handle) {
+    UniquePtr<Operation> op(operation);
+    if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) == 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+    if (*op_handle == 0){
+        // Statistically this is vanishingly unlikely, which means if it ever happens in practice,
+        // it indicates a broken RNG.
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    for (size_t i = 0; i < operation_table_size_; ++i) {
+        if (operation_table_[i].operation == NULL) {
+            operation_table_[i].operation = op.release();
+            operation_table_[i].handle = *op_handle;
+            return KM_ERROR_OK;
+        }
+    }
+    return KM_ERROR_TOO_MANY_OPERATIONS;
+}
+
+GoogleKeymaster::OpTableEntry*
+GoogleKeymaster::FindOperation(keymaster_operation_handle_t op_handle) {
+    if (op_handle == 0)
+        return NULL;
+
+    for (size_t i = 0; i < operation_table_size_; ++i) {
+        if (operation_table_[i].handle == op_handle)
+            return operation_table_.get() + i;
+    }
+    return NULL;
+}
+
+void GoogleKeymaster::DeleteOperation(OpTableEntry* entry) {
+    delete entry->operation;
+    entry->operation = NULL;
+    entry->handle = 0;
 }
 
 }  // namespace keymaster

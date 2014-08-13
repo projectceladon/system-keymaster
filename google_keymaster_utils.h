@@ -17,6 +17,8 @@
 #ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 #define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
 
+#include <stdint.h>
+#include <string.h>
 #include <time.h>  // for time_t.
 
 namespace keymaster {
@@ -97,13 +99,13 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
 #ifndef KEYMASTER_CLANG_TEST_BUILD
 #pragma GCC push_options
 #pragma GCC optimize("O0")
-#endif // not KEYMASTER_CLANG_TEST_BUILD
+#endif  // not KEYMASTER_CLANG_TEST_BUILD
 inline void* memset_s(void* s, int c, size_t n) {
     return memset(s, c, n);
 }
 #ifndef KEYMASTER_CLANG_TEST_BUILD
 #pragma GCC pop_options
-#endif // not KEYMASTER_CLANG_TEST_BUILD
+#endif  // not KEYMASTER_CLANG_TEST_BUILD
 
 /**
  * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
@@ -129,8 +131,57 @@ class Eraser {
     }
 
   private:
+    Eraser(const Eraser&);
+    void operator=(const Eraser&);
+
     uint8_t* buf_;
     size_t size_;
+};
+
+/**
+ * A simple buffer that supports reading and writing.  Manages its own memory.
+ */
+class Buffer {
+  public:
+    Buffer() : buffer_(NULL), buffer_size_(0), read_position_(0), write_position_(0) {
+    }
+    Buffer(size_t size) : buffer_(NULL) {
+        Reinitialize(size);
+    }
+    Buffer(const void* buf, size_t size) : buffer_(NULL) {
+        Reinitialize(buf, size);
+    }
+    ~Buffer();
+
+    bool Reinitialize(size_t size);
+    bool Reinitialize(const void* buf, size_t size);
+
+    size_t available_write() const;
+    size_t available_read() const;
+    size_t buffer_size() const {
+        return buffer_size_;
+    }
+
+    bool write(const uint8_t* src, size_t write_length);
+    bool read(uint8_t* dest, size_t read_length);
+    const uint8_t* peek_read() const {
+        return buffer_ + read_position_;
+    }
+    void advance_read(int distance) {
+        read_position_ += distance;
+    }
+    uint8_t* peek_write() {
+        return buffer_ + write_position_;
+    }
+    void advance_write(int distance) {
+        write_position_ += distance;
+    }
+
+  private:
+    uint8_t* buffer_;
+    size_t buffer_size_;
+    int read_position_;
+    int write_position_;
 };
 
 }  // namespace keymaster

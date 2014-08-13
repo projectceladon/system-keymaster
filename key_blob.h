@@ -125,9 +125,16 @@ class KeyBlob : public Serializable {
     inline const AuthorizationSet& hidden() const {
         return hidden_;
     }
+    inline keymaster_algorithm_t algorithm() const {
+        return algorithm_;
+    }
+    inline size_t key_size_bits() const {
+        return key_size_bits_;
+    }
 
   private:
     void EncryptKey(const keymaster_key_blob_t& master_key);
+    bool ExtractKeyCharacteristics();
 
     /**
      * Create an AES_OCB context initialized with a key derived using \p master_key and the
@@ -147,6 +154,8 @@ class KeyBlob : public Serializable {
     AuthorizationSet enforced_;
     AuthorizationSet unenforced_;
     AuthorizationSet hidden_;
+    keymaster_algorithm_t algorithm_;
+    uint32_t key_size_bits_;
 };
 
 }  // namespace keymaster

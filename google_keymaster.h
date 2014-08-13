@@ -23,6 +23,7 @@
 namespace keymaster {
 
 class KeyBlob;
+class Operation;
 
 /**
  * OpenSSL-based Keymaster backing implementation, for use as a pure software implmentation
@@ -41,7 +42,7 @@ class KeyBlob;
  */
 class GoogleKeymaster {
   public:
-    GoogleKeymaster();
+    GoogleKeymaster(size_t operation_table_size);
     virtual ~GoogleKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
@@ -56,20 +57,27 @@ class GoogleKeymaster {
     void SupportedExportFormats(keymaster_algorithm_t algorithm,
                                 SupportedResponse<keymaster_key_format_t>* response) const;
 
-    // virtual keymaster_error_t AddRngEntropy(AddEntropyRequest& /* request */);
+    virtual keymaster_error_t AddRngEntropy(AddEntropyRequest& /* request */) {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
-
-    // void Rescope(const RescopeRequest& request, RescopeResponse* response);
-    // void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
-    // void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
-    // void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);
-    // void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse*
-    // response);
-    // void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse*
-    // response);
-    // void AbortOperation(const AbortOperationRequest& request);
+    void Rescope(const RescopeRequest& /* request */, RescopeResponse* response) {
+        // Not going to implement rescoping until post-L.
+        response->error = KM_ERROR_UNIMPLEMENTED;
+    }
+    void ImportKey(const ImportKeyRequest& /* request */, ImportKeyResponse* response) {
+        response->error = KM_ERROR_UNIMPLEMENTED;
+    }
+    void ExportKey(const ExportKeyRequest& /* request */, ExportKeyResponse* response) {
+        response->error = KM_ERROR_UNIMPLEMENTED;
+    }
+    void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);
+    void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
+    void FinishOperation(const keymaster_operation_handle_t op_handle,
+                         FinishOperationResponse* response);
+    keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
 
   private:
     virtual bool is_enforced(keymaster_tag_t tag) = 0;
@@ -80,6 +88,8 @@ class GoogleKeymaster {
 
     bool CreateKeyBlob(GenerateKeyResponse* response, const AuthorizationSet& hidden_auths,
                        uint8_t* key_material, size_t key_length);
+    KeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
+                         keymaster_error_t* error);
 
     bool CopyAuthorizations(const AuthorizationSet& key_description, GenerateKeyResponse* response);
     keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
@@ -90,6 +100,22 @@ class GoogleKeymaster {
     keymaster_error_t WrapKey(const uint8_t* key_material, size_t key_material_length,
                               KeyBlob* blob);
     keymaster_error_t UnwrapKey(const KeyBlob* blob, uint8_t* key, size_t key_length);
+
+    struct OpTableEntry {
+        OpTableEntry() {
+            handle = 0;
+            operation = NULL;
+        }
+        keymaster_operation_handle_t handle;
+        Operation* operation;
+    };
+
+    keymaster_error_t AddOperation(Operation* operation, keymaster_operation_handle_t* op_handle);
+    OpTableEntry* FindOperation(keymaster_operation_handle_t op_handle);
+    void DeleteOperation(OpTableEntry* entry);
+
+    UniquePtr<OpTableEntry[]> operation_table_;
+    size_t operation_table_size_;
 };
 
 }  // namespace keymaster

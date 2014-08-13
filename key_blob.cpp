@@ -53,6 +53,9 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
         return;
     }
 
+    if (!ExtractKeyCharacteristics())
+        return;
+
     memcpy(nonce_, nonce, NONCE_LENGTH);
 
     key_material_length_ = key.key_material_size;
@@ -105,6 +108,9 @@ bool KeyBlob::Deserialize(const uint8_t** buf, const uint8_t* end) {
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return false;
     }
+
+    if (!ExtractKeyCharacteristics())
+        return false;
 
     encrypted_key_material_.reset(tmp_key_ptr);
     key_material_.reset(new uint8_t[key_material_length_]);
@@ -211,6 +217,20 @@ const uint8_t* KeyBlob::BuildDerivationData(size_t* derivation_data_length) cons
         buf = unenforced_.Serialize(buf, end);
     }
     return derivation_data;
+}
+
+bool KeyBlob::ExtractKeyCharacteristics() {
+    if (!enforced_.GetTagValue(TAG_ALGORITHM, &algorithm_) &&
+        !unenforced_.GetTagValue(TAG_ALGORITHM, &algorithm_)) {
+        error_ = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return false;
+    }
+    if (!enforced_.GetTagValue(TAG_KEY_SIZE, &key_size_bits_) &&
+        !unenforced_.GetTagValue(TAG_KEY_SIZE, &key_size_bits_)) {
+        error_ = KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        return false;
+    }
+    return true;
 }
 
 }  // namespace keymaster
