@@ -29,12 +29,16 @@ namespace keymaster {
 const uint32_t GENERATE_KEY = 0;
 
 struct GenerateKeyRequest : public Serializable {
-    GenerateKeyRequest() {}
-    GenerateKeyRequest(uint8_t* buf, size_t size) : key_description(buf, size) {}
+    GenerateKeyRequest() {
+    }
+    GenerateKeyRequest(uint8_t* buf, size_t size) : key_description(buf, size) {
+    }
 
     AuthorizationSet key_description;
 
-    size_t SerializedSize() const { return key_description.SerializedSize(); }
+    size_t SerializedSize() const {
+        return key_description.SerializedSize();
+    }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
         return key_description.Serialize(buf, end);
     }
@@ -68,8 +72,11 @@ struct SupportedAlgorithmsResponse {
 };
 
 template <typename T> struct SupportedResponse {
-    SupportedResponse() : results(NULL), results_length(0) {}
-    ~SupportedResponse() { delete[] results; }
+    SupportedResponse() : results(NULL), results_length(0) {
+    }
+    ~SupportedResponse() {
+        delete[] results;
+    }
 
     template <size_t N> void SetResults(const T (&arr)[N]) {
         delete[] results;
@@ -90,14 +97,60 @@ template <typename T> struct SupportedResponse {
 
 struct GetKeyCharacteristicsRequest {
     keymaster_key_blob_t key_blob;
-    keymaster_blob_t client_id;
-    keymaster_blob_t app_data;
+    AuthorizationSet additional_params;
 };
 
 struct GetKeyCharacteristicsResponse {
     keymaster_error_t error;
     AuthorizationSet enforced;
     AuthorizationSet unenforced;
+};
+
+struct BeginOperationRequest {
+    keymaster_purpose_t purpose;
+    keymaster_key_blob_t key_blob;
+    AuthorizationSet additional_params;
+};
+
+struct BeginOperationResponse {
+    keymaster_error_t error;
+    keymaster_operation_handle_t op_handle;
+};
+
+struct UpdateOperationRequest {
+    keymaster_operation_handle_t op_handle;
+    Buffer input;
+};
+
+struct UpdateOperationResponse {
+    keymaster_error_t error;
+    Buffer output;
+};
+
+struct FinishOperationResponse {
+    keymaster_error_t error;
+    Buffer signature;
+    Buffer output;
+};
+
+struct AddEntropyRequest {
+    Buffer random_data;
+};
+
+// The structs below are trivial because they're not yet implemented.
+struct RescopeRequest {};
+struct RescopeResponse {
+    keymaster_error_t error;
+};
+
+struct ImportKeyRequest {};
+struct ImportKeyResponse {
+    keymaster_error_t error;
+};
+
+struct ExportKeyRequest {};
+struct ExportKeyResponse {
+    keymaster_error_t error;
 };
 
 }  // namespace keymaster

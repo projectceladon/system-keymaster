@@ -2,10 +2,11 @@ BASE=../..
 SUBS=system/core \
 	hardware/libhardware \
 	external/gtest
+GTEST=$(BASE)/external/gtest
 
 INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
 	-I $(BASE)/system/core/include/utils \
-	-I $(BASE)/external/gtest
+	-I $(GTEST)
 
 ifdef USE_CLANG
 CC=/usr/bin/clang
@@ -19,20 +20,23 @@ CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Wmissing-declarations -fprofile-arcs -ftest-coverage \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
-	$(COMPILER_SPECIFIC_ARGS) 
+	$(COMPILER_SPECIFIC_ARGS)
 LDLIBS=-lcrypto -lpthread -lstdc++
 
-CPPSRCS=authorization_set.cpp \
+CPPSRCS=\
+	authorization_set.cpp \
 	authorization_set_test.cpp \
 	google_keymaster.cpp \
-	google_keymaster_test.cpp \
 	google_keymaster_messages.cpp \
 	google_keymaster_messages_test.cpp \
-	serializable.cpp \
+	google_keymaster_test.cpp \
+	google_keymaster_test_utils.cpp \
+	google_keymaster_utils.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
-	google_keymaster_test_utils.cpp
-CCSRCS=$(BASE)/external/gtest/src/gtest-all.cc
+	rsa_operation.cpp \
+	serializable.cpp
+CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
 
 OBJS=$(CPPSRCS:.cpp=.o) $(CCSRCS:.cc=.o) $(CSRCS:.c=.o)
@@ -90,35 +94,37 @@ massif: $(BINARIES:=.massif)
 
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
-	serializable.o \
 	google_keymaster_test_utils.o \
-	$(BASE)/external/gtest/src/gtest-all.o
+	serializable.o \
+	$(GTEST)/src/gtest-all.o
 
 key_blob_test: key_blob_test.o \
-	key_blob.o \
 	authorization_set.o \
+	google_keymaster_test_utils.o \
+	key_blob.o \
 	ocb.o \
 	serializable.o \
-	google_keymaster_test_utils.o \
-	$(BASE)/external/gtest/src/gtest-all.o
+	$(GTEST)/src/gtest-all.o
 
 google_keymaster_messages_test: google_keymaster_messages_test.o \
-	google_keymaster_messages.o \
 	authorization_set.o \
+	google_keymaster_messages.o \
 	serializable.o \
-	$(BASE)/external/gtest/src/gtest-all.o
+	$(GTEST)/src/gtest-all.o
 
 google_keymaster_test: google_keymaster_test.o \
-	google_keymaster.o \
 	authorization_set.o \
+	google_keymaster.o \
 	google_keymaster_messages.o \
+	google_keymaster_test_utils.o \
+	google_keymaster_utils.o \
 	key_blob.o \
 	ocb.o \
+	rsa_operation.o \
 	serializable.o \
-	google_keymaster_test_utils.o \
-	$(BASE)/external/gtest/src/gtest-all.o
+	$(GTEST)/src/gtest-all.o
 
-$(BASE)/external/gtest/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
+$(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
 
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) \

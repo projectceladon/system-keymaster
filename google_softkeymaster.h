@@ -23,13 +23,17 @@ namespace keymaster {
 
 class GoogleSoftKeymaster : public GoogleKeymaster {
   public:
-    GoogleSoftKeymaster() {
+    GoogleSoftKeymaster(size_t operation_table_size) : GoogleKeymaster(operation_table_size) {
         root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
         root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("SW");
         root_of_trust.blob.data_length = 2;
     }
-    bool is_enforced(keymaster_tag_t /* tag */) { return false; }
-    keymaster_key_origin_t origin() { return KM_ORIGIN_SOFTWARE; }
+    bool is_enforced(keymaster_tag_t /* tag */) {
+        return false;
+    }
+    keymaster_key_origin_t origin() {
+        return KM_ORIGIN_SOFTWARE;
+    }
 
   private:
     static uint8_t master_key_[];
