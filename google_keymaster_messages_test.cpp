@@ -18,7 +18,6 @@
 
 #include <gtest/gtest.h>
 
-#define KEYMASTER_NAME_TAGS
 #include "keymaster_tags.h"
 #include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"

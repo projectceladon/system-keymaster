@@ -16,8 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#define KEYMASTER_NAME_TAGS
-
 #include "authorization_set.h"
 #include "google_keymaster_test_utils.h"
 #include "google_keymaster_utils.h"
