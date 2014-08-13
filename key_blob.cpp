@@ -37,7 +37,7 @@ const size_t KeyBlob::TAG_LENGTH;
 
 KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenforced,
                  const AuthorizationSet& hidden, const keymaster_key_blob_t& key,
-                 const keymaster_key_blob_t& master_key, uint8_t nonce[NONCE_LENGTH])
+                 const keymaster_key_blob_t& master_key, const uint8_t nonce[NONCE_LENGTH])
     : error_(KM_ERROR_OK), enforced_(enforced), unenforced_(unenforced), hidden_(hidden) {
     if (enforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         unenforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||

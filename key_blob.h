@@ -57,7 +57,7 @@ class KeyBlob : public Serializable {
      */
     KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenforced,
             const AuthorizationSet& hidden, const keymaster_key_blob_t& key,
-            const keymaster_key_blob_t& master_key, uint8_t nonce[NONCE_LENGTH]);
+            const keymaster_key_blob_t& master_key, const uint8_t nonce[NONCE_LENGTH]);
 
     /**
      * Create a KeyBlob, reconstituting it from the encrypted material in \p encrypted_key,

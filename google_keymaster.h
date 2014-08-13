@@ -22,7 +22,7 @@
 
 namespace keymaster {
 
-struct KeyBlob;
+class KeyBlob;
 
 /**
  * OpenSSL-based Keymaster backing implementation, for use as a pure software implmentation

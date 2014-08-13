@@ -94,12 +94,16 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
  * optimized away.  This is important because we often need to wipe blocks of sensitive data from
  * memory.
  */
+#ifndef KEYMASTER_CLANG_TEST_BUILD
 #pragma GCC push_options
 #pragma GCC optimize("O0")
+#endif // not KEYMASTER_CLANG_TEST_BUILD
 inline void* memset_s(void* s, int c, size_t n) {
     return memset(s, c, n);
 }
+#ifndef KEYMASTER_CLANG_TEST_BUILD
 #pragma GCC pop_options
+#endif // not KEYMASTER_CLANG_TEST_BUILD
 
 /**
  * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
