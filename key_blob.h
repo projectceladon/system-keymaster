@@ -82,7 +82,7 @@ class KeyBlob : public Serializable {
 
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
-    bool Deserialize(const uint8_t** buf, const uint8_t* end);
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     /**
      * Decrypt encrypted key.  Call this after calling "Deserialize". Until it's called,
@@ -96,41 +96,19 @@ class KeyBlob : public Serializable {
      * error code should be checked after constructing or deserializing/decrypting, and if it does
      * not return KM_ERROR_OK, then don't call any other methods.
      */
-    inline keymaster_error_t error() {
-        return error_;
-    }
+    inline keymaster_error_t error() { return error_; }
 
-    inline const uint8_t* nonce() const {
-        return nonce_;
-    }
-    inline const uint8_t* key_material() const {
-        return key_material_.get();
-    }
-    inline const uint8_t* encrypted_key_material() const {
-        return encrypted_key_material_.get();
-    }
-    inline size_t key_material_length() const {
-        return key_material_length_;
-    }
-    inline const uint8_t* tag() const {
-        return tag_;
-    }
+    inline const uint8_t* nonce() const { return nonce_; }
+    inline const uint8_t* key_material() const { return key_material_.get(); }
+    inline const uint8_t* encrypted_key_material() const { return encrypted_key_material_.get(); }
+    inline size_t key_material_length() const { return key_material_length_; }
+    inline const uint8_t* tag() const { return tag_; }
 
-    inline const AuthorizationSet& enforced() const {
-        return enforced_;
-    }
-    inline const AuthorizationSet& unenforced() const {
-        return unenforced_;
-    }
-    inline const AuthorizationSet& hidden() const {
-        return hidden_;
-    }
-    inline keymaster_algorithm_t algorithm() const {
-        return algorithm_;
-    }
-    inline size_t key_size_bits() const {
-        return key_size_bits_;
-    }
+    inline const AuthorizationSet& enforced() const { return enforced_; }
+    inline const AuthorizationSet& unenforced() const { return unenforced_; }
+    inline const AuthorizationSet& hidden() const { return hidden_; }
+    inline keymaster_algorithm_t algorithm() const { return algorithm_; }
+    inline size_t key_size_bits() const { return key_size_bits_; }
 
   private:
     void EncryptKey(const keymaster_key_blob_t& master_key);

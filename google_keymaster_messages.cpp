@@ -32,13 +32,13 @@ size_t GenerateKeyResponse::SerializedSize() const {
 }
 
 uint8_t* GenerateKeyResponse::Serialize(uint8_t* buf, const uint8_t* end) const {
-    buf = append_to_buf(buf, end, static_cast<int32_t>(error));
+    buf = append_uint32_to_buf(buf, end, error);
     if (error == KM_ERROR_OK) {
         buf = append_size_and_data_to_buf(buf, end, key_blob.key_material,
                                           key_blob.key_material_size);
-        buf = append_to_buf(buf, end, static_cast<uint32_t>(enforced.SerializedSize()));
+        buf = append_uint32_to_buf(buf, end, enforced.SerializedSize());
         buf = enforced.Serialize(buf, end);
-        buf = append_to_buf(buf, end, static_cast<uint32_t>(unenforced.SerializedSize()));
+        buf = append_uint32_to_buf(buf, end, unenforced.SerializedSize());
         buf = unenforced.Serialize(buf, end);
     };
     return buf;
@@ -47,7 +47,7 @@ uint8_t* GenerateKeyResponse::Serialize(uint8_t* buf, const uint8_t* end) const 
 bool GenerateKeyResponse::Deserialize(const uint8_t** buf, const uint8_t* end) {
     delete[] key_blob.key_material;
 
-    if (!copy_from_buf(buf, end, &error))
+    if (!copy_uint32_from_buf(buf, end, &error))
         return false;
 
     if (end == *buf)
@@ -55,7 +55,7 @@ bool GenerateKeyResponse::Deserialize(const uint8_t** buf, const uint8_t* end) {
         return true;
 
     uint32_t key_material_size;
-    if (!copy_from_buf(buf, end, &key_material_size) || end - *buf < key_material_size)
+    if (!copy_uint32_from_buf(buf, end, &key_material_size) || end - *buf < key_material_size)
         return false;
 
     key_blob.key_material = new uint8_t[key_material_size];
@@ -66,12 +66,12 @@ bool GenerateKeyResponse::Deserialize(const uint8_t** buf, const uint8_t* end) {
         return false;
 
     uint32_t enforced_size;
-    if (!copy_from_buf(buf, end, &enforced_size) || end - *buf < enforced_size ||
+    if (!copy_uint32_from_buf(buf, end, &enforced_size) || end - *buf < enforced_size ||
         !enforced.Deserialize(buf, *buf + enforced_size))
         return false;
 
     uint32_t unenforced_size;
-    if (!copy_from_buf(buf, end, &unenforced_size) || end - *buf < unenforced_size ||
+    if (!copy_uint32_from_buf(buf, end, &unenforced_size) || end - *buf < unenforced_size ||
         !unenforced.Deserialize(buf, *buf + unenforced_size))
         return false;
 

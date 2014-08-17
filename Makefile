@@ -11,14 +11,15 @@ INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
 ifdef USE_CLANG
 CC=/usr/bin/clang
 CXX=/usr/bin/clang
-COMPILER_SPECIFIC_ARGS=-std=c++11 -DKEYMASTER_CLANG_TEST_BUILD
+CLANG_TEST_DEFINE=-DKEYMASTER_CLANG_TEST_BUILD
+COMPILER_SPECIFIC_ARGS=-std=c++11 $(CLANG_TEST_DEFINE)
 else
-COMPILER_SPECIFIC_ARGS=-std=c++0x
+COMPILER_SPECIFIC_ARGS=-std=c++0x -fprofile-arcs 
 endif
 
 CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
-	-Wmissing-declarations -fprofile-arcs -ftest-coverage \
+	-Wmissing-declarations -ftest-coverage \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
 	$(COMPILER_SPECIFIC_ARGS)
 LDLIBS=-lcrypto -lpthread -lstdc++
@@ -125,6 +126,7 @@ google_keymaster_test: google_keymaster_test.o \
 	$(GTEST)/src/gtest-all.o
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
+ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)
 
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) \

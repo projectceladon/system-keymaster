@@ -144,7 +144,7 @@ static inline unsigned ntz(unsigned x) {
 /* Define blocks and operations -- Patch if incorrect on your compiler.    */
 /* ----------------------------------------------------------------------- */
 
-#if __SSE2__
+#if __SSE2__ && !KEYMASTER_CLANG_TEST_BUILD
 #include <xmmintrin.h> /* SSE instructions and _mm_malloc */
 #include <emmintrin.h> /* SSE2 instructions               */
 typedef __m128i block;
