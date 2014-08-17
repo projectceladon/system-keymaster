@@ -28,55 +28,39 @@ namespace keymaster {
 // Commands
 const uint32_t GENERATE_KEY = 0;
 
-struct GenerateKeyRequest : public Serializable {
-    GenerateKeyRequest() {
-    }
-    GenerateKeyRequest(uint8_t* buf, size_t size) : key_description(buf, size) {
-    }
-
-    AuthorizationSet key_description;
-
-    size_t SerializedSize() const {
-        return key_description.SerializedSize();
-    }
-    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
-        return key_description.Serialize(buf, end);
-    }
-    bool Deserialize(const uint8_t** buf, const uint8_t* end) {
-        return key_description.Deserialize(buf, end);
-    }
-};
-
-struct GenerateKeyResponse : public Serializable {
-    GenerateKeyResponse() {
-        error = KM_ERROR_OK;
-        key_blob.key_material = NULL;
-        key_blob.key_material_size = 0;
-    }
-    ~GenerateKeyResponse();
-
-    keymaster_error_t error;
-    keymaster_key_blob_t key_blob;
-    AuthorizationSet enforced;
-    AuthorizationSet unenforced;
-
+/**
+ * All responses include an error value, and if the error is not KM_ERROR_OK, return no additional
+ * data.  This abstract class factors out the common serialization functionality for all of the
+ * responses, so we only have to implement it once.  Inheritance for reuse is generally not a great
+ * structure, but in this case it's the cleanest option.
+ */
+struct KeymasterResponse : public Serializable {
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
-    bool Deserialize(const uint8_t** buf, const uint8_t* end);
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    virtual size_t NonErrorSerializedSize() const = 0;
+    virtual uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const = 0;
+    virtual bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) = 0;
+
+    keymaster_error_t error;
 };
 
-struct SupportedAlgorithmsResponse {
-    keymaster_error_t error;
+struct SupportedAlgorithmsResponse : public KeymasterResponse {
+    SupportedAlgorithmsResponse() : algorithms(NULL), algorithms_length(0) {}
+    ~SupportedAlgorithmsResponse() { delete[] algorithms; }
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     keymaster_algorithm_t* algorithms;
     size_t algorithms_length;
 };
 
-template <typename T> struct SupportedResponse {
-    SupportedResponse() : results(NULL), results_length(0) {
-    }
-    ~SupportedResponse() {
-        delete[] results;
-    }
+template <typename T> struct SupportedResponse : public KeymasterResponse {
+    SupportedResponse() : results(NULL), results_length(0) {}
+    ~SupportedResponse() { delete[] results; }
 
     template <size_t N> void SetResults(const T (&arr)[N]) {
         delete[] results;
@@ -90,72 +74,215 @@ template <typename T> struct SupportedResponse {
         }
     }
 
-    keymaster_error_t error;
+    size_t NonErrorSerializedSize() const {
+        return sizeof(uint32_t) + results_length * sizeof(uint32_t);
+    }
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
+        return append_uint32_array_to_buf(buf, end, results, results_length);
+    }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        return copy_uint32_array_from_buf(buf_ptr, end, &results, &results_length);
+    }
+
     T* results;
     size_t results_length;
 };
 
-struct GetKeyCharacteristicsRequest {
-    keymaster_key_blob_t key_blob;
-    AuthorizationSet additional_params;
+struct GenerateKeyRequest : public Serializable {
+    GenerateKeyRequest() {}
+    GenerateKeyRequest(uint8_t* buf, size_t size) : key_description(buf, size) {}
+
+    size_t SerializedSize() const { return key_description.SerializedSize(); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
+        return key_description.Serialize(buf, end);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        return key_description.Deserialize(buf_ptr, end);
+    }
+
+    AuthorizationSet key_description;
 };
 
-struct GetKeyCharacteristicsResponse {
-    keymaster_error_t error;
+struct GenerateKeyResponse : public KeymasterResponse {
+    GenerateKeyResponse() {
+        error = KM_ERROR_OK;
+        key_blob.key_material = NULL;
+        key_blob.key_material_size = 0;
+    }
+    ~GenerateKeyResponse();
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    keymaster_key_blob_t key_blob;
     AuthorizationSet enforced;
     AuthorizationSet unenforced;
 };
 
-struct BeginOperationRequest {
+struct GetKeyCharacteristicsRequest : public Serializable {
+    GetKeyCharacteristicsRequest() { key_blob.key_material = NULL; }
+    ~GetKeyCharacteristicsRequest();
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    keymaster_key_blob_t key_blob;
+    AuthorizationSet additional_params;
+};
+
+struct GetKeyCharacteristicsResponse : public KeymasterResponse {
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    AuthorizationSet enforced;
+    AuthorizationSet unenforced;
+};
+
+struct BeginOperationRequest : public Serializable {
+    BeginOperationRequest() { key_blob.key_material = NULL; }
+    ~BeginOperationRequest() { delete[] key_blob.key_material; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     keymaster_purpose_t purpose;
     keymaster_key_blob_t key_blob;
     AuthorizationSet additional_params;
 };
 
-struct BeginOperationResponse {
-    keymaster_error_t error;
+struct BeginOperationResponse : public KeymasterResponse {
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     keymaster_operation_handle_t op_handle;
 };
 
-struct UpdateOperationRequest {
+struct UpdateOperationRequest : public Serializable {
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     keymaster_operation_handle_t op_handle;
     Buffer input;
 };
 
-struct UpdateOperationResponse {
-    keymaster_error_t error;
+struct UpdateOperationResponse : public KeymasterResponse {
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     Buffer output;
 };
 
-struct FinishOperationRequest {
+struct FinishOperationRequest : public Serializable {
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     keymaster_operation_handle_t op_handle;
     Buffer signature;
 };
 
-struct FinishOperationResponse {
-    keymaster_error_t error;
+struct FinishOperationResponse : public KeymasterResponse {
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     Buffer output;
 };
 
-struct AddEntropyRequest {
+struct AddEntropyRequest : public Serializable {
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
     Buffer random_data;
 };
 
-// The structs below are trivial because they're not yet implemented.
-struct RescopeRequest {};
-struct RescopeResponse {
-    keymaster_error_t error;
+struct ImportKeyRequest : public Serializable {
+    ImportKeyRequest() : key_data(NULL) {}
+    ~ImportKeyRequest() { delete[] key_data; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    AuthorizationSet additional_params;
+    keymaster_key_format_t key_format;
+    uint8_t* key_data;
+    size_t key_data_length;
 };
 
-struct ImportKeyRequest {};
-struct ImportKeyResponse {
-    keymaster_error_t error;
+struct ImportKeyResponse : public KeymasterResponse {
+    ImportKeyResponse() { key_blob.key_material = NULL; }
+    ~ImportKeyResponse() { delete[] key_blob.key_material; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    keymaster_key_blob_t key_blob;
+    AuthorizationSet enforced;
+    AuthorizationSet unenforced;
 };
 
-struct ExportKeyRequest {};
-struct ExportKeyResponse {
-    keymaster_error_t error;
+struct ExportKeyRequest : public Serializable {
+    ExportKeyRequest() { key_blob.key_material = NULL; }
+    ~ExportKeyRequest() { delete[] key_blob.key_material; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    AuthorizationSet additional_params;
+    keymaster_key_format_t key_format;
+    keymaster_key_blob_t key_blob;
 };
+
+struct ExportKeyResponse : public KeymasterResponse {
+    ExportKeyResponse() : key_data(NULL) {}
+    ~ExportKeyResponse() { delete[] key_data; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    uint8_t* key_data;
+    size_t key_data_length;
+};
+
+// The structs below are trivial because they're not implemented yet.
+struct RescopeRequest : public Serializable {};
+struct RescopeResponse : public KeymasterResponse {};
 
 }  // namespace keymaster
 

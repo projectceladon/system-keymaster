@@ -110,6 +110,8 @@ key_blob_test: key_blob_test.o \
 google_keymaster_messages_test: google_keymaster_messages_test.o \
 	authorization_set.o \
 	google_keymaster_messages.o \
+	google_keymaster_test_utils.o \
+	google_keymaster_utils.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 

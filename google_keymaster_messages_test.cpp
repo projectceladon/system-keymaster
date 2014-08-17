@@ -18,9 +18,10 @@
 
 #include <gtest/gtest.h>
 
-#include "keymaster_tags.h"
+#include "google_keymaster_test_utils.h"
 #include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"
+#include "keymaster_tags.h"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
@@ -31,131 +32,267 @@ int main(int argc, char** argv) {
 namespace keymaster {
 namespace test {
 
-TEST(GenerateKeyRequest, RoundTrip) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    GenerateKeyRequest req;
-    req.key_description.Reinitialize(params, array_length(params));
-
-    size_t size = req.SerializedSize();
-    EXPECT_EQ(78U, size);
+/**
+ * Serialize and deserialize a message.
+ */
+template <typename Message> Message* round_trip(const Message& message, size_t expected_size) {
+    size_t size = message.SerializedSize();
+    EXPECT_EQ(expected_size, size);
+    if (size == 0)
+        return NULL;
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, req.Serialize(buf.get(), buf.get() + size));
+    EXPECT_EQ(buf.get() + size, message.Serialize(buf.get(), buf.get() + size));
 
-    GenerateKeyRequest deserialized1;
+    Message* deserialized = new Message;
     const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized1.Deserialize(&p, p + size));
-    EXPECT_EQ(7U, deserialized1.key_description.size());
-
-    // Check a few entries.
-    keymaster_purpose_t purpose;
-    EXPECT_TRUE(deserialized1.key_description.GetTagValue(TAG_PURPOSE, 0, &purpose));
-    EXPECT_EQ(KM_PURPOSE_SIGN, purpose);
-    keymaster_blob_t blob;
-    EXPECT_TRUE(deserialized1.key_description.GetTagValue(TAG_APPLICATION_ID, &blob));
-    EXPECT_EQ(6U, blob.data_length);
-    EXPECT_EQ(0, memcmp(blob.data, "app_id", 6));
-    uint32_t val;
-    EXPECT_TRUE(deserialized1.key_description.GetTagValue(TAG_USER_ID, &val));
-    EXPECT_EQ(7U, val);
-
-    GenerateKeyRequest deserialized2;
-    const uint8_t* p2 = buf.get();
-    EXPECT_TRUE(deserialized2.Deserialize(&p2, p2 + size));
-    EXPECT_EQ(7U, deserialized2.key_description.size());
-
-    // Check a few entries.
-    EXPECT_TRUE(deserialized2.key_description.GetTagValue(TAG_PURPOSE, 0, &purpose));
-    EXPECT_EQ(KM_PURPOSE_SIGN, purpose);
-    EXPECT_TRUE(deserialized2.key_description.GetTagValue(TAG_APPLICATION_ID, &blob));
-    EXPECT_EQ(6U, blob.data_length);
-    EXPECT_EQ(0, memcmp(blob.data, "app_id", 6));
-    EXPECT_TRUE(deserialized2.key_description.GetTagValue(TAG_USER_ID, &val));
-    EXPECT_EQ(7U, val);
+    EXPECT_TRUE(deserialized->Deserialize(&p, p + size));
+    EXPECT_EQ((ptrdiff_t)size, p - buf.get());
+    return deserialized;
 }
 
+class EmptyKeymasterResponse : public KeymasterResponse {
+    size_t NonErrorSerializedSize() const { return 1; }
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* /* end */) const {
+        *buf++ = 0;
+        return buf;
+    }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        if (*buf_ptr >= end)
+            return false;
+        EXPECT_EQ(0, **buf_ptr);
+        (*buf_ptr)++;
+        return true;
+    }
+};
+
+TEST(RoundTrip, EmptyKeymasterResponse) {
+    EmptyKeymasterResponse msg;
+    msg.error = KM_ERROR_OK;
+
+    UniquePtr<EmptyKeymasterResponse> deserialized(round_trip(msg, 5));
+}
+
+TEST(RoundTrip, EmptyKeymasterResponseError) {
+    EmptyKeymasterResponse msg;
+    msg.error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    UniquePtr<EmptyKeymasterResponse> deserialized(round_trip(msg, 4));
+}
+
+TEST(RoundTrip, SupportedAlgorithmsResponse) {
+    SupportedAlgorithmsResponse rsp;
+    keymaster_algorithm_t algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA};
+    rsp.error = KM_ERROR_OK;
+    rsp.algorithms = dup_array(algorithms);
+    rsp.algorithms_length = array_length(algorithms);
+
+    UniquePtr<SupportedAlgorithmsResponse> deserialized(round_trip(rsp, 20));
+    EXPECT_EQ(array_length(algorithms), deserialized->algorithms_length);
+    EXPECT_EQ(0, memcmp(deserialized->algorithms, algorithms, array_size(algorithms)));
+}
+
+TEST(RoundTrip, SupportedResponse) {
+    SupportedResponse<keymaster_digest_t> rsp;
+    keymaster_digest_t digests[] = {KM_DIGEST_NONE, KM_DIGEST_MD5, KM_DIGEST_SHA1};
+    rsp.error = KM_ERROR_OK;
+    rsp.SetResults(digests);
+
+    UniquePtr<SupportedResponse<keymaster_digest_t>> deserialized(round_trip(rsp, 20));
+    EXPECT_EQ(array_length(digests), deserialized->results_length);
+    EXPECT_EQ(0, memcmp(deserialized->results, digests, array_size(digests)));
+}
+
+static keymaster_key_param_t params[] = {
+    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),    Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_USER_ID, 7),
+    Authorization(TAG_USER_AUTH_ID, 8),             Authorization(TAG_APPLICATION_ID, "app_id", 6),
+    Authorization(TAG_AUTH_TIMEOUT, 300),
+};
 uint8_t TEST_DATA[] = "a key blob";
 
-TEST(GenerateKeyResponse, RoundTrip) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
+TEST(RoundTrip, GenerateKeyRequest) {
+    GenerateKeyRequest req;
+    req.key_description.Reinitialize(params, array_length(params));
+    UniquePtr<GenerateKeyRequest> deserialized(round_trip(req, 78));
+    EXPECT_EQ(deserialized->key_description, req.key_description);
+}
+
+TEST(RoundTrip, GenerateKeyResponse) {
     GenerateKeyResponse rsp;
     rsp.error = KM_ERROR_OK;
     rsp.key_blob.key_material = dup_array(TEST_DATA);
     rsp.key_blob.key_material_size = array_length(TEST_DATA);
     rsp.enforced.Reinitialize(params, array_length(params));
 
-    size_t size = rsp.SerializedSize();
-    EXPECT_EQ(117U, size);
-
-    UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get(), buf.get() + size));
-
-    GenerateKeyResponse deserialized;
-    const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
-    EXPECT_EQ(7U, deserialized.enforced.size());
-
-    EXPECT_EQ(0U, deserialized.unenforced.size());
-    EXPECT_EQ(KM_ERROR_OK, deserialized.error);
-
-    // Check a few entries of enforced.
-    keymaster_purpose_t purpose;
-    EXPECT_TRUE(deserialized.enforced.GetTagValue(TAG_PURPOSE, 0, &purpose));
-    EXPECT_EQ(KM_PURPOSE_SIGN, purpose);
-    keymaster_blob_t blob;
-    EXPECT_TRUE(deserialized.enforced.GetTagValue(TAG_APPLICATION_ID, &blob));
-    EXPECT_EQ(6U, blob.data_length);
-    EXPECT_EQ(0, memcmp(blob.data, "app_id", 6));
-    uint32_t val;
-    EXPECT_TRUE(deserialized.enforced.GetTagValue(TAG_USER_ID, &val));
-    EXPECT_EQ(7U, val);
+    UniquePtr<GenerateKeyResponse> deserialized(round_trip(rsp, 117));
+    EXPECT_EQ(KM_ERROR_OK, deserialized->error);
+    EXPECT_EQ(deserialized->enforced, rsp.enforced);
+    EXPECT_EQ(deserialized->unenforced, rsp.unenforced);
 }
 
-TEST(GenerateKeyResponse, Error) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
+TEST(RoundTrip, GenerateKeyResponseTestError) {
     GenerateKeyResponse rsp;
     rsp.error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     rsp.key_blob.key_material = dup_array(TEST_DATA);
     rsp.key_blob.key_material_size = array_length(TEST_DATA);
     rsp.enforced.Reinitialize(params, array_length(params));
 
-    size_t size = rsp.SerializedSize();
-    EXPECT_EQ(4U, size);
+    UniquePtr<GenerateKeyResponse> deserialized(round_trip(rsp, 4));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, deserialized->error);
+    EXPECT_EQ(0U, deserialized->enforced.size());
+    EXPECT_EQ(0U, deserialized->unenforced.size());
+    EXPECT_EQ(0U, deserialized->key_blob.key_material_size);
+}
 
-    UniquePtr<uint8_t[]> buf(new uint8_t[size]);
-    EXPECT_EQ(buf.get() + size, rsp.Serialize(buf.get(), buf.get() + size));
+TEST(RoundTrip, GetKeyCharacteristicsRequest) {
+    GetKeyCharacteristicsRequest req;
+    req.additional_params.Reinitialize(params, array_length(params));
+    req.SetKeyMaterial("foo", 3);
 
-    GenerateKeyResponse deserialized;
-    const uint8_t* p = buf.get();
-    EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, deserialized.error);
-    EXPECT_EQ(0U, deserialized.enforced.size());
-    EXPECT_EQ(0U, deserialized.unenforced.size());
-    EXPECT_EQ(0U, deserialized.key_blob.key_material_size);
+    UniquePtr<GetKeyCharacteristicsRequest> deserialized(round_trip(req, 89));
+    EXPECT_EQ(7U, deserialized->additional_params.size());
+    EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+    EXPECT_EQ(0, memcmp(deserialized->key_blob.key_material, "foo", 3));
+}
+
+TEST(RoundTrip, GetKeyCharacteristicsResponse) {
+    GetKeyCharacteristicsResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.enforced.Reinitialize(params, array_length(params));
+    msg.unenforced.Reinitialize(params, array_length(params));
+
+    UniquePtr<GetKeyCharacteristicsResponse> deserialized(round_trip(msg, 168));
+    EXPECT_EQ(msg.enforced, deserialized->enforced);
+    EXPECT_EQ(msg.unenforced, deserialized->unenforced);
+}
+
+TEST(RoundTrip, BeginOperationRequest) {
+    BeginOperationRequest msg;
+    msg.purpose = KM_PURPOSE_SIGN;
+    msg.SetKeyMaterial("foo", 3);
+    msg.additional_params.Reinitialize(params, array_length(params));
+
+    UniquePtr<BeginOperationRequest> deserialized(round_trip(msg, 89));
+    EXPECT_EQ(KM_PURPOSE_SIGN, deserialized->purpose);
+    EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+    EXPECT_EQ(0, memcmp(deserialized->key_blob.key_material, "foo", 3));
+    EXPECT_EQ(msg.additional_params, deserialized->additional_params);
+}
+
+TEST(RoundTrip, BeginOperationResponse) {
+    BeginOperationResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.op_handle = 0xDEADBEEF;
+
+    UniquePtr<BeginOperationResponse> deserialized(round_trip(msg, 12));
+    EXPECT_EQ(KM_ERROR_OK, deserialized->error);
+    EXPECT_EQ(0xDEADBEEF, deserialized->op_handle);
+}
+
+TEST(RoundTrip, BeginOperationResponseError) {
+    BeginOperationResponse msg;
+    msg.error = KM_ERROR_INVALID_OPERATION_HANDLE;
+    msg.op_handle = 0xDEADBEEF;
+
+    UniquePtr<BeginOperationResponse> deserialized(round_trip(msg, 4));
+    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, deserialized->error);
+}
+
+TEST(RoundTrip, UpdateOperationRequest) {
+    UpdateOperationRequest msg;
+    msg.op_handle = 0xDEADBEEF;
+    msg.input.Reinitialize("foo", 3);
+
+    UniquePtr<UpdateOperationRequest> deserialized(round_trip(msg, 15));
+    EXPECT_EQ(3U, deserialized->input.available_read());
+    EXPECT_EQ(0, memcmp(deserialized->input.peek_read(), "foo", 3));
+}
+
+TEST(RoundTrip, UpdateOperationResponse) {
+    UpdateOperationResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.output.Reinitialize("foo", 3);
+
+    UniquePtr<UpdateOperationResponse> deserialized(round_trip(msg, 11));
+    EXPECT_EQ(KM_ERROR_OK, deserialized->error);
+    EXPECT_EQ(3U, deserialized->output.available_read());
+    EXPECT_EQ(0, memcmp(deserialized->output.peek_read(), "foo", 3));
+}
+
+TEST(RoundTrip, FinishOperationRequest) {
+    FinishOperationRequest msg;
+    msg.op_handle = 0xDEADBEEF;
+    msg.signature.Reinitialize("bar", 3);
+
+    UniquePtr<FinishOperationRequest> deserialized(round_trip(msg, 15));
+    EXPECT_EQ(0xDEADBEEF, deserialized->op_handle);
+    EXPECT_EQ(3U, deserialized->signature.available_read());
+    EXPECT_EQ(0, memcmp(deserialized->signature.peek_read(), "bar", 3));
+}
+
+TEST(Round_Trip, FinishOperationResponse) {
+    FinishOperationResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.output.Reinitialize("foo", 3);
+
+    UniquePtr<FinishOperationResponse> deserialized(round_trip(msg, 11));
+    EXPECT_EQ(msg.error, deserialized->error);
+    EXPECT_EQ(msg.output.available_read(), deserialized->output.available_read());
+    EXPECT_EQ(0, memcmp(msg.output.peek_read(), deserialized->output.peek_read(),
+                        msg.output.available_read()));
+}
+
+TEST(RoundTrip, ImportKeyRequest) {
+    ImportKeyRequest msg;
+    msg.additional_params.Reinitialize(params, array_length(params));
+    msg.key_format = KM_KEY_FORMAT_X509;
+    msg.SetKeyMaterial("foo", 3);
+
+    UniquePtr<ImportKeyRequest> deserialized(round_trip(msg, 93));
+    EXPECT_EQ(msg.additional_params, deserialized->additional_params);
+    EXPECT_EQ(msg.key_format, deserialized->key_format);
+    EXPECT_EQ(msg.key_data_length, deserialized->key_data_length);
+    EXPECT_EQ(0, memcmp(msg.key_data, deserialized->key_data, msg.key_data_length));
+}
+
+TEST(RoundTrip, ImportKeyResponse) {
+    ImportKeyResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.SetKeyMaterial("foo", 3);
+    msg.enforced.Reinitialize(params, array_length(params));
+    msg.unenforced.Reinitialize(params, array_length(params));
+
+    UniquePtr<ImportKeyResponse> deserialized(round_trip(msg, 175));
+    EXPECT_EQ(msg.error, deserialized->error);
+    EXPECT_EQ(msg.key_blob.key_material_size, deserialized->key_blob.key_material_size);
+    EXPECT_EQ(0, memcmp(msg.key_blob.key_material, deserialized->key_blob.key_material,
+                        msg.key_blob.key_material_size));
+    EXPECT_EQ(msg.enforced, deserialized->enforced);
+    EXPECT_EQ(msg.unenforced, deserialized->unenforced);
+}
+
+TEST(RoundTrip, ExportKeyRequest) {
+    ExportKeyRequest msg;
+    msg.additional_params.Reinitialize(params, array_length(params));
+    msg.key_format = KM_KEY_FORMAT_X509;
+    msg.SetKeyMaterial("foo", 3);
+
+    UniquePtr<ExportKeyRequest> deserialized(round_trip(msg, 93));
+    EXPECT_EQ(msg.additional_params, deserialized->additional_params);
+    EXPECT_EQ(msg.key_format, deserialized->key_format);
+    EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+    EXPECT_EQ(0, memcmp("foo", deserialized->key_blob.key_material, 3));
+}
+
+TEST(RoundTrip, ExportKeyResponse) {
+    ExportKeyResponse msg;
+    msg.error = KM_ERROR_OK;
+    msg.SetKeyMaterial("foo", 3);
+
+    UniquePtr<ExportKeyResponse> deserialized(round_trip(msg, 11));
+    EXPECT_EQ(3U, deserialized->key_data_length);
+    EXPECT_EQ(0, memcmp("foo", deserialized->key_data, 3));
 }
 
 }  // namespace test
