@@ -25,6 +25,7 @@
 
 #include "ae.h"
 #include "dsa_operation.h"
+#include "ecdsa_operation.h"
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
 #include "key_blob.h"
@@ -54,7 +55,7 @@ struct AE_CTX_Delete {
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
 keymaster_algorithm_t supported_algorithms[] = {
-    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA,
+    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA,
 };
 
 template <typename T>
@@ -92,6 +93,7 @@ GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
     case KM_ALGORITHM_DSA:
+    case KM_ALGORITHM_ECDSA:
         response->SetResults(supported_padding);
         break;
     default:
@@ -110,6 +112,7 @@ void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
     case KM_ALGORITHM_DSA:
+    case KM_ALGORITHM_ECDSA:
         response->SetResults(supported_digests);
         break;
     default:
@@ -129,6 +132,7 @@ GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
     case KM_ALGORITHM_DSA:
+    case KM_ALGORITHM_ECDSA:
         response->SetResults(supported_import_formats);
         break;
     default:
@@ -148,6 +152,7 @@ GoogleKeymaster::SupportedExportFormats(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
     case KM_ALGORITHM_DSA:
+    case KM_ALGORITHM_ECDSA:
         response->SetResults(supported_export_formats);
         break;
     default:
@@ -183,6 +188,10 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
         break;
     case KM_ALGORITHM_DSA:
         if (!GenerateDsa(request.key_description, response, &hidden_auths))
+            return;
+        break;
+    case KM_ALGORITHM_ECDSA:
+        if (!GenerateEcdsa(request.key_description, response, &hidden_auths))
             return;
         break;
     default:
@@ -351,6 +360,27 @@ bool GoogleKeymaster::GenerateDsa(const AuthorizationSet& key_auths, GenerateKey
         delete[] q_blob.data;
     }
 
+    if (error != KM_ERROR_OK) {
+        response->error = error;
+        return false;
+    }
+
+    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
+}
+
+bool GoogleKeymaster::GenerateEcdsa(const AuthorizationSet& key_auths,
+                                    GenerateKeyResponse* response, AuthorizationSet* hidden_auths) {
+    uint64_t public_exponent = RSA_DEFAULT_EXPONENT;
+    if (!key_auths.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent))
+        AddAuthorization(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent), response);
+
+    uint32_t key_size = RSA_DEFAULT_KEY_SIZE;
+    if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
+        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
+
+    UniquePtr<uint8_t[]> key_data;
+    size_t key_data_size;
+    keymaster_error_t error = EcdsaOperation::Generate(key_size, &key_data, &key_data_size);
     if (error != KM_ERROR_OK) {
         response->error = error;
         return false;
