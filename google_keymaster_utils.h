@@ -96,16 +96,22 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
  * optimized away.  This is important because we often need to wipe blocks of sensitive data from
  * memory.
  */
-#ifndef KEYMASTER_CLANG_TEST_BUILD
-#pragma GCC push_options
-#pragma GCC optimize("O0")
-#endif  // not KEYMASTER_CLANG_TEST_BUILD
-inline void* memset_s(void* s, int c, size_t n) {
+#ifdef KEYMASTER_CLANG_TEST_BUILD
+#define OPTIMIZE(x)
+#else // not KEYMASTER_CLANG_TEST_BUILD
+#define OPTIMIZE(x) __attribute__((optimize(x)))
+#endif // not KEYMASTER_CLANG_TEST_BUILD
+inline OPTIMIZE("O0") void* memset_s(void* s, int c, size_t n) {
     return memset(s, c, n);
 }
-#ifndef KEYMASTER_CLANG_TEST_BUILD
-#pragma GCC pop_options
-#endif  // not KEYMASTER_CLANG_TEST_BUILD
+#undef OPTIMIZE
+
+/**
+ * Variant of memcmp that has the same runtime regardless of whether the data matches (i.e. doesn't
+ * short-circuit).  Not an exact equivalent to memcmp because it doesn't return <0 if p1 < p2, just
+ * 0 for match and non-zero for non-match.
+ */
+int memcmp_s(const void* p1, const void* p2, size_t length);
 
 /**
  * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
@@ -156,6 +162,11 @@ class Buffer {
     bool Reinitialize(size_t size);
     bool Reinitialize(const void* buf, size_t size);
 
+    // Reinitialize with a copy of the provided buffer's readable data.
+    bool Reinitialize(const Buffer& buffer) {
+        return Reinitialize(buffer.peek_read(), buffer.available_read());
+    }
+
     size_t available_write() const;
     size_t available_read() const;
     size_t buffer_size() const {
@@ -178,6 +189,10 @@ class Buffer {
     }
 
   private:
+    // Disallow copy construction and assignment.
+    void operator=(const Buffer& other);
+    Buffer(const Buffer&);
+
     uint8_t* buffer_;
     size_t buffer_size_;
     int read_position_;

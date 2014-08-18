@@ -298,15 +298,15 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
     }
 }
 
-void GoogleKeymaster::FinishOperation(const keymaster_operation_handle_t op_handle,
+void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
                                       FinishOperationResponse* response) {
-    OpTableEntry* entry = FindOperation(op_handle);
+    OpTableEntry* entry = FindOperation(request.op_handle);
     if (entry == NULL) {
         response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
         return;
     }
 
-    response->error = entry->operation->Finish(&response->signature, &response->output);
+    response->error = entry->operation->Finish(request.signature, &response->output);
     DeleteOperation(entry);
 }
 

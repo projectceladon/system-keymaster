@@ -34,20 +34,20 @@ class RsaOperation : public Operation {
         return error_;
     }
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output);
-    virtual keymaster_error_t Finish(Buffer* signature, Buffer* output);
+    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
     virtual keymaster_error_t Abort() {
         // Nothing to do.
         return KM_ERROR_OK;
     }
 
   private:
-    keymaster_error_t Sign(const Buffer& input, Buffer* output);
+    keymaster_error_t StoreData(const Buffer& input);
 
     keymaster_error_t error_;
     keymaster_digest_t digest_;
     keymaster_padding_t padding_;
     RSA* rsa_key_;
-    Buffer data_to_sign_;
+    Buffer data_;
 };
 
 }  // namespace keymaster
