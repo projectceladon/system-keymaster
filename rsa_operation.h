@@ -17,7 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_RSA_OPERATION_H_
 #define SYSTEM_KEYMASTER_RSA_OPERATION_H_
 
-#include "openssl/evp.h"
+#include <UniquePtr.h>
 
 #include "key_blob.h"
 #include "operation.h"
@@ -28,6 +28,9 @@ class RsaOperation : public Operation {
   public:
     RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key);
     ~RsaOperation();
+
+    static keymaster_error_t Generate(uint64_t public_exponent, uint32_t key_size,
+                                      UniquePtr<uint8_t[]>* key_data, size_t* key_data_size);
 
     virtual keymaster_error_t Begin() {
         // In this case, all of the actual intialization was done in the constructor.
