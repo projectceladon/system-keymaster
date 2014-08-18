@@ -238,6 +238,9 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     case KM_ALGORITHM_DSA:
         operation.reset(new DsaOperation(request.purpose, *key));
         break;
+    case KM_ALGORITHM_ECDSA:
+        operation.reset(new EcdsaOperation(request.purpose, *key));
+        break;
     default:
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         break;
