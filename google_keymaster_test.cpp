@@ -342,14 +342,17 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
     EXPECT_EQ(gen_rsp.unenforced, rsp.unenforced);
 }
 
+/**
+ * Test class that provides some infrastructure for generating keys and signing messages.
+ */
 class SigningOperationsTest : public KeymasterTest {
   protected:
-    keymaster_key_blob_t* GenerateKey(keymaster_digest_t digest, keymaster_padding_t padding,
-                                      uint32_t key_size) {
+    void GenerateKey(keymaster_algorithm_t algorithm, keymaster_digest_t digest,
+                     keymaster_padding_t padding, uint32_t key_size) {
         keymaster_key_param_t params[] = {
             Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
             Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-            Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+            Authorization(TAG_ALGORITHM, algorithm),
             Authorization(TAG_KEY_SIZE, key_size),
             Authorization(TAG_USER_ID, 7),
             Authorization(TAG_USER_AUTH_ID, 8),
@@ -364,25 +367,57 @@ class SigningOperationsTest : public KeymasterTest {
             generate_request.key_description.push_back(TAG_PADDING, padding);
         device.GenerateKey(generate_request, &generate_response_);
         EXPECT_EQ(KM_ERROR_OK, generate_response_.error);
+    }
 
-        // This is safe because generate_response_ lives as long as the test and will keep the key
-        // blob around.
-        return &generate_response_.key_blob;
+    void SignMessage(const void* message, size_t size) {
+        BeginOperationRequest begin_request;
+        BeginOperationResponse begin_response;
+        begin_request.SetKeyMaterial(generate_response_.key_blob);
+        begin_request.purpose = KM_PURPOSE_SIGN;
+        AddClientParams(&begin_request.additional_params);
+
+        device.BeginOperation(begin_request, &begin_response);
+        ASSERT_EQ(KM_ERROR_OK, begin_response.error);
+
+        UpdateOperationRequest update_request;
+        UpdateOperationResponse update_response;
+        update_request.op_handle = begin_response.op_handle;
+        update_request.input.Reinitialize(message, size);
+        EXPECT_EQ(size, update_request.input.available_read());
+
+        device.UpdateOperation(update_request, &update_response);
+        ASSERT_EQ(KM_ERROR_OK, update_response.error);
+        EXPECT_EQ(0U, update_response.output.available_read());
+
+        FinishOperationRequest finish_request;
+        finish_request.op_handle = begin_response.op_handle;
+        device.FinishOperation(finish_request, &finish_response_);
+        ASSERT_EQ(KM_ERROR_OK, finish_response_.error);
+        EXPECT_GT(finish_response_.output.available_read(), 0U);
+    }
+
+    void AddClientParams(AuthorizationSet* set) { set->push_back(TAG_APPLICATION_ID, "app_id", 6); }
+
+    const keymaster_key_blob_t& key_blob() { return generate_response_.key_blob; }
+    Buffer* signature() {
+        if (finish_response_.error == KM_ERROR_OK)
+            return &finish_response_.output;
+        return NULL;
     }
 
   private:
     GenerateKeyResponse generate_response_;
+    FinishOperationResponse finish_response_;
 };
 
 TEST_F(SigningOperationsTest, RsaSuccess) {
-    keymaster_key_blob_t* key = GenerateKey(KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(*key);
+    begin_request.SetKeyMaterial(key_blob());
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_OK, begin_response.error);
@@ -408,14 +443,13 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
 }
 
 TEST_F(SigningOperationsTest, RsaAbort) {
-    keymaster_key_blob_t* key = GenerateKey(KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(*key);
+    begin_request.SetKeyMaterial(key_blob());
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_OK, begin_response.error);
@@ -427,14 +461,13 @@ TEST_F(SigningOperationsTest, RsaAbort) {
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
-    keymaster_key_blob_t* key = GenerateKey(KM_DIGEST_SHA_2_256, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_SHA_2_256, KM_PAD_NONE, 256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.SetKeyMaterial(*key);
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    begin_request.SetKeyMaterial(key_blob());
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, begin_response.error);
@@ -443,14 +476,13 @@ TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
-    keymaster_key_blob_t* key = GenerateKey(KM_DIGEST_NONE, KM_PAD_RSA_OAEP, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_RSA_OAEP, 256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.SetKeyMaterial(*key);
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    begin_request.SetKeyMaterial(key_blob());
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, begin_response.error);
@@ -459,15 +491,14 @@ TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
 }
 
 TEST_F(SigningOperationsTest, RsaNoDigest) {
-    keymaster_key_blob_t* key =
-        GenerateKey(static_cast<keymaster_digest_t>(-1), KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, static_cast<keymaster_digest_t>(-1), KM_PAD_NONE,
+                256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.SetKeyMaterial(*key);
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    begin_request.SetKeyMaterial(key_blob());
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, begin_response.error);
@@ -476,15 +507,14 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
 }
 
 TEST_F(SigningOperationsTest, RsaNoPadding) {
-    keymaster_key_blob_t* key =
-        GenerateKey(KM_DIGEST_NONE, static_cast<keymaster_padding_t>(-1), 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, static_cast<keymaster_padding_t>(-1),
+                256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.SetKeyMaterial(*key);
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    begin_request.SetKeyMaterial(key_blob());
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, begin_response.error);
@@ -493,14 +523,13 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
 }
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
-    keymaster_key_blob_t* key = GenerateKey(KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(*key);
+    begin_request.SetKeyMaterial(key_blob());
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_OK, begin_response.error);
@@ -525,86 +554,18 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
 }
 
-class VerificationOperationsTest : public KeymasterTest {
-  protected:
-    VerificationOperationsTest() {
-        generate_response_.error = KM_ERROR_UNKNOWN_ERROR;
-        finish_response_.error = KM_ERROR_UNKNOWN_ERROR;
-    }
-
-    void GenerateKey(keymaster_digest_t digest, keymaster_padding_t padding, uint32_t key_size) {
-        keymaster_key_param_t params[] = {
-            Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-            Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-            Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-            Authorization(TAG_KEY_SIZE, key_size),
-            Authorization(TAG_USER_ID, 7),
-            Authorization(TAG_USER_AUTH_ID, 8),
-            Authorization(TAG_APPLICATION_ID, "app_id", 6),
-            Authorization(TAG_AUTH_TIMEOUT, 300),
-        };
-        GenerateKeyRequest generate_request;
-        generate_request.key_description.Reinitialize(params, array_length(params));
-        if (static_cast<int>(digest) != -1)
-            generate_request.key_description.push_back(TAG_DIGEST, digest);
-        if (static_cast<int>(padding) != -1)
-            generate_request.key_description.push_back(TAG_PADDING, padding);
-        device.GenerateKey(generate_request, &generate_response_);
-        EXPECT_EQ(KM_ERROR_OK, generate_response_.error);
-
-        BeginOperationRequest begin_request;
-        BeginOperationResponse begin_response;
-        begin_request.SetKeyMaterial(generate_response_.key_blob);
-        begin_request.purpose = KM_PURPOSE_SIGN;
-        begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
-
-        device.BeginOperation(begin_request, &begin_response);
-        ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-        UpdateOperationRequest update_request;
-        UpdateOperationResponse update_response;
-        update_request.op_handle = begin_response.op_handle;
-        update_request.input.Reinitialize("012345678901234567890123456789012", 32);
-        EXPECT_EQ(32U, update_request.input.available_read());
-
-        device.UpdateOperation(update_request, &update_response);
-        ASSERT_EQ(KM_ERROR_OK, update_response.error);
-        EXPECT_EQ(0U, update_response.output.available_read());
-
-        FinishOperationRequest finish_request;
-        finish_request.op_handle = begin_response.op_handle;
-        device.FinishOperation(finish_request, &finish_response_);
-        ASSERT_EQ(KM_ERROR_OK, finish_response_.error);
-        EXPECT_GT(finish_response_.output.available_read(), 0U);
-    }
-
-    keymaster_key_blob_t* key_blob() {
-        if (generate_response_.error == KM_ERROR_OK)
-            return &generate_response_.key_blob;
-        return NULL;
-    }
-
-    Buffer* signature() {
-        if (finish_response_.error == KM_ERROR_OK)
-            return &finish_response_.output;
-        return NULL;
-    }
-
-  private:
-    GenerateKeyResponse generate_response_;
-    FinishOperationResponse finish_response_;
-};
-
+typedef SigningOperationsTest VerificationOperationsTest;
 TEST_F(VerificationOperationsTest, RsaSuccess) {
-    GenerateKey(KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(key_blob() != NULL);
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+    const char message[] = "12345678901234567890123456789012";
+    SignMessage(message, array_size(message) - 1);
     ASSERT_TRUE(signature() != NULL);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(*key_blob());
+    begin_request.SetKeyMaterial(key_blob());
     begin_request.purpose = KM_PURPOSE_VERIFY;
-    begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
+    AddClientParams(&begin_request.additional_params);
 
     device.BeginOperation(begin_request, &begin_response);
     ASSERT_EQ(KM_ERROR_OK, begin_response.error);
@@ -612,8 +573,8 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
     UpdateOperationRequest update_request;
     UpdateOperationResponse update_response;
     update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize("012345678901234567890123456789012", 32);
-    EXPECT_EQ(32U, update_request.input.available_read());
+    update_request.input.Reinitialize(message, array_size(message) - 1);
+    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
 
     device.UpdateOperation(update_request, &update_response);
     ASSERT_EQ(KM_ERROR_OK, update_response.error);
