@@ -14,7 +14,7 @@ CXX=/usr/bin/clang
 CLANG_TEST_DEFINE=-DKEYMASTER_CLANG_TEST_BUILD
 COMPILER_SPECIFIC_ARGS=-std=c++11 $(CLANG_TEST_DEFINE)
 else
-COMPILER_SPECIFIC_ARGS=-std=c++0x -fprofile-arcs 
+COMPILER_SPECIFIC_ARGS=-std=c++0x -fprofile-arcs
 endif
 
 CPPFLAGS=$(INCLUDES) -g -O0 -MD
@@ -27,6 +27,7 @@ LDLIBS=-lcrypto -lpthread -lstdc++
 CPPSRCS=\
 	authorization_set.cpp \
 	authorization_set_test.cpp \
+	dsa_operation.cpp \
 	google_keymaster.cpp \
 	google_keymaster_messages.cpp \
 	google_keymaster_messages_test.cpp \
@@ -117,6 +118,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 
 google_keymaster_test: google_keymaster_test.o \
 	authorization_set.o \
+	dsa_operation.o \
 	google_keymaster.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \

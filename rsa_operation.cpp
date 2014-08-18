@@ -18,29 +18,13 @@
 #include <openssl/evp.h>
 
 #include "rsa_operation.h"
+#include "openssl_utils.h"
 
 namespace keymaster {
-
-struct EVP_PKEY_Delete {
-    void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
-};
-struct BIGNUM_Delete {
-    void operator()(BIGNUM* p) const { BN_free(p); }
-};
 
 struct RSA_Delete {
     void operator()(RSA* p) const { RSA_free(p); }
 };
-
-/**
- * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
- * failure. This means we need to tell our scoped pointers when we've transferred ownership, without
- * triggering a warning by not using the result of release().
- */
-template <typename T, typename Delete_T>
-inline void release_because_ownership_transferred(UniquePtr<T, Delete_T>& p) {
-    T* val __attribute__((unused)) = p.release();
-}
 
 /* static */
 keymaster_error_t RsaOperation::Generate(uint64_t public_exponent, uint32_t key_size,
