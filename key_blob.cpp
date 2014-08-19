@@ -74,8 +74,8 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
 KeyBlob::KeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& hidden,
                  const keymaster_key_blob_t& master_key)
     : hidden_(hidden) {
-    if (!Deserialize(const_cast<const uint8_t**>(&(key.key_material)),
-                     key.key_material + key.key_material_size))
+    const uint8_t* p = key.key_material;
+    if (!Deserialize(&p, key.key_material + key.key_material_size))
         return;
     DecryptKey(master_key);
 }
@@ -96,13 +96,12 @@ uint8_t* KeyBlob::Serialize(uint8_t* buf, const uint8_t* end) const {
     return buf;
 }
 
-bool KeyBlob::Deserialize(const uint8_t** buf, const uint8_t* end) {
+bool KeyBlob::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
     uint8_t* tmp_key_ptr = NULL;
-
-    if (!copy_from_buf(buf, end, nonce_, NONCE_LENGTH) ||
-        !copy_size_and_data_from_buf(buf, end, &key_material_length_, &tmp_key_ptr) ||
-        !copy_from_buf(buf, end, tag_, TAG_LENGTH) || !enforced_.Deserialize(buf, end) ||
-        !unenforced_.Deserialize(buf, end)) {
+    if (!copy_from_buf(buf_ptr, end, nonce_, NONCE_LENGTH) ||
+        !copy_size_and_data_from_buf(buf_ptr, end, &key_material_length_, &tmp_key_ptr) ||
+        !copy_from_buf(buf_ptr, end, tag_, TAG_LENGTH) || !enforced_.Deserialize(buf_ptr, end) ||
+        !unenforced_.Deserialize(buf_ptr, end)) {
         if (tmp_key_ptr != NULL)
             delete[] tmp_key_ptr;
         error_ = KM_ERROR_INVALID_KEY_BLOB;

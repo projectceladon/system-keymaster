@@ -205,23 +205,23 @@ static size_t serialized_size(const keymaster_key_param_t& param) {
 
 static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, const uint8_t* end,
                           const uint8_t* indirect_base) {
-    buf = append_to_buf(buf, end, static_cast<uint32_t>(param.tag));
+    buf = append_uint32_to_buf(buf, end, param.tag);
     switch (keymaster_tag_get_type(param.tag)) {
     case KM_INVALID:
         break;
     case KM_ENUM:
     case KM_ENUM_REP:
-        buf = append_to_buf(buf, end, param.enumerated);
+        buf = append_uint32_to_buf(buf, end, param.enumerated);
         break;
     case KM_INT:
     case KM_INT_REP:
-        buf = append_to_buf(buf, end, param.integer);
+        buf = append_uint32_to_buf(buf, end, param.integer);
         break;
     case KM_LONG:
-        buf = append_to_buf(buf, end, param.long_integer);
+        buf = append_uint64_to_buf(buf, end, param.long_integer);
         break;
     case KM_DATE:
-        buf = append_to_buf(buf, end, param.date_time);
+        buf = append_uint64_to_buf(buf, end, param.date_time);
         break;
     case KM_BOOL:
         if (buf < end)
@@ -230,19 +230,17 @@ static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, cons
         break;
     case KM_BIGNUM:
     case KM_BYTES:
-        buf = append_to_buf(buf, end, static_cast<uint32_t>(param.blob.data_length));
-        buf = append_to_buf(buf, end, static_cast<uint32_t>(param.blob.data - indirect_base));
+        buf = append_uint32_to_buf(buf, end, param.blob.data_length);
+        buf = append_uint32_to_buf(buf, end, param.blob.data - indirect_base);
         break;
     }
     return buf;
 }
 
-static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf, const uint8_t* end,
+static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, const uint8_t* end,
                         const uint8_t* indirect_base, const uint8_t* indirect_end) {
-    uint32_t tag_val;
-    if (!copy_from_buf(buf, end, &tag_val))
+    if (!copy_uint32_from_buf(buf_ptr, end, &param->tag))
         return false;
-    param->tag = static_cast<keymaster_tag_t>(tag_val);
 
     switch (keymaster_tag_get_type(param->tag)) {
     default:
@@ -250,33 +248,32 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf, const
         return false;
     case KM_ENUM:
     case KM_ENUM_REP:
-        return copy_from_buf(buf, end, &param->enumerated);
+        return copy_uint32_from_buf(buf_ptr, end, &param->enumerated);
     case KM_INT:
     case KM_INT_REP:
-        return copy_from_buf(buf, end, &param->integer);
+        return copy_uint32_from_buf(buf_ptr, end, &param->integer);
     case KM_LONG:
-        return copy_from_buf(buf, end, &param->long_integer);
+        return copy_uint64_from_buf(buf_ptr, end, &param->long_integer);
     case KM_DATE:
-        return copy_from_buf(buf, end, &param->date_time);
+        return copy_uint64_from_buf(buf_ptr, end, &param->date_time);
         break;
     case KM_BOOL:
-        if (*buf < end) {
-            param->boolean = static_cast<bool>(**buf);
-            (*buf)++;
+        if (*buf_ptr < end) {
+            param->boolean = static_cast<bool>(**buf_ptr);
+            (*buf_ptr)++;
             return true;
         }
         return false;
 
     case KM_BIGNUM:
     case KM_BYTES: {
-        uint32_t length;
         uint32_t offset;
-        if (!copy_from_buf(buf, end, &length) || !copy_from_buf(buf, end, &offset))
+        if (!copy_uint32_from_buf(buf_ptr, end, &param->blob.data_length) ||
+            !copy_uint32_from_buf(buf_ptr, end, &offset))
             return false;
         if (static_cast<ptrdiff_t>(offset) > indirect_end - indirect_base ||
-            static_cast<ptrdiff_t>(offset + length) > indirect_end - indirect_base)
+            static_cast<ptrdiff_t>(offset + param->blob.data_length) > indirect_end - indirect_base)
             return false;
-        param->blob.data_length = length;
         param->blob.data = indirect_base + offset;
         return true;
     }
@@ -301,28 +298,29 @@ size_t AuthorizationSet::SerializedSize() const {
 
 uint8_t* AuthorizationSet::Serialize(uint8_t* buf, const uint8_t* end) const {
     buf = append_size_and_data_to_buf(buf, end, indirect_data_, indirect_data_size_);
-    buf = append_to_buf(buf, end, static_cast<uint32_t>(elems_size_));
-    buf = append_to_buf(buf, end, static_cast<uint32_t>(SerializedSizeOfElements()));
+    buf = append_uint32_to_buf(buf, end, elems_size_);
+    buf = append_uint32_to_buf(buf, end, SerializedSizeOfElements());
     for (size_t i = 0; i < elems_size_; ++i) {
         buf = serialize(elems_[i], buf, end, indirect_data_);
     }
     return buf;
 }
 
-bool AuthorizationSet::Deserialize(const uint8_t** buf, const uint8_t* end) {
+bool AuthorizationSet::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
     FreeData();
 
     uint32_t elements_count;
     uint32_t elements_size;
-    if (!copy_size_and_data_from_buf(buf, end, &indirect_data_size_, &indirect_data_) ||
-        !copy_from_buf(buf, end, &elements_count) || !copy_from_buf(buf, end, &elements_size)) {
+    if (!copy_size_and_data_from_buf(buf_ptr, end, &indirect_data_size_, &indirect_data_) ||
+        !copy_uint32_from_buf(buf_ptr, end, &elements_count) ||
+        !copy_uint32_from_buf(buf_ptr, end, &elements_size)) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
 
     // Note that the following validation of elements_count is weak, but it prevents allocation of
     // elems_ arrays which are clearly too large to be reasonable.
-    if (elements_size > end - *buf || elements_count * sizeof(uint32_t) > elements_size) {
+    if (elements_size > end - *buf_ptr || elements_count * sizeof(uint32_t) > elements_size) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
@@ -334,9 +332,9 @@ bool AuthorizationSet::Deserialize(const uint8_t** buf, const uint8_t* end) {
     }
 
     uint8_t* indirect_end = indirect_data_ + indirect_data_size_;
-    const uint8_t* elements_end = *buf + elements_size;
+    const uint8_t* elements_end = *buf_ptr + elements_size;
     for (size_t i = 0; i < elements_count; ++i) {
-        if (!deserialize(elems_ + i, buf, elements_end, indirect_data_, indirect_end)) {
+        if (!deserialize(elems_ + i, buf_ptr, elements_end, indirect_data_, indirect_end)) {
             set_invalid(MALFORMED_DATA);
             return false;
         }

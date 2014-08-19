@@ -39,8 +39,7 @@ class AuthorizationSet : public Serializable {
      */
     AuthorizationSet()
         : elems_(NULL), elems_size_(0), elems_capacity_(0), indirect_data_(NULL),
-          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {
-    }
+          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {}
 
     /**
      * Construct an AuthorizationSet from the provided array.  The AuthorizationSet copies the data
@@ -82,16 +81,12 @@ class AuthorizationSet : public Serializable {
         MALFORMED_DATA,
     };
 
-    Error is_valid() const {
-        return error_;
-    }
+    Error is_valid() const { return error_; }
 
     /**
      * Returns the size of the set.
      */
-    size_t size() const {
-        return elems_size_;
-    }
+    size_t size() const { return elems_size_; }
 
     /**
      * Returns the data in the set, directly. Be careful with this.
@@ -227,7 +222,7 @@ class AuthorizationSet : public Serializable {
     /* Virtual methods from Serializable */
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* serialized_set, const uint8_t* end) const;
-    bool Deserialize(const uint8_t** buf, const uint8_t* end);
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     size_t SerializedSizeOfElements() const;
 

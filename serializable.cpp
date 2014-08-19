@@ -24,25 +24,27 @@ uint8_t* append_to_buf(uint8_t* buf, const uint8_t* end, const void* data, size_
     return buf + data_len;
 }
 
-bool copy_from_buf(const uint8_t** buf, const uint8_t* end, void* dest, size_t size) {
-    if (end < *buf + size)
+bool copy_from_buf(const uint8_t** buf_ptr, const uint8_t* end, void* dest, size_t size) {
+    if (end < *buf_ptr + size)
         return false;
-    memcpy(dest, *buf, size);
-    *buf += size;
+    memcpy(dest, *buf_ptr, size);
+    *buf_ptr += size;
     return true;
 }
 
-bool copy_size_and_data_from_buf(const uint8_t** buf, const uint8_t* end, size_t* size,
+bool copy_size_and_data_from_buf(const uint8_t** buf_ptr, const uint8_t* end, size_t* size,
                                  uint8_t** dest) {
-    uint32_t data_len;
-    if (!copy_from_buf(buf, end, &data_len) || *buf + data_len > end) {
+    if (!copy_uint32_from_buf(buf_ptr, end, size) || *buf_ptr + *size > end) {
         return false;
     }
-    *size = data_len;
+    if (*size == 0) {
+        *dest = NULL;
+        return true;
+    }
     *dest = new uint8_t[*size];
     if (*dest == NULL)
         return false;
-    return copy_from_buf(buf, end, *dest, *size);
+    return copy_from_buf(buf_ptr, end, *dest, *size);
 }
 
 }  // namespace keymaster
