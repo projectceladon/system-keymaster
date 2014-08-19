@@ -18,6 +18,13 @@
 
 namespace keymaster {
 
+uint8_t* dup_buffer(const void* buf, size_t size) {
+    uint8_t* retval = new uint8_t[size];
+    if (retval != NULL)
+        memcpy(retval, buf, size);
+    return retval;
+}
+
 Buffer::~Buffer() {
     delete[] buffer_;
 }
@@ -68,6 +75,23 @@ bool Buffer::read(uint8_t* dest, size_t read_length) {
         return false;
     memcpy(dest, buffer_ + read_position_, read_length);
     read_position_ += read_length;
+    return true;
+}
+
+size_t Buffer::SerializedSize() const {
+    return sizeof(uint32_t) + available_read();
+}
+
+uint8_t* Buffer::Serialize(uint8_t* buf, const uint8_t* end) const {
+    return append_size_and_data_to_buf(buf, end, peek_read(), available_read());
+}
+
+bool Buffer::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    delete[] buffer_;
+    if (!copy_size_and_data_from_buf(buf_ptr, end, &buffer_size_, &buffer_))
+        return false;
+    read_position_ = 0;
+    write_position_ = buffer_size_;
     return true;
 }
 

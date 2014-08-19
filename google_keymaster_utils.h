@@ -21,6 +21,8 @@
 #include <string.h>
 #include <time.h>  // for time_t.
 
+#include "serializable.h"
+
 namespace keymaster {
 
 /**
@@ -57,7 +59,7 @@ template <typename T, size_t N> inline size_t array_length(const T (&)[N]) {
 }
 
 /**
- * Duplicate the array \p a.  The memory for the new array is malloced and the caller takes
+ * Duplicate the array \p a.  The memory for the new array is allocated and the caller takes
  * responsibility.  Note that the dup is necessarily returned as a pointer, so size is lost.  Call
  * array_length() on the original array to discover the size.
  */
@@ -68,6 +70,12 @@ template <typename T, size_t N> inline T* dup_array(const T (&a)[N]) {
     }
     return dup;
 }
+
+/**
+ * Duplicate the buffer \p buf.  The memory for the new buffer is allocated and the caller takes
+ * responsibility.
+ */
+uint8_t* dup_buffer(const void* buf, size_t size);
 
 /**
  * Copy the contents of array \p arr to \p dest.
@@ -98,9 +106,9 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
  */
 #ifdef KEYMASTER_CLANG_TEST_BUILD
 #define OPTIMIZE(x)
-#else // not KEYMASTER_CLANG_TEST_BUILD
+#else  // not KEYMASTER_CLANG_TEST_BUILD
 #define OPTIMIZE(x) __attribute__((optimize(x)))
-#endif // not KEYMASTER_CLANG_TEST_BUILD
+#endif  // not KEYMASTER_CLANG_TEST_BUILD
 inline OPTIMIZE("O0") void* memset_s(void* s, int c, size_t n) {
     return memset(s, c, n);
 }
@@ -124,17 +132,12 @@ class Eraser {
 
     template <typename T>
     explicit Eraser(T& t)
-        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {
-    }
+        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {}
 
-    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {
-    }
+    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {}
 
-    Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {
-    }
-    ~Eraser() {
-        memset_s(buf_, 0, size_);
-    }
+    Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {}
+    ~Eraser() { memset_s(buf_, 0, size_); }
 
   private:
     Eraser(const Eraser&);
@@ -147,16 +150,11 @@ class Eraser {
 /**
  * A simple buffer that supports reading and writing.  Manages its own memory.
  */
-class Buffer {
+class Buffer : public Serializable {
   public:
-    Buffer() : buffer_(NULL), buffer_size_(0), read_position_(0), write_position_(0) {
-    }
-    Buffer(size_t size) : buffer_(NULL) {
-        Reinitialize(size);
-    }
-    Buffer(const void* buf, size_t size) : buffer_(NULL) {
-        Reinitialize(buf, size);
-    }
+    Buffer() : buffer_(NULL), buffer_size_(0), read_position_(0), write_position_(0) {}
+    Buffer(size_t size) : buffer_(NULL) { Reinitialize(size); }
+    Buffer(const void* buf, size_t size) : buffer_(NULL) { Reinitialize(buf, size); }
     ~Buffer();
 
     bool Reinitialize(size_t size);
@@ -169,24 +167,18 @@ class Buffer {
 
     size_t available_write() const;
     size_t available_read() const;
-    size_t buffer_size() const {
-        return buffer_size_;
-    }
+    size_t buffer_size() const { return buffer_size_; }
 
     bool write(const uint8_t* src, size_t write_length);
     bool read(uint8_t* dest, size_t read_length);
-    const uint8_t* peek_read() const {
-        return buffer_ + read_position_;
-    }
-    void advance_read(int distance) {
-        read_position_ += distance;
-    }
-    uint8_t* peek_write() {
-        return buffer_ + write_position_;
-    }
-    void advance_write(int distance) {
-        write_position_ += distance;
-    }
+    const uint8_t* peek_read() const { return buffer_ + read_position_; }
+    void advance_read(int distance) { read_position_ += distance; }
+    uint8_t* peek_write() { return buffer_ + write_position_; }
+    void advance_write(int distance) { write_position_ += distance; }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
   private:
     // Disallow copy construction and assignment.

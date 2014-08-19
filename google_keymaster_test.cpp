@@ -37,11 +37,8 @@ namespace test {
 
 class KeymasterTest : public testing::Test {
   protected:
-    KeymasterTest() : device(5) {
-        RAND_seed("foobar", 6);
-    }
-    ~KeymasterTest() {
-    }
+    KeymasterTest() : device(5) { RAND_seed("foobar", 6); }
+    ~KeymasterTest() {}
 
     GoogleSoftKeymaster device;
 };
@@ -250,7 +247,7 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
     ASSERT_EQ(KM_ERROR_OK, gen_rsp.error);
 
     GetKeyCharacteristicsRequest req;
-    req.key_blob = gen_rsp.key_blob;
+    req.SetKeyMaterial(gen_rsp.key_blob);
     req.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
     GetKeyCharacteristicsResponse rsp;
@@ -299,7 +296,7 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.purpose = KM_PURPOSE_SIGN;
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
@@ -332,7 +329,7 @@ TEST_F(SigningOperationsTest, RsaAbort) {
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.purpose = KM_PURPOSE_SIGN;
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
@@ -352,7 +349,7 @@ TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
     device.BeginOperation(begin_request, &begin_response);
@@ -368,7 +365,7 @@ TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
     device.BeginOperation(begin_request, &begin_response);
@@ -385,7 +382,7 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
     device.BeginOperation(begin_request, &begin_response);
@@ -402,7 +399,7 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
     begin_request.purpose = KM_PURPOSE_SIGN;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
     device.BeginOperation(begin_request, &begin_response);
@@ -417,7 +414,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.key_blob = *key;
+    begin_request.SetKeyMaterial(*key);
     begin_request.purpose = KM_PURPOSE_SIGN;
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
@@ -451,8 +448,7 @@ class VerificationOperationsTest : public KeymasterTest {
         finish_response_.error = KM_ERROR_UNKNOWN_ERROR;
     }
 
-    void GenerateKey(keymaster_digest_t digest, keymaster_padding_t padding,
-                                      uint32_t key_size) {
+    void GenerateKey(keymaster_digest_t digest, keymaster_padding_t padding, uint32_t key_size) {
         keymaster_key_param_t params[] = {
             Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
             Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
@@ -474,7 +470,7 @@ class VerificationOperationsTest : public KeymasterTest {
 
         BeginOperationRequest begin_request;
         BeginOperationResponse begin_response;
-        begin_request.key_blob = generate_response_.key_blob;
+        begin_request.SetKeyMaterial(generate_response_.key_blob);
         begin_request.purpose = KM_PURPOSE_SIGN;
         begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
@@ -522,7 +518,7 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
-    begin_request.key_blob = *key_blob();
+    begin_request.SetKeyMaterial(*key_blob());
     begin_request.purpose = KM_PURPOSE_VERIFY;
     begin_request.additional_params.push_back(TAG_APPLICATION_ID, "app_id", 6);
 
