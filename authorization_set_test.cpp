@@ -408,6 +408,27 @@ TEST(Growable, InsufficientIndirectBuf) {
     EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 }
 
+TEST(Growable, PushBackSets) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+        Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "my_app", 6),
+        Authorization(TAG_KEY_SIZE, 256),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    AuthorizationSet set1(params, array_length(params));
+    AuthorizationSet set2(params, array_length(params));
+
+    AuthorizationSet combined;
+    EXPECT_TRUE(combined.push_back(set1));
+    EXPECT_TRUE(combined.push_back(set2));
+    EXPECT_EQ(array_length(params) * 2, combined.size());
+    EXPECT_EQ(12U, combined.indirect_size());
+}
+
 TEST(GetValue, GetInt) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),

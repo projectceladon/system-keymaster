@@ -89,6 +89,11 @@ class AuthorizationSet : public Serializable {
     size_t size() const { return elems_size_; }
 
     /**
+     * Returns the total size of all indirect data referenced by set elements.
+     */
+    size_t indirect_size() const { return indirect_data_size_; }
+
+    /**
      * Returns the data in the set, directly. Be careful with this.
      */
     const keymaster_key_param_t* data() const;
@@ -190,6 +195,20 @@ class AuthorizationSet : public Serializable {
 
     bool push_back(keymaster_key_param_t elem);
 
+    /**
+     * Grow the elements array to ensure it can contain \p count entries.  Preserves any existing
+     * entries.
+     */
+    bool reserve_elems(size_t count);
+
+    /**
+     * Grow the indirect data array to ensure it can contain \p length bytes.  Preserves any
+     * existing indirect data.
+     */
+    bool reserve_indirect(size_t length);
+
+    bool push_back(const AuthorizationSet& set);
+
     template <keymaster_tag_t Tag, keymaster_tag_type_t Type, typename KeymasterEnum>
     bool push_back(TypedEnumTag<Type, Tag, KeymasterEnum> tag, KeymasterEnum val) {
         return push_back(Authorization(tag, val));
@@ -236,6 +255,9 @@ class AuthorizationSet : public Serializable {
     static size_t ComputeIndirectDataSize(const keymaster_key_param_t* elems, size_t count);
     void CopyIndirectData();
     bool CheckIndirectData();
+
+    bool DeserializeIndirectData(const uint8_t** buf_ptr, const uint8_t* end);
+    bool DeserializeElementsData(const uint8_t** buf_ptr, const uint8_t* end);
 
     bool GetTagValueEnum(keymaster_tag_t tag, uint32_t* val) const;
     bool GetTagValueEnumRep(keymaster_tag_t tag, size_t instance, uint32_t* val) const;
