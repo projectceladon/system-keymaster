@@ -25,12 +25,11 @@
 #include <UniquePtr.h>
 
 #include "ae.h"
-#include "dsa_operation.h"
-#include "ecdsa_operation.h"
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
+#include "key.h"
 #include "key_blob.h"
-#include "rsa_operation.h"
+#include "operation.h"
 
 namespace keymaster {
 
@@ -45,10 +44,6 @@ GoogleKeymaster::~GoogleKeymaster() {
         if (operation_table_[i].operation != NULL)
             delete operation_table_[i].operation;
 }
-
-const uint32_t RSA_DEFAULT_KEY_SIZE = 2048;
-const uint32_t DSA_DEFAULT_KEY_SIZE = 2048;
-const uint64_t RSA_DEFAULT_EXPONENT = 65537;
 
 struct AE_CTX_Delete {
     void operator()(ae_ctx* ctx) const { ae_free(ctx); }
@@ -176,41 +171,27 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                   GenerateKeyResponse* response) {
     if (response == NULL)
         return;
-    response->error = KM_ERROR_UNKNOWN_ERROR;
 
-    if (!CopyAuthorizations(request.key_description, response))
-        return;
-
-    AuthorizationSet hidden_auths;
-    response->error = BuildHiddenAuthorizations(request.key_description, &hidden_auths);
+    UniquePtr<Key> key(Key::GenerateKey(request.key_description, &response->error));
     if (response->error != KM_ERROR_OK)
         return;
 
-    keymaster_algorithm_t algorithm;
-    if (!request.key_description.GetTagValue(TAG_ALGORITHM, &algorithm)) {
-        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    if (!CopyAuthorizations(key->authorizations(), response))
         return;
-    }
 
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-        if (!GenerateRsa(request.key_description, response, &hidden_auths))
-            return;
-        break;
-    case KM_ALGORITHM_DSA:
-        if (!GenerateDsa(request.key_description, response, &hidden_auths))
-            return;
-        break;
-    case KM_ALGORITHM_ECDSA:
-        if (!GenerateEcdsa(request.key_description, response, &hidden_auths))
-            return;
-        break;
-    default:
-        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    AuthorizationSet hidden_auths;
+    response->error = BuildHiddenAuthorizations(key->authorizations(), &hidden_auths);
+    if (response->error != KM_ERROR_OK)
         return;
-    }
 
-    response->error = KM_ERROR_OK;
+    UniquePtr<uint8_t[]> key_material;
+    size_t key_material_size;
+    response->error = key->key_material(&key_material, &key_material_size);
+    if (response->error != KM_ERROR_OK)
+        return;
+
+    response->error =
+        SerializeKeyToResponse(key_material.get(), key_material_size, hidden_auths, response);
 }
 
 void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
@@ -233,33 +214,15 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
                                      BeginOperationResponse* response) {
     if (response == NULL)
         return;
-    response->error = KM_ERROR_UNKNOWN_ERROR;
     response->op_handle = 0;
 
-    UniquePtr<KeyBlob> key(
-        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
+    UniquePtr<Key> key(LoadKey(request.key_blob, request.additional_params, &response->error));
     if (key.get() == NULL)
         return;
 
-    UniquePtr<Operation> operation;
-    switch (key->algorithm()) {
-    case KM_ALGORITHM_RSA:
-        operation.reset(new RsaOperation(request.purpose, *key));
-        break;
-    case KM_ALGORITHM_DSA:
-        operation.reset(new DsaOperation(request.purpose, *key));
-        break;
-    case KM_ALGORITHM_ECDSA:
-        operation.reset(new EcdsaOperation(request.purpose, *key));
-        break;
-    default:
-        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-        break;
-    }
-
-    if (operation.get() == NULL) {
+    UniquePtr<Operation> operation(key->CreateOperation(request.purpose, &response->error));
+    if (operation.get() == NULL)
         return;
-    }
 
     response->error = operation->Begin();
     if (response->error != KM_ERROR_OK)
@@ -423,135 +386,39 @@ void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespon
     response->error = KM_ERROR_OK;
 }
 
-bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
-                                  AuthorizationSet* hidden_auths) {
-    uint64_t public_exponent = RSA_DEFAULT_EXPONENT;
-    if (!key_auths.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent))
-        AddAuthorization(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent), response);
-
-    uint32_t key_size = RSA_DEFAULT_KEY_SIZE;
-    if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
-        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
-
-    UniquePtr<uint8_t[]> key_data;
-    size_t key_data_size;
-    keymaster_error_t error =
-        RsaOperation::Generate(public_exponent, key_size, &key_data, &key_data_size);
-    if (error != KM_ERROR_OK) {
-        response->error = error;
-        return false;
-    }
-
-    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
-}
-
-template <keymaster_tag_t Tag>
-static void GetDsaParamData(const AuthorizationSet& auths, TypedTag<KM_BIGNUM, Tag> tag,
-                            keymaster_blob_t* blob) {
-    if (!auths.GetTagValue(tag, blob))
-        blob->data = NULL;
-}
-
-bool GoogleKeymaster::GenerateDsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
-                                  AuthorizationSet* hidden_auths) {
-    keymaster_blob_t g_blob;
-    GetDsaParamData(key_auths, TAG_DSA_GENERATOR, &g_blob);
-    const uint8_t* original_g = g_blob.data;
-
-    keymaster_blob_t p_blob;
-    GetDsaParamData(key_auths, TAG_DSA_P, &p_blob);
-    const uint8_t* original_p = p_blob.data;
-
-    keymaster_blob_t q_blob;
-    GetDsaParamData(key_auths, TAG_DSA_Q, &q_blob);
-    const uint8_t* original_q = q_blob.data;
-
-    uint32_t key_size = DSA_DEFAULT_KEY_SIZE;
-    if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
-        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
-
-    UniquePtr<uint8_t[]> key_data;
-    size_t key_data_size;
-    keymaster_error_t error =
-        DsaOperation::Generate(key_size, &g_blob, &p_blob, &q_blob, &key_data, &key_data_size);
-
-    // If any the original_* pointers are NULL, DsaOperation::Generate should have generated values
-    // for the corressponding blobs.  We need to put them in the authorization set and clean up the
-    // allocated memory.
-    if (original_g == NULL && g_blob.data != NULL) {
-        if (!AddAuthorization(Authorization(TAG_DSA_GENERATOR, g_blob), response))
-            error = KM_ERROR_INVALID_DSA_PARAMS;
-        delete[] g_blob.data;
-    }
-    if (original_p == NULL && p_blob.data != NULL) {
-        if (!AddAuthorization(Authorization(TAG_DSA_P, p_blob), response))
-            error = KM_ERROR_INVALID_DSA_PARAMS;
-        delete[] p_blob.data;
-    }
-    if (original_q == NULL && q_blob.data != NULL) {
-        if (!AddAuthorization(Authorization(TAG_DSA_Q, q_blob), response))
-            error = KM_ERROR_INVALID_DSA_PARAMS;
-        delete[] q_blob.data;
-    }
-
-    if (error != KM_ERROR_OK) {
-        response->error = error;
-        return false;
-    }
-
-    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
-}
-
-bool GoogleKeymaster::GenerateEcdsa(const AuthorizationSet& key_auths,
-                                    GenerateKeyResponse* response, AuthorizationSet* hidden_auths) {
-    uint64_t public_exponent = RSA_DEFAULT_EXPONENT;
-    if (!key_auths.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent))
-        AddAuthorization(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent), response);
-
-    uint32_t key_size = RSA_DEFAULT_KEY_SIZE;
-    if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
-        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
-
-    UniquePtr<uint8_t[]> key_data;
-    size_t key_data_size;
-    keymaster_error_t error = EcdsaOperation::Generate(key_size, &key_data, &key_data_size);
-    if (error != KM_ERROR_OK) {
-        response->error = error;
-        return false;
-    }
-
-    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
-}
-
-bool GoogleKeymaster::CreateKeyBlob(GenerateKeyResponse* response,
-                                    const AuthorizationSet& hidden_auths, uint8_t* key_bytes,
-                                    size_t key_length) {
+keymaster_error_t GoogleKeymaster::SerializeKeyToResponse(uint8_t* key_bytes, size_t key_length,
+                                                          const AuthorizationSet& hidden_auths,
+                                                          GenerateKeyResponse* response) {
     uint8_t nonce[KeyBlob::NONCE_LENGTH];
     GenerateNonce(nonce, array_size(nonce));
 
     keymaster_key_blob_t key_data = {key_bytes, key_length};
     UniquePtr<KeyBlob> blob(new KeyBlob(response->enforced, response->unenforced, hidden_auths,
                                         key_data, MasterKey(), nonce));
-    if (blob.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return false;
-    }
+    if (blob.get() == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    if (blob->error() != KM_ERROR_OK) {
+    if (blob->error() != KM_ERROR_OK)
         return blob->error();
-        return false;
-    }
 
     size_t size = blob->SerializedSize();
     UniquePtr<uint8_t[]> blob_bytes(new uint8_t[size]);
-    if (blob_bytes.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return false;
-    }
+    if (blob_bytes.get() == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
     blob->Serialize(blob_bytes.get(), blob_bytes.get() + size);
     response->key_blob.key_material_size = size;
     response->key_blob.key_material = blob_bytes.release();
-    return true;
+
+    return KM_ERROR_OK;
+}
+
+Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
+                              const AuthorizationSet& client_params, keymaster_error_t* error) {
+    UniquePtr<KeyBlob> blob(LoadKeyBlob(key, client_params, error));
+    if (*error != KM_ERROR_OK)
+        return NULL;
+    return Key::CreateKey(*blob, error);
 }
 
 KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
@@ -567,6 +434,7 @@ KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
         *error = blob->error();
         return NULL;
     }
+    *error = KM_ERROR_OK;
     return blob.release();
 }
 

@@ -26,87 +26,6 @@ struct RSA_Delete {
     void operator()(RSA* p) const { RSA_free(p); }
 };
 
-/* static */
-keymaster_error_t RsaOperation::Generate(uint64_t public_exponent, uint32_t key_size,
-                                         UniquePtr<uint8_t[]>* key_data, size_t* key_data_size) {
-    if (key_data == NULL || key_data_size == NULL)
-        return KM_ERROR_OUTPUT_PARAMETER_NULL;
-
-    UniquePtr<BIGNUM, BIGNUM_Delete> exponent(BN_new());
-    UniquePtr<RSA, RSA_Delete> rsa_key(RSA_new());
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
-    if (rsa_key.get() == NULL || pkey.get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    if (!BN_set_word(exponent.get(), public_exponent) ||
-        !RSA_generate_key_ex(rsa_key.get(), key_size, exponent.get(), NULL /* callback */))
-        return KM_ERROR_UNKNOWN_ERROR;
-
-    if (!EVP_PKEY_assign_RSA(pkey.get(), rsa_key.get()))
-        return KM_ERROR_UNKNOWN_ERROR;
-    else
-        release_because_ownership_transferred(rsa_key);
-
-    *key_data_size = i2d_PrivateKey(pkey.get(), NULL);
-    if (*key_data_size <= 0)
-        return KM_ERROR_UNKNOWN_ERROR;
-
-    key_data->reset(new uint8_t[*key_data_size]);
-    if (key_data->get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    uint8_t* tmp = key_data->get();
-    i2d_PrivateKey(pkey.get(), &tmp);
-
-    return KM_ERROR_OK;
-}
-
-RsaOperation::RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key)
-    : Operation(purpose), rsa_key_(NULL) {
-    assert(key.algorithm() == KM_ALGORITHM_RSA);
-
-    if ((!key.enforced().GetTagValue(TAG_DIGEST, &digest_) &&
-         !key.unenforced().GetTagValue(TAG_DIGEST, &digest_)) ||
-        digest_ != KM_DIGEST_NONE) {
-        error_ = KM_ERROR_UNSUPPORTED_DIGEST;
-        return;
-    }
-
-    if ((!key.enforced().GetTagValue(TAG_PADDING, &padding_) &&
-         !key.unenforced().GetTagValue(TAG_PADDING, &padding_)) ||
-        padding_ != KM_PAD_NONE) {
-        error_ = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        return;
-    }
-
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> evp_key(EVP_PKEY_new());
-    if (evp_key.get() == NULL) {
-        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
-    }
-
-    EVP_PKEY* tmp_pkey = evp_key.get();
-    const uint8_t* key_material = key.key_material();
-    if (d2i_PrivateKey(EVP_PKEY_RSA, &tmp_pkey, &key_material, key.key_material_length()) == NULL) {
-        error_ = KM_ERROR_INVALID_KEY_BLOB;
-        return;
-    }
-
-    rsa_key_ = EVP_PKEY_get1_RSA(evp_key.get());
-    if (rsa_key_ == NULL) {
-        error_ = KM_ERROR_UNKNOWN_ERROR;
-        return;
-    }
-
-    // Since we're not using a digest function, we just need to store the text, up to the key
-    // size, until Finish is called, so we allocate a place to put it.
-    if (!data_.Reinitialize(RSA_size(rsa_key_))) {
-        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
-    }
-    error_ = KM_ERROR_OK;
-}
-
 RsaOperation::~RsaOperation() {
     if (rsa_key_ != NULL)
         RSA_free(rsa_key_);
@@ -123,46 +42,43 @@ keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */
 }
 
 keymaster_error_t RsaOperation::StoreData(const Buffer& input) {
-    if (!data_.write(input.peek_read(), input.available_read()))
-        return KM_ERROR_INVALID_INPUT_LENGTH;
+    if (!data_.reserve(input.available_read()) ||
+        !data_.write(input.peek_read(), input.available_read()))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaOperation::Finish(const Buffer& signature, Buffer* output) {
-    switch (purpose()) {
-    case KM_PURPOSE_SIGN: {
-        output->Reinitialize(RSA_size(rsa_key_));
-        if (data_.available_read() != output->buffer_size())
-            return KM_ERROR_INVALID_INPUT_LENGTH;
+keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+    output->Reinitialize(RSA_size(rsa_key_));
+    if (data_.available_read() != output->buffer_size())
+        return KM_ERROR_INVALID_INPUT_LENGTH;
 
-        int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
-                                                  output->peek_write(), rsa_key_, RSA_NO_PADDING);
-        if (bytes_encrypted < 0)
-            return KM_ERROR_UNKNOWN_ERROR;
-        assert(bytes_encrypted == RSA_size(rsa_key_));
-        output->advance_write(bytes_encrypted);
-        return KM_ERROR_OK;
-    }
-    case KM_PURPOSE_VERIFY: {
-        if ((int)data_.available_read() != RSA_size(rsa_key_))
-            return KM_ERROR_INVALID_INPUT_LENGTH;
-        if (data_.available_read() != signature.available_read())
-            return KM_ERROR_VERIFICATION_FAILED;
+    int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
+                                              output->peek_write(), rsa_key_, RSA_NO_PADDING);
+    if (bytes_encrypted < 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+    assert(bytes_encrypted == RSA_size(rsa_key_));
+    output->advance_write(bytes_encrypted);
+    return KM_ERROR_OK;
+}
 
-        UniquePtr<uint8_t[]> decrypted_data(new uint8_t[RSA_size(rsa_key_)]);
-        int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
-                                                 decrypted_data.get(), rsa_key_, RSA_NO_PADDING);
-        if (bytes_decrypted < 0)
-            return KM_ERROR_UNKNOWN_ERROR;
-        assert(bytes_decrypted == RSA_size(rsa_key_));
+keymaster_error_t RsaVerifyOperation::Finish(const Buffer& signature, Buffer* /* output */) {
 
-        if (memcmp_s(decrypted_data.get(), data_.peek_read(), data_.available_read()) == 0)
-            return KM_ERROR_OK;
+    if ((int)data_.available_read() != RSA_size(rsa_key_))
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    if (data_.available_read() != signature.available_read())
         return KM_ERROR_VERIFICATION_FAILED;
-    }
-    default:
-        return KM_ERROR_UNIMPLEMENTED;
-    }
+
+    UniquePtr<uint8_t[]> decrypted_data(new uint8_t[RSA_size(rsa_key_)]);
+    int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
+                                             decrypted_data.get(), rsa_key_, RSA_NO_PADDING);
+    if (bytes_decrypted < 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+    assert(bytes_decrypted == RSA_size(rsa_key_));
+
+    if (memcmp_s(decrypted_data.get(), data_.peek_read(), data_.available_read()) == 0)
+        return KM_ERROR_OK;
+    return KM_ERROR_VERIFICATION_FAILED;
 }
 
 }  // namespace keymaster

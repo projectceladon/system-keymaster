@@ -25,6 +25,7 @@ CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-paramete
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
+	asymmetric_key.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	dsa_operation.cpp \
@@ -35,6 +36,7 @@ CPPSRCS=\
 	google_keymaster_test.cpp \
 	google_keymaster_test_utils.cpp \
 	google_keymaster_utils.cpp \
+	key.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
 	rsa_operation.cpp \
@@ -118,6 +120,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 	$(GTEST)/src/gtest-all.o
 
 google_keymaster_test: google_keymaster_test.o \
+	asymmetric_key.o \
 	authorization_set.o \
 	dsa_operation.o \
 	ecdsa_operation.o \
@@ -125,6 +128,7 @@ google_keymaster_test: google_keymaster_test.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \
 	google_keymaster_utils.o \
+	key.o \
 	key_blob.o \
 	ocb.o \
 	rsa_operation.o \

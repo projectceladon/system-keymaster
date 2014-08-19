@@ -330,7 +330,7 @@ TEST_F(NewKeyGeneration, Dsa) {
     EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_GENERATOR, &g));
     EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_P, &p));
     EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_Q, &q));
-    EXPECT_EQ(64U, g.data_length);
+    EXPECT_TRUE(g.data_length >= 63 && g.data_length <= 64);
     EXPECT_EQ(64U, p.data_length);
     EXPECT_EQ(20U, q.data_length);
 }

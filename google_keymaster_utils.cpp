@@ -29,6 +29,21 @@ Buffer::~Buffer() {
     delete[] buffer_;
 }
 
+bool Buffer::reserve(size_t size) {
+    if (available_write() < size) {
+        size_t new_size = buffer_size_ + size - available_write();
+        uint8_t* new_buffer = new uint8_t[new_size];
+        if (!new_buffer)
+            return false;
+        memcpy(new_buffer, buffer_ + read_position_, available_read());
+        buffer_ = new_buffer;
+        buffer_size_ = new_size;
+        write_position_ -= read_position_;
+        read_position_ = 0;
+    }
+    return true;
+}
+
 bool Buffer::Reinitialize(size_t size) {
     delete[] buffer_;
 
