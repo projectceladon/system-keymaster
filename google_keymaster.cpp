@@ -20,6 +20,7 @@
 #include <cstddef>
 
 #include <openssl/rand.h>
+#include <openssl/x509.h>
 
 #include <UniquePtr.h>
 
@@ -53,6 +54,16 @@ struct AE_CTX_Delete {
     void operator()(ae_ctx* ctx) const { ae_free(ctx); }
 };
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
+
+struct EVP_PKEY_Delete {
+    void operator()(EVP_PKEY* p) { EVP_PKEY_free(p); }
+};
+typedef UniquePtr<EVP_PKEY, EVP_PKEY_Delete> Unique_EVP_PKEY;
+
+struct PKCS8_PRIV_KEY_INFO_Delete {
+    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
+};
+typedef UniquePtr<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_Delete> Unique_PKCS8_PRIV_KEY_INFO;
 
 keymaster_algorithm_t supported_algorithms[] = {
     KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA,
@@ -290,6 +301,126 @@ keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_hand
         return KM_ERROR_INVALID_OPERATION_HANDLE;
     DeleteOperation(entry);
     return KM_ERROR_OK;
+}
+
+bool GoogleKeymaster::is_supported_export_format(keymaster_key_format_t test_format) {
+    unsigned int index;
+    for (index = 0; index < array_length(supported_export_formats); index++) {
+        if (test_format == supported_export_formats[index]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GoogleKeymaster::is_supported_import_format(keymaster_key_format_t test_format) {
+    unsigned int index;
+    for (index = 0; index < array_length(supported_import_formats); index++) {
+        if (test_format == supported_import_formats[index]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response) {
+    if (response == NULL)
+        return;
+
+    keymaster_error_t blob_error;
+    UniquePtr<KeyBlob> to_export(
+        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
+    if (to_export.get() == NULL)
+        return;
+
+    Unique_EVP_PKEY pkey(EVP_PKEY_new());
+    if (pkey.get() == NULL) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    EVP_PKEY* pkey_tmp = pkey.get();
+    const uint8_t* km_tmp = to_export->key_material();
+    if (d2i_PrivateKey(EVP_PKEY_RSA, &pkey_tmp, &km_tmp, to_export->key_material_length()) ==
+        NULL) {
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    int len = i2d_PUBKEY(pkey.get(), NULL);
+    if (len <= 0) {
+        response->error = KM_ERROR_UNKNOWN_ERROR;
+        return;
+    }
+
+    UniquePtr<uint8_t[]> out_key(new uint8_t[len]);
+    if (out_key.get() == NULL) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    uint8_t* tmp = out_key.get();
+    if (i2d_PUBKEY(pkey.get(), &tmp) != len) {
+        fprintf(stderr, "i2d_pubkey(x, len) failed.\n");
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+
+        return;
+    }
+
+    response->key_data = out_key.release();
+    response->error = KM_ERROR_OK;
+}
+
+void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
+
+    if (request.key_data == NULL || request.key_data_length <= 0) {
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    if (!is_supported_export_format(request.key_format)) {
+        response->error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+        return;
+    }
+
+    const uint8_t* key_data = request.key_data;
+    Unique_PKCS8_PRIV_KEY_INFO pkcs8(
+        d2i_PKCS8_PRIV_KEY_INFO(NULL, &key_data, request.key_data_length));
+    if (pkcs8.get() == NULL) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    Unique_EVP_PKEY pkey(EVP_PKCS82PKEY(pkcs8.get()));
+    if (pkey.get() == NULL) {
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    int len = i2d_PrivateKey(pkey.get(), NULL);
+    if (len <= 0) {
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    UniquePtr<uint8_t[]> der_encoded_key(new uint8_t[len]);
+    if (der_encoded_key.get() == NULL) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    uint8_t* tmp_der = der_encoded_key.get();
+    if (i2d_PrivateKey(pkey.get(), &tmp_der) != len) {
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    void* key_material = der_encoded_key.release();
+    response->SetKeyMaterial(key_material, len);
+
+    response->error = KM_ERROR_OK;
 }
 
 bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,

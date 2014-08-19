@@ -487,6 +487,7 @@ class SigningOperationsTest : public KeymasterTest {
 
 TEST_F(SigningOperationsTest, RsaSuccess) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+    const char message[] = "12345678901234567890123456789012";
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
@@ -500,8 +501,8 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
     UpdateOperationRequest update_request;
     UpdateOperationResponse update_response;
     update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize("012345678901234567890123456789012", 32);
-    EXPECT_EQ(32U, update_request.input.available_read());
+    update_request.input.Reinitialize(message, array_size(message) - 1);
+    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
 
     device.UpdateOperation(update_request, &update_response);
     ASSERT_EQ(KM_ERROR_OK, update_response.error);
@@ -800,6 +801,22 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     EXPECT_EQ(0U, finish_response.output.available_read());
 
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+}
+
+typedef SigningOperationsTest ExportKeyTest;
+TEST_F(ExportKeyTest, RsaSuccess) {
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+    ASSERT_TRUE(signature() != NULL);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+    request.key_format = KM_KEY_FORMAT_X509;
+    request.SetKeyMaterial(key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_TRUE(response.key_data != NULL);
 }
 
 }  // namespace test

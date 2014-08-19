@@ -58,21 +58,18 @@ class GoogleKeymaster {
                                 SupportedResponse<keymaster_key_format_t>* response) const;
 
     virtual keymaster_error_t AddRngEntropy(AddEntropyRequest& /* request */) {
+        // Not going to implement until post-L.
         return KM_ERROR_UNIMPLEMENTED;
     }
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
     void Rescope(const RescopeRequest& /* request */, RescopeResponse* response) {
-        // Not going to implement rescoping until post-L.
+        // Not going to implement until post-L.
         response->error = KM_ERROR_UNIMPLEMENTED;
     }
-    void ImportKey(const ImportKeyRequest& /* request */, ImportKeyResponse* response) {
-        response->error = KM_ERROR_UNIMPLEMENTED;
-    }
-    void ExportKey(const ExportKeyRequest& /* request */, ExportKeyResponse* response) {
-        response->error = KM_ERROR_UNIMPLEMENTED;
-    }
+    void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
+    void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
     void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);
     void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
@@ -117,6 +114,8 @@ class GoogleKeymaster {
     keymaster_error_t AddOperation(Operation* operation, keymaster_operation_handle_t* op_handle);
     OpTableEntry* FindOperation(keymaster_operation_handle_t op_handle);
     void DeleteOperation(OpTableEntry* entry);
+    bool is_supported_export_format(keymaster_key_format_t test_format);
+    bool is_supported_import_format(keymaster_key_format_t test_format);
 
     UniquePtr<OpTableEntry[]> operation_table_;
     size_t operation_table_size_;

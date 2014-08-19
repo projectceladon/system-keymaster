@@ -345,7 +345,8 @@ typedef struct {
 } keymaster_key_blob_t;
 
 /**
- * Formats for key import and export.
+ * Formats for key import and export.  At present, only asymmetric key import/export is supported.
+ * In the future this list will expand greatly to accommodate asymmetric key import/export.
  */
 typedef enum {
     KM_KEY_FORMAT_X509,   /* for public key export, required */
