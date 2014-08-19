@@ -86,4 +86,100 @@ keymaster_error_t EcdsaOperation::Generate(uint32_t key_size_bits, UniquePtr<uin
     return KM_ERROR_OK;
 }
 
+EcdsaOperation::EcdsaOperation(keymaster_purpose_t purpose, const KeyBlob& key)
+    : Operation(purpose), ecdsa_key_(NULL) {
+    assert(key.algorithm() == KM_ALGORITHM_ECDSA);
+
+    if ((!key.enforced().GetTagValue(TAG_DIGEST, &digest_) &&
+         !key.unenforced().GetTagValue(TAG_DIGEST, &digest_)) ||
+        digest_ != KM_DIGEST_NONE) {
+        error_ = KM_ERROR_UNSUPPORTED_DIGEST;
+        return;
+    }
+
+    if ((!key.enforced().GetTagValue(TAG_PADDING, &padding_) &&
+         !key.unenforced().GetTagValue(TAG_PADDING, &padding_)) ||
+        padding_ != KM_PAD_NONE) {
+        error_ = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+        return;
+    }
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> evp_key(EVP_PKEY_new());
+    if (evp_key.get() == NULL) {
+        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    EVP_PKEY* tmp_pkey = evp_key.get();
+    const uint8_t* key_material = key.key_material();
+    if (d2i_PrivateKey(EVP_PKEY_EC, &tmp_pkey, &key_material, key.key_material_length()) ==
+        NULL) {
+        error_ = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
+    ecdsa_key_ = EVP_PKEY_get1_EC_KEY(evp_key.get());
+    if (ecdsa_key_ == NULL) {
+        error_ = KM_ERROR_UNKNOWN_ERROR;
+        return;
+    }
+
+    // Since we're not using a digest function, we just need to store the text, up to the key
+    // size, until Finish is called, so we allocate a place to put it.
+    if (!data_.Reinitialize(512)) {
+        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    error_ = KM_ERROR_OK;
+}
+
+EcdsaOperation::~EcdsaOperation() {
+    if (ecdsa_key_ != NULL)
+        EC_KEY_free(ecdsa_key_);
+}
+
+keymaster_error_t EcdsaOperation::Update(const Buffer& input, Buffer* /* output */) {
+    switch (purpose()) {
+    default:
+        return KM_ERROR_UNIMPLEMENTED;
+    case KM_PURPOSE_SIGN:
+    case KM_PURPOSE_VERIFY:
+        return StoreData(input);
+    }
+}
+
+keymaster_error_t EcdsaOperation::StoreData(const Buffer& input) {
+    if (!data_.write(input.peek_read(), input.available_read()))
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t EcdsaOperation::Finish(const Buffer& signature, Buffer* output) {
+    switch (purpose()) {
+    case KM_PURPOSE_SIGN: {
+        output->Reinitialize(ECDSA_size(ecdsa_key_));
+        unsigned int siglen;
+        if (!ECDSA_sign(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
+                        output->peek_write(), &siglen, ecdsa_key_))
+            return KM_ERROR_UNKNOWN_ERROR;
+        output->advance_write(siglen);
+        return KM_ERROR_OK;
+    }
+    case KM_PURPOSE_VERIFY: {
+        int result =
+            ECDSA_verify(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
+                         signature.peek_read(), signature.available_read(), ecdsa_key_);
+        if (result < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+        else if (result == 0)
+            return KM_ERROR_VERIFICATION_FAILED;
+        else
+            return KM_ERROR_OK;
+    }
+    default:
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+}
+
 }  // namespace keymaster
