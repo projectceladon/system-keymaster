@@ -31,7 +31,6 @@ class DsaOperation : public Operation {
     DsaOperation(keymaster_purpose_t purpose, const KeyBlob& key);
     ~DsaOperation();
 
-    static keymaster_error_t GetDefaultGenerator(keymaster_blob_t* generator);
     static keymaster_error_t Generate(uint32_t key_size_bits, keymaster_blob_t* generator,
                                       keymaster_blob_t* p, keymaster_blob_t* q,
                                       UniquePtr<uint8_t[]>* key_data, size_t* key_data_size);
