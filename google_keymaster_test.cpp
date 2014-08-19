@@ -474,6 +474,13 @@ class SigningOperationsTest : public KeymasterTest {
     void AddClientParams(AuthorizationSet* set) { set->push_back(TAG_APPLICATION_ID, "app_id", 6); }
 
     const keymaster_key_blob_t& key_blob() { return generate_response_.key_blob; }
+
+    const keymaster_key_blob_t& corrupt_key_blob() {
+        ++generate_response_.key_blob
+              .key_material[generate_response_.key_blob.key_material_size / 2];
+        return generate_response_.key_blob;
+    }
+
     Buffer* signature() {
         if (finish_response_.error == KM_ERROR_OK)
             return &finish_response_.output;
@@ -806,7 +813,6 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
 typedef SigningOperationsTest ExportKeyTest;
 TEST_F(ExportKeyTest, RsaSuccess) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_TRUE(signature() != NULL);
 
     ExportKeyRequest request;
     ExportKeyResponse response;
@@ -817,6 +823,64 @@ TEST_F(ExportKeyTest, RsaSuccess) {
     device.ExportKey(request, &response);
     ASSERT_EQ(KM_ERROR_OK, response.error);
     EXPECT_TRUE(response.key_data != NULL);
+}
+
+TEST_F(ExportKeyTest, DsaSuccess) {
+    GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 1024 /* key size */);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+    request.key_format = KM_KEY_FORMAT_X509;
+    request.SetKeyMaterial(key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_TRUE(response.key_data != NULL);
+}
+
+TEST_F(ExportKeyTest, EcdsaSuccess) {
+    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 192 /* key size */);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+    request.key_format = KM_KEY_FORMAT_X509;
+    request.SetKeyMaterial(key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_TRUE(response.key_data != NULL);
+}
+
+TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+
+    /* We have no other defined export formats defined. */
+    request.key_format = KM_KEY_FORMAT_PKCS8;
+    request.SetKeyMaterial(key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, response.error);
+    EXPECT_TRUE(response.key_data == NULL);
+}
+
+TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
+    GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+    request.key_format = KM_KEY_FORMAT_X509;
+    request.SetKeyMaterial(corrupt_key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, response.error);
+    ASSERT_TRUE(response.key_data == NULL);
 }
 
 }  // namespace test

@@ -293,47 +293,18 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
         return;
 
     keymaster_error_t blob_error;
-    UniquePtr<KeyBlob> to_export(
-        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
+    UniquePtr<Key> to_export(
+        LoadKey(request.key_blob, request.additional_params, &response->error));
     if (to_export.get() == NULL)
         return;
 
-    Unique_EVP_PKEY pkey(EVP_PKEY_new());
-    if (pkey.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
+    UniquePtr<uint8_t[]> out_key;
+    size_t size;
+    response->error = to_export->formatted_key_material(request.key_format, &out_key, &size);
+    if (response->error == KM_ERROR_OK) {
+        response->key_data = out_key.release();
+        response->key_data_length = size;
     }
-
-    EVP_PKEY* pkey_tmp = pkey.get();
-    const uint8_t* km_tmp = to_export->key_material();
-    if (d2i_PrivateKey(EVP_PKEY_RSA, &pkey_tmp, &km_tmp, to_export->key_material_length()) ==
-        NULL) {
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
-        return;
-    }
-
-    int len = i2d_PUBKEY(pkey.get(), NULL);
-    if (len <= 0) {
-        response->error = KM_ERROR_UNKNOWN_ERROR;
-        return;
-    }
-
-    UniquePtr<uint8_t[]> out_key(new uint8_t[len]);
-    if (out_key.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
-    }
-
-    uint8_t* tmp = out_key.get();
-    if (i2d_PUBKEY(pkey.get(), &tmp) != len) {
-        fprintf(stderr, "i2d_pubkey(x, len) failed.\n");
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
-
-        return;
-    }
-
-    response->key_data = out_key.release();
-    response->error = KM_ERROR_OK;
 }
 
 void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {

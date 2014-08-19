@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <openssl/evp.h>
+#include <openssl/x509.h>
+
 #include "asymmetric_key.h"
 #include "dsa_operation.h"
 #include "ecdsa_operation.h"
@@ -70,12 +73,35 @@ keymaster_error_t AsymmetricKey::key_material(UniquePtr<uint8_t[]>* material, si
     return KM_ERROR_OK;
 }
 
-keymaster_error_t AsymmetricKey::formatted_key_material(UniquePtr<uint8_t[]>* material,
+keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t format,
+                                                        UniquePtr<uint8_t[]>* material,
                                                         size_t* size) const {
+    if (format != KM_KEY_FORMAT_X509)
+        return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+
     if (material == NULL || size == NULL)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    return KM_ERROR_UNIMPLEMENTED;
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
+    if (!InternalToEvp(pkey.get()))
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    int key_data_length = i2d_PUBKEY(pkey.get(), NULL);
+    if (key_data_length <= 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    material->reset(new uint8_t[key_data_length]);
+    if (material->get() == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    uint8_t* tmp = material->get();
+    if (i2d_PUBKEY(pkey.get(), &tmp) != key_data_length) {
+        material->reset();
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    *size = key_data_length;
+    return KM_ERROR_OK;
 }
 
 Operation* AsymmetricKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
