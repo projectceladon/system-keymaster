@@ -28,6 +28,7 @@ CPPSRCS=\
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	dsa_operation.cpp \
+	ecdsa_operation.cpp \
 	google_keymaster.cpp \
 	google_keymaster_messages.cpp \
 	google_keymaster_messages_test.cpp \
@@ -119,6 +120,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 google_keymaster_test: google_keymaster_test.o \
 	authorization_set.o \
 	dsa_operation.o \
+	ecdsa_operation.o \
 	google_keymaster.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \
