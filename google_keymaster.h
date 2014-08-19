@@ -93,8 +93,11 @@ class GoogleKeymaster {
     bool CopyAuthorizations(const AuthorizationSet& key_description, GenerateKeyResponse* response);
     keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
                                                 AuthorizationSet* hidden);
-    void AddAuthorization(const keymaster_key_param_t& auth, GenerateKeyResponse* response);
+
+    bool AddAuthorization(const keymaster_key_param_t& auth, GenerateKeyResponse* response);
     bool GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
+                     AuthorizationSet* hidden_auths);
+    bool GenerateDsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
                      AuthorizationSet* hidden_auths);
     keymaster_error_t WrapKey(const uint8_t* key_material, size_t key_material_length,
                               KeyBlob* blob);

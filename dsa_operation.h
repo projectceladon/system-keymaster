@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_RSA_OPERATION_H_
-#define SYSTEM_KEYMASTER_RSA_OPERATION_H_
+#ifndef SYSTEM_KEYMASTER_DSA_OPERATION_H_
+#define SYSTEM_KEYMASTER_DSA_OPERATION_H_
+
+#include <openssl/dsa.h>
 
 #include <UniquePtr.h>
 
@@ -24,12 +26,14 @@
 
 namespace keymaster {
 
-class RsaOperation : public Operation {
+class DsaOperation : public Operation {
   public:
-    RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key);
-    ~RsaOperation();
+    DsaOperation(keymaster_purpose_t purpose, const KeyBlob& key);
+    ~DsaOperation();
 
-    static keymaster_error_t Generate(uint64_t public_exponent, uint32_t key_size_bits,
+    static keymaster_error_t GetDefaultGenerator(keymaster_blob_t* generator);
+    static keymaster_error_t Generate(uint32_t key_size_bits, keymaster_blob_t* generator,
+                                      keymaster_blob_t* p, keymaster_blob_t* q,
                                       UniquePtr<uint8_t[]>* key_data, size_t* key_data_size);
 
     virtual keymaster_error_t Begin() {
@@ -49,10 +53,10 @@ class RsaOperation : public Operation {
     keymaster_error_t error_;
     keymaster_digest_t digest_;
     keymaster_padding_t padding_;
-    RSA* rsa_key_;
+    DSA* dsa_key_;
     Buffer data_;
 };
 
 }  // namespace keymaster
 
-#endif  // SYSTEM_KEYMASTER_RSA_OPERATION_H_
+#endif  // SYSTEM_KEYMASTER_DSA_OPERATION_H_

@@ -101,8 +101,9 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     SupportedResponse<keymaster_algorithm_t> response;
     device.SupportedAlgorithms(&response);
     EXPECT_EQ(KM_ERROR_OK, response.error);
-    EXPECT_EQ(1U, response.results_length);
+    EXPECT_EQ(2U, response.results_length);
     EXPECT_EQ(KM_ALGORITHM_RSA, response.results[0]);
+    EXPECT_EQ(KM_ALGORITHM_DSA, response.results[1]);
 }
 
 TEST_F(CheckSupported, SupportedBlockModes) {
@@ -115,6 +116,10 @@ TEST_F(CheckSupported, SupportedBlockModes) {
     EXPECT_EQ(0U, response.results_length);
 
     device.SupportedBlockModes(KM_ALGORITHM_DSA, &response);
+    EXPECT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_EQ(0U, response.results_length);
+
+    device.SupportedBlockModes(KM_ALGORITHM_AES, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -129,6 +134,11 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     EXPECT_EQ(KM_PAD_NONE, response.results[0]);
 
     device.SupportedPaddingModes(KM_ALGORITHM_DSA, &response);
+    EXPECT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_EQ(1U, response.results_length);
+    EXPECT_EQ(KM_PAD_NONE, response.results[0]);
+
+    device.SupportedPaddingModes(KM_ALGORITHM_AES, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -143,6 +153,11 @@ TEST_F(CheckSupported, SupportedDigests) {
     EXPECT_EQ(KM_DIGEST_NONE, response.results[0]);
 
     device.SupportedDigests(KM_ALGORITHM_DSA, &response);
+    EXPECT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_EQ(1U, response.results_length);
+    EXPECT_EQ(KM_DIGEST_NONE, response.results[0]);
+
+    device.SupportedDigests(KM_ALGORITHM_AES, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -157,6 +172,11 @@ TEST_F(CheckSupported, SupportedImportFormats) {
     EXPECT_EQ(KM_KEY_FORMAT_PKCS8, response.results[0]);
 
     device.SupportedImportFormats(KM_ALGORITHM_DSA, &response);
+    EXPECT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_EQ(1U, response.results_length);
+    EXPECT_EQ(KM_KEY_FORMAT_PKCS8, response.results[0]);
+
+    device.SupportedImportFormats(KM_ALGORITHM_AES, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -171,6 +191,11 @@ TEST_F(CheckSupported, SupportedExportFormats) {
     EXPECT_EQ(KM_KEY_FORMAT_X509, response.results[0]);
 
     device.SupportedExportFormats(KM_ALGORITHM_DSA, &response);
+    EXPECT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_EQ(1U, response.results_length);
+    EXPECT_EQ(KM_KEY_FORMAT_X509, response.results[0]);
+
+    device.SupportedExportFormats(KM_ALGORITHM_AES, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -224,6 +249,65 @@ TEST_F(NewKeyGeneration, Rsa) {
     EXPECT_TRUE(contains(rsp.unenforced, TAG_RSA_PUBLIC_EXPONENT, 65537));
     EXPECT_TRUE(contains(rsp.unenforced, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
     EXPECT_TRUE(contains(rsp.unenforced, KM_TAG_CREATION_DATETIME));
+}
+
+TEST_F(NewKeyGeneration, Dsa) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_DSA),
+        Authorization(TAG_KEY_SIZE, 256),
+        Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6),
+        Authorization(TAG_APPLICATION_DATA, "app_data", 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    GenerateKeyRequest req;
+    req.key_description.Reinitialize(params, array_length(params));
+    GenerateKeyResponse rsp;
+
+    device.GenerateKey(req, &rsp);
+
+    ASSERT_EQ(KM_ERROR_OK, rsp.error);
+    EXPECT_EQ(0U, rsp.enforced.size());
+    EXPECT_EQ(12U, rsp.enforced.SerializedSize());
+    EXPECT_GT(rsp.unenforced.SerializedSize(), 12U);
+
+    // Check specified tags are all present in unenforced characteristics
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_VERIFY));
+
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_ID, 7));
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_USER_AUTH_ID, 8));
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_KEY_SIZE, 256));
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_AUTH_TIMEOUT, 300));
+
+    // Verify that App ID, App data and ROT are NOT included.
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_ROOT_OF_TRUST));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_APPLICATION_ID));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_APPLICATION_DATA));
+
+    // Just for giggles, check that some unexpected tags/values are NOT present.
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_AUTH_TIMEOUT, 301));
+    EXPECT_FALSE(contains(rsp.unenforced, TAG_RESCOPE_AUTH_TIMEOUT));
+
+    // Now check that unspecified, defaulted tags are correct.
+    EXPECT_TRUE(contains(rsp.unenforced, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
+    EXPECT_TRUE(contains(rsp.unenforced, KM_TAG_CREATION_DATETIME));
+
+    // Generator should have created DSA params.
+    keymaster_blob_t g, p, q;
+    EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_GENERATOR, &g));
+    EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_P, &p));
+    EXPECT_TRUE(rsp.unenforced.GetTagValue(TAG_DSA_Q, &q));
+    EXPECT_EQ(64U, g.data_length);
+    EXPECT_EQ(64U, p.data_length);
+    EXPECT_EQ(20U, q.data_length);
 }
 
 typedef KeymasterTest GetKeyCharacteristics;

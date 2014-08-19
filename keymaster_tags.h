@@ -232,6 +232,24 @@ inline keymaster_key_param_t Authorization(TypedTag<KM_BYTES, Tag> tag, const vo
     return keymaster_param_blob(tag, reinterpret_cast<const uint8_t*>(bytes), bytes_len);
 }
 
+template <keymaster_tag_t Tag>
+inline keymaster_key_param_t Authorization(TypedTag<KM_BYTES, Tag> tag,
+                                           const keymaster_blob_t& blob) {
+    return keymaster_param_blob(tag, blob.data, blob.data_length);
+}
+
+template <keymaster_tag_t Tag>
+inline keymaster_key_param_t Authorization(TypedTag<KM_BIGNUM, Tag> tag, const void* bytes,
+                                           size_t bytes_len) {
+    return keymaster_param_blob(tag, reinterpret_cast<const uint8_t*>(bytes), bytes_len);
+}
+
+template <keymaster_tag_t Tag>
+inline keymaster_key_param_t Authorization(TypedTag<KM_BIGNUM, Tag> tag,
+                                           const keymaster_blob_t& blob) {
+    return keymaster_param_blob(tag, blob.data, blob.data_length);
+}
+
 template <keymaster_tag_t Tag, typename KeymasterEnum>
 inline keymaster_key_param_t Authorization(TypedEnumTag<KM_ENUM, Tag, KeymasterEnum> tag,
                                            KeymasterEnum value) {

@@ -24,6 +24,7 @@
 #include <UniquePtr.h>
 
 #include "ae.h"
+#include "dsa_operation.h"
 #include "google_keymaster.h"
 #include "google_keymaster_utils.h"
 #include "key_blob.h"
@@ -43,20 +44,17 @@ GoogleKeymaster::~GoogleKeymaster() {
             delete operation_table_[i].operation;
 }
 
-const int RSA_DEFAULT_KEY_SIZE = 2048;
-const int RSA_DEFAULT_EXPONENT = 65537;
+const uint32_t RSA_DEFAULT_KEY_SIZE = 2048;
+const uint32_t DSA_DEFAULT_KEY_SIZE = 2048;
+const uint64_t RSA_DEFAULT_EXPONENT = 65537;
 
 struct AE_CTX_Delete {
     void operator()(ae_ctx* ctx) const { ae_free(ctx); }
 };
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
-struct ByteArray_Delete {
-    void operator()(void* p) const { delete[] reinterpret_cast<uint8_t*>(p); }
-};
-
 keymaster_algorithm_t supported_algorithms[] = {
-    KM_ALGORITHM_RSA,
+    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA,
 };
 
 template <typename T>
@@ -83,8 +81,7 @@ GoogleKeymaster::SupportedBlockModes(keymaster_algorithm_t algorithm,
     response->error = KM_ERROR_OK;
 }
 
-keymaster_padding_t rsa_supported_padding[] = {KM_PAD_NONE};
-
+keymaster_padding_t supported_padding[] = {KM_PAD_NONE};
 void
 GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
                                        SupportedResponse<keymaster_padding_t>* response) const {
@@ -94,7 +91,8 @@ GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
     response->error = KM_ERROR_OK;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
-        response->SetResults(rsa_supported_padding);
+    case KM_ALGORITHM_DSA:
+        response->SetResults(supported_padding);
         break;
     default:
         response->results_length = 0;
@@ -102,7 +100,7 @@ GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
     }
 }
 
-keymaster_digest_t rsa_supported_digests[] = {KM_DIGEST_NONE};
+keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
 void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
                                        SupportedResponse<keymaster_digest_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
@@ -111,7 +109,8 @@ void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
     response->error = KM_ERROR_OK;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
-        response->SetResults(rsa_supported_digests);
+    case KM_ALGORITHM_DSA:
+        response->SetResults(supported_digests);
         break;
     default:
         response->results_length = 0;
@@ -119,7 +118,7 @@ void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
     }
 }
 
-keymaster_key_format_t rsa_supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
+keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
 void
 GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
                                         SupportedResponse<keymaster_key_format_t>* response) const {
@@ -129,7 +128,8 @@ GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
     response->error = KM_ERROR_OK;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
-        response->SetResults(rsa_supported_import_formats);
+    case KM_ALGORITHM_DSA:
+        response->SetResults(supported_import_formats);
         break;
     default:
         response->results_length = 0;
@@ -137,7 +137,7 @@ GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
     }
 }
 
-keymaster_key_format_t rsa_supported_export_formats[] = {KM_KEY_FORMAT_X509};
+keymaster_key_format_t supported_export_formats[] = {KM_KEY_FORMAT_X509};
 void
 GoogleKeymaster::SupportedExportFormats(keymaster_algorithm_t algorithm,
                                         SupportedResponse<keymaster_key_format_t>* response) const {
@@ -147,7 +147,8 @@ GoogleKeymaster::SupportedExportFormats(keymaster_algorithm_t algorithm,
     response->error = KM_ERROR_OK;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
-        response->SetResults(rsa_supported_export_formats);
+    case KM_ALGORITHM_DSA:
+        response->SetResults(supported_export_formats);
         break;
     default:
         response->results_length = 0;
@@ -174,9 +175,14 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return;
     }
+
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
         if (!GenerateRsa(request.key_description, response, &hidden_auths))
+            return;
+        break;
+    case KM_ALGORITHM_DSA:
+        if (!GenerateDsa(request.key_description, response, &hidden_auths))
             return;
         break;
     default:
@@ -293,6 +299,63 @@ bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKey
     return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
 }
 
+template <keymaster_tag_t Tag>
+static void GetDsaParamData(const AuthorizationSet& auths, TypedTag<KM_BIGNUM, Tag> tag,
+                            keymaster_blob_t* blob) {
+    if (!auths.GetTagValue(tag, blob))
+        blob->data = NULL;
+}
+
+bool GoogleKeymaster::GenerateDsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
+                                  AuthorizationSet* hidden_auths) {
+    keymaster_blob_t g_blob;
+    GetDsaParamData(key_auths, TAG_DSA_GENERATOR, &g_blob);
+    const uint8_t* original_g = g_blob.data;
+
+    keymaster_blob_t p_blob;
+    GetDsaParamData(key_auths, TAG_DSA_P, &p_blob);
+    const uint8_t* original_p = p_blob.data;
+
+    keymaster_blob_t q_blob;
+    GetDsaParamData(key_auths, TAG_DSA_Q, &q_blob);
+    const uint8_t* original_q = q_blob.data;
+
+    uint32_t key_size = DSA_DEFAULT_KEY_SIZE;
+    if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
+        AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
+
+    UniquePtr<uint8_t[]> key_data;
+    size_t key_data_size;
+    keymaster_error_t error =
+        DsaOperation::Generate(key_size, &g_blob, &p_blob, &q_blob, &key_data, &key_data_size);
+
+    // If any the original_* pointers are NULL, DsaOperation::Generate should have generated values
+    // for the corressponding blobs.  We need to put them in the authorization set and clean up the
+    // allocated memory.
+    if (original_g == NULL && g_blob.data != NULL) {
+        if (!AddAuthorization(Authorization(TAG_DSA_GENERATOR, g_blob), response))
+            error = KM_ERROR_INVALID_DSA_PARAMS;
+        delete[] g_blob.data;
+    }
+    if (original_p == NULL && p_blob.data != NULL) {
+        if (!AddAuthorization(Authorization(TAG_DSA_P, p_blob), response))
+            error = KM_ERROR_INVALID_DSA_PARAMS;
+        delete[] p_blob.data;
+    }
+    if (original_q == NULL && q_blob.data != NULL) {
+        if (!AddAuthorization(Authorization(TAG_DSA_Q, q_blob), response))
+            error = KM_ERROR_INVALID_DSA_PARAMS;
+        delete[] q_blob.data;
+    }
+
+    if (error != KM_ERROR_OK) {
+        response->error = error;
+        return false;
+    }
+
+    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
+}
+
 bool GoogleKeymaster::CreateKeyBlob(GenerateKeyResponse* response,
                                     const AuthorizationSet& hidden_auths, uint8_t* key_bytes,
                                     size_t key_length) {
@@ -365,13 +428,15 @@ bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description
             response->error = KM_ERROR_UNSUPPORTED_TAG;
             return false;
         default:
-            AddAuthorization(key_description[i], response);
+            if (!AddAuthorization(key_description[i], response))
+                return false;
             break;
         }
     }
 
-    AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), response);
-    AddAuthorization(Authorization(TAG_ORIGIN, origin()), response);
+    if (!AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), response) ||
+        !AddAuthorization(Authorization(TAG_ORIGIN, origin()), response))
+        return false;
 
     response->error = CheckAuthorizationSet(response->enforced);
     if (response->error != KM_ERROR_OK)
@@ -395,20 +460,19 @@ keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const Authorization
     return CheckAuthorizationSet(*hidden);
 }
 
-void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
+bool GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
                                        GenerateKeyResponse* response) {
     switch (auth.tag) {
     case KM_TAG_ROOT_OF_TRUST:
     case KM_TAG_APPLICATION_ID:
     case KM_TAG_APPLICATION_DATA:
         // Skip.  We handle these tags separately.
-        break;
+        return true;
     default:
         if (is_enforced(auth.tag))
-            response->enforced.push_back(auth);
+            return response->enforced.push_back(auth);
         else
-            response->unenforced.push_back(auth);
-        break;
+            return response->unenforced.push_back(auth);
     }
 }
 

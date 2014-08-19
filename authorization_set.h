@@ -176,7 +176,7 @@ class AuthorizationSet : public Serializable {
      */
     template <keymaster_tag_t Tag>
     bool GetTagValue(TypedTag<KM_BIGNUM, Tag> tag, keymaster_blob_t* val) const {
-        return GetTagValueDate(tag, val);
+        return GetTagValueBlob(tag, val);
     }
 
     /**

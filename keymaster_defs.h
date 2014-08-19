@@ -405,6 +405,7 @@ typedef enum {
     KM_ERROR_INVALID_TAG = -40,
     KM_ERROR_MEMORY_ALLOCATION_FAILED = -41,
     KM_ERROR_INVALID_RESCOPING = -42,
+    KM_ERROR_INVALID_DSA_PARAMS = -43,
     KM_ERROR_UNIMPLEMENTED = -100,
 
     /* Additional error codes may be added by implementations, but implementers should coordinate
