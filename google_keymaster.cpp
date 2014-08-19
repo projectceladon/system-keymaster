@@ -19,9 +19,6 @@
 
 #include <cstddef>
 
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/rsa.h>
 #include <openssl/rand.h>
 
 #include <UniquePtr.h>
@@ -49,49 +46,14 @@ GoogleKeymaster::~GoogleKeymaster() {
 const int RSA_DEFAULT_KEY_SIZE = 2048;
 const int RSA_DEFAULT_EXPONENT = 65537;
 
-struct BIGNUM_Delete {
-    void operator()(BIGNUM* p) const {
-        BN_free(p);
-    }
-};
-typedef UniquePtr<BIGNUM, BIGNUM_Delete> Unique_BIGNUM;
-
-struct RSA_Delete {
-    void operator()(RSA* p) const {
-        RSA_free(p);
-    }
-};
-typedef UniquePtr<RSA, RSA_Delete> Unique_RSA;
-
-struct EVP_PKEY_Delete {
-    void operator()(EVP_PKEY* p) const {
-        EVP_PKEY_free(p);
-    }
-};
-typedef UniquePtr<EVP_PKEY, EVP_PKEY_Delete> Unique_EVP_PKEY;
-
 struct AE_CTX_Delete {
-    void operator()(ae_ctx* ctx) const {
-        ae_free(ctx);
-    }
+    void operator()(ae_ctx* ctx) const { ae_free(ctx); }
 };
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
 struct ByteArray_Delete {
-    void operator()(void* p) const {
-        delete[] reinterpret_cast<uint8_t*>(p);
-    }
+    void operator()(void* p) const { delete[] reinterpret_cast<uint8_t*>(p); }
 };
-
-/**
- * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
- * failure. This means we need to tell our scoped pointers when we've transferred ownership, without
- * triggering a warning by not using the result of release().
- */
-template <typename T, typename Delete_T>
-inline void release_because_ownership_transferred(UniquePtr<T, Delete_T>& p) {
-    T* val __attribute__((unused)) = p.release();
-}
 
 keymaster_algorithm_t supported_algorithms[] = {
     KM_ALGORITHM_RSA,
@@ -191,15 +153,6 @@ GoogleKeymaster::SupportedExportFormats(keymaster_algorithm_t algorithm,
         response->results_length = 0;
         break;
     }
-}
-
-template <typename Message>
-void store_bignum(Message* message, void (Message::*set)(const void* value, size_t size),
-                  BIGNUM* bignum) {
-    size_t bufsize = BN_num_bytes(bignum);
-    UniquePtr<uint8_t[]> buf(new uint8_t[bufsize]);
-    int bytes_written = BN_bn2bin(bignum, buf.get());
-    (message->*set)(buf.get(), bytes_written);
 }
 
 void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
@@ -328,42 +281,16 @@ bool GoogleKeymaster::GenerateRsa(const AuthorizationSet& key_auths, GenerateKey
     if (!key_auths.GetTagValue(TAG_KEY_SIZE, &key_size))
         AddAuthorization(Authorization(TAG_KEY_SIZE, key_size), response);
 
-    Unique_BIGNUM exponent(BN_new());
-    Unique_RSA rsa_key(RSA_new());
-    Unique_EVP_PKEY pkey(EVP_PKEY_new());
-    if (rsa_key.get() == NULL || pkey.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    UniquePtr<uint8_t[]> key_data;
+    size_t key_data_size;
+    keymaster_error_t error =
+        RsaOperation::Generate(public_exponent, key_size, &key_data, &key_data_size);
+    if (error != KM_ERROR_OK) {
+        response->error = error;
         return false;
     }
 
-    if (!BN_set_word(exponent.get(), public_exponent) ||
-        !RSA_generate_key_ex(rsa_key.get(), key_size, exponent.get(), NULL /* callback */)) {
-        response->error = KM_ERROR_UNKNOWN_ERROR;
-        return false;
-    }
-
-    if (!EVP_PKEY_assign_RSA(pkey.get(), rsa_key.get())) {
-        response->error = KM_ERROR_UNKNOWN_ERROR;
-        return false;
-    } else {
-        release_because_ownership_transferred(rsa_key);
-    }
-
-    int der_length = i2d_PrivateKey(pkey.get(), NULL);
-    if (der_length <= 0) {
-        response->error = KM_ERROR_UNKNOWN_ERROR;
-        return false;
-    }
-    UniquePtr<uint8_t[]> der_data(new uint8_t[der_length]);
-    if (der_data.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return false;
-    }
-
-    uint8_t* tmp = der_data.get();
-    i2d_PrivateKey(pkey.get(), &tmp);
-
-    return CreateKeyBlob(response, *hidden_auths, der_data.get(), der_length);
+    return CreateKeyBlob(response, *hidden_auths, key_data.get(), key_data_size);
 }
 
 bool GoogleKeymaster::CreateKeyBlob(GenerateKeyResponse* response,
@@ -490,7 +417,7 @@ keymaster_error_t GoogleKeymaster::AddOperation(Operation* operation,
     UniquePtr<Operation> op(operation);
     if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) == 0)
         return KM_ERROR_UNKNOWN_ERROR;
-    if (*op_handle == 0){
+    if (*op_handle == 0) {
         // Statistically this is vanishingly unlikely, which means if it ever happens in practice,
         // it indicates a broken RNG.
         return KM_ERROR_UNKNOWN_ERROR;

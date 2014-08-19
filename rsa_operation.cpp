@@ -22,10 +22,60 @@
 namespace keymaster {
 
 struct EVP_PKEY_Delete {
-    void operator()(EVP_PKEY* p) const {
-        EVP_PKEY_free(p);
-    }
+    void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
 };
+struct BIGNUM_Delete {
+    void operator()(BIGNUM* p) const { BN_free(p); }
+};
+
+struct RSA_Delete {
+    void operator()(RSA* p) const { RSA_free(p); }
+};
+
+/**
+ * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
+ * failure. This means we need to tell our scoped pointers when we've transferred ownership, without
+ * triggering a warning by not using the result of release().
+ */
+template <typename T, typename Delete_T>
+inline void release_because_ownership_transferred(UniquePtr<T, Delete_T>& p) {
+    T* val __attribute__((unused)) = p.release();
+}
+
+/* static */
+keymaster_error_t RsaOperation::Generate(uint64_t public_exponent, uint32_t key_size,
+                                         UniquePtr<uint8_t[]>* key_data, size_t* key_data_size) {
+    if (key_data == NULL || key_data_size == NULL)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    UniquePtr<BIGNUM, BIGNUM_Delete> exponent(BN_new());
+    UniquePtr<RSA, RSA_Delete> rsa_key(RSA_new());
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
+    if (rsa_key.get() == NULL || pkey.get() == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    if (!BN_set_word(exponent.get(), public_exponent) ||
+        !RSA_generate_key_ex(rsa_key.get(), key_size, exponent.get(), NULL /* callback */))
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    if (!EVP_PKEY_assign_RSA(pkey.get(), rsa_key.get()))
+        return KM_ERROR_UNKNOWN_ERROR;
+    else
+        release_because_ownership_transferred(rsa_key);
+
+    *key_data_size = i2d_PrivateKey(pkey.get(), NULL);
+    if (*key_data_size <= 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    key_data->reset(new uint8_t[*key_data_size]);
+    if (key_data->get() == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    uint8_t* tmp = key_data->get();
+    i2d_PrivateKey(pkey.get(), &tmp);
+
+    return KM_ERROR_OK;
+}
 
 RsaOperation::RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key)
     : Operation(purpose), rsa_key_(NULL) {
