@@ -29,6 +29,9 @@ class Key {
   public:
     static Key* CreateKey(const KeyBlob& blob, keymaster_error_t* error);
     static Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
+    static Key* ImportKey(const AuthorizationSet& key_description,
+                          keymaster_key_format_t key_format, const uint8_t* key_data,
+                          size_t key_data_length, keymaster_error_t* error);
 
     virtual ~Key() {}
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) = 0;

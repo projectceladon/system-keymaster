@@ -83,19 +83,22 @@ class GoogleKeymaster {
     virtual keymaster_key_blob_t MasterKey() = 0;
     virtual void GenerateNonce(uint8_t* nonce, size_t length) = 0;
 
-    keymaster_error_t SerializeKeyToResponse(uint8_t* key_material, size_t key_length,
-                                             const AuthorizationSet& hidden_auths,
-                                             GenerateKeyResponse* response);
+    keymaster_error_t SerializeKey(const Key* key, keymaster_key_origin_t origin,
+                                   keymaster_key_blob_t* keymaster_blob, AuthorizationSet* enforced,
+                                   AuthorizationSet* unenforced);
     Key* LoadKey(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
                  keymaster_error_t* error);
     KeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
                          keymaster_error_t* error);
 
-    bool CopyAuthorizations(const AuthorizationSet& key_description, GenerateKeyResponse* response);
+    keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
+                                        keymaster_key_origin_t origin, AuthorizationSet* enforced,
+                                        AuthorizationSet* unenforced);
     keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
                                                 AuthorizationSet* hidden);
 
-    bool AddAuthorization(const keymaster_key_param_t& auth, GenerateKeyResponse* response);
+    void AddAuthorization(const keymaster_key_param_t& auth, AuthorizationSet* enforced,
+                          AuthorizationSet* unenforced);
     bool GenerateRsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,
                      AuthorizationSet* hidden_auths);
     bool GenerateDsa(const AuthorizationSet& key_auths, GenerateKeyResponse* response,

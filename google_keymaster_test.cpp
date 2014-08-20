@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <string>
+#include <fstream>
+
 #include <gtest/gtest.h>
 
 #include <openssl/engine.h>
@@ -22,6 +25,10 @@
 #include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"
 #include "keymaster_tags.h"
+
+using std::string;
+using std::ifstream;
+using std::istreambuf_iterator;
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
@@ -445,9 +452,13 @@ class SigningOperationsTest : public KeymasterTest {
     }
 
     void SignMessage(const void* message, size_t size) {
+        SignMessage(generate_response_.key_blob, message, size);
+    }
+
+    void SignMessage(const keymaster_key_blob_t& key_blob, const void* message, size_t size) {
         BeginOperationRequest begin_request;
         BeginOperationResponse begin_response;
-        begin_request.SetKeyMaterial(generate_response_.key_blob);
+        begin_request.SetKeyMaterial(key_blob);
         begin_request.purpose = KM_PURPOSE_SIGN;
         AddClientParams(&begin_request.additional_params);
 
@@ -881,6 +892,85 @@ TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
     device.ExportKey(request, &response);
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, response.error);
     ASSERT_TRUE(response.key_data == NULL);
+}
+
+static string read_file(const string& file_name) {
+    ifstream file_stream(file_name, std::ios::binary);
+    istreambuf_iterator<char> file_begin(file_stream);
+    istreambuf_iterator<char> file_end;
+    return string(file_begin, file_end);
+}
+
+typedef SigningOperationsTest ImportKeyTest;
+TEST_F(ImportKeyTest, RsaSuccess) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
+        Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+
+    string pk8_key = read_file("privkey_pk8.der");
+    ASSERT_EQ(633U, pk8_key.size());
+
+    ImportKeyRequest import_request;
+    import_request.key_description.Reinitialize(params, array_length(params));
+    import_request.key_format = KM_KEY_FORMAT_PKCS8;
+    import_request.SetKeyMaterial(pk8_key.data(), pk8_key.size());
+
+    ImportKeyResponse import_response;
+    device.ImportKey(import_request, &import_response);
+    ASSERT_EQ(KM_ERROR_OK, import_response.error);
+    EXPECT_EQ(0U, import_response.enforced.size());
+    EXPECT_GT(import_response.unenforced.size(), 0U);
+
+    // Check values derived from the key.
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ALGORITHM, KM_ALGORITHM_RSA));
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_KEY_SIZE, 1024));
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_RSA_PUBLIC_EXPONENT, 65537U));
+
+    // And values provided by GoogleKeymaster
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(import_response.unenforced, KM_TAG_CREATION_DATETIME));
+
+    size_t message_len = 1024 / 8;
+    UniquePtr<uint8_t[]> message(new uint8_t[message_len]);
+    std::fill(message.get(), message.get() + message_len, 'a');
+    SignMessage(import_response.key_blob, message.get(), message_len);
+    ASSERT_TRUE(signature() != NULL);
+
+    BeginOperationRequest begin_request;
+    BeginOperationResponse begin_response;
+    begin_request.SetKeyMaterial(import_response.key_blob);
+    begin_request.purpose = KM_PURPOSE_VERIFY;
+    AddClientParams(&begin_request.additional_params);
+
+    device.BeginOperation(begin_request, &begin_response);
+    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
+
+    UpdateOperationRequest update_request;
+    UpdateOperationResponse update_response;
+    update_request.op_handle = begin_response.op_handle;
+    update_request.input.Reinitialize(message.get(), message_len);
+    EXPECT_EQ(message_len, update_request.input.available_read());
+
+    device.UpdateOperation(update_request, &update_response);
+    ASSERT_EQ(KM_ERROR_OK, update_response.error);
+    EXPECT_EQ(0U, update_response.output.available_read());
+
+    FinishOperationRequest finish_request;
+    finish_request.op_handle = begin_response.op_handle;
+    finish_request.signature.Reinitialize(*signature());
+    FinishOperationResponse finish_response;
+    device.FinishOperation(finish_request, &finish_response);
+    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
+    EXPECT_EQ(0U, finish_response.output.available_read());
+
+    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
 }
 
 }  // namespace test

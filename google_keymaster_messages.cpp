@@ -228,14 +228,14 @@ void ImportKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
 }
 
 size_t ImportKeyRequest::SerializedSize() const {
-    return sizeof(uint32_t) /* additional_params size */ + additional_params.SerializedSize() +
+    return sizeof(uint32_t) /* additional_params size */ + key_description.SerializedSize() +
            sizeof(uint32_t) /* key_format */ + sizeof(uint32_t) /* key_data_length */ +
            key_data_length;
 }
 
 uint8_t* ImportKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
-    buf = append_uint32_to_buf(buf, end, additional_params.SerializedSize());
-    buf = additional_params.Serialize(buf, end);
+    buf = append_uint32_to_buf(buf, end, key_description.SerializedSize());
+    buf = key_description.Serialize(buf, end);
     buf = append_uint32_to_buf(buf, end, key_format);
     return append_size_and_data_to_buf(buf, end, key_data, key_data_length);
 }
@@ -243,7 +243,7 @@ uint8_t* ImportKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
 bool ImportKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
     uint32_t additional_params_size;
     return copy_uint32_from_buf(buf_ptr, end, &additional_params_size) &&
-           additional_params.Deserialize(buf_ptr, *buf_ptr + additional_params_size) &&
+           key_description.Deserialize(buf_ptr, *buf_ptr + additional_params_size) &&
            copy_uint32_from_buf(buf_ptr, end, &key_format) &&
            copy_size_and_data_from_buf(buf_ptr, end, &key_data_length, &key_data);
 }

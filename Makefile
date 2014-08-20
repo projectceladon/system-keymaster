@@ -140,7 +140,7 @@ ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)
 
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) \
-		$(BINARIES:=.run) $(BINARIES:=.memcheck) $(BINARIES:=massif) \
+		$(BINARIES:=.run) $(BINARIES:=.memcheck) $(BINARIES:=.massif) \
 		*gcno *gcda coverage.info
 	rm -rf coverage
 

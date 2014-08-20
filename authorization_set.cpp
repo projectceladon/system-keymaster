@@ -41,6 +41,9 @@ AuthorizationSet::~AuthorizationSet() {
 }
 
 bool AuthorizationSet::reserve_elems(size_t count) {
+    if (is_valid() != OK)
+        return false;
+
     if (count >= elems_capacity_) {
         keymaster_key_param_t* new_elems = new keymaster_key_param_t[count];
         if (new_elems == NULL) {
@@ -56,6 +59,9 @@ bool AuthorizationSet::reserve_elems(size_t count) {
 }
 
 bool AuthorizationSet::reserve_indirect(size_t length) {
+    if (is_valid() != OK)
+        return false;
+
     if (length > indirect_data_capacity_) {
         uint8_t* new_data = new uint8_t[length];
         if (new_data == NULL) {
@@ -98,6 +104,9 @@ void AuthorizationSet::set_invalid(Error error) {
 }
 
 int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
+    if (is_valid() != OK)
+        return -1;
+
     int i = ++begin;
     while (i < (int)elems_size_ && elems_[i].tag != tag)
         ++i;
@@ -109,7 +118,7 @@ int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
 
 keymaster_key_param_t empty;
 keymaster_key_param_t AuthorizationSet::operator[](int at) const {
-    if (at < (int)elems_size_) {
+    if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
     memset(&empty, 0, sizeof(empty));
@@ -171,6 +180,9 @@ static int param_comparator(const void* a, const void* b) {
 }
 
 bool AuthorizationSet::push_back(const AuthorizationSet& set) {
+    if (is_valid() != OK)
+        return false;
+
     if (!reserve_elems(elems_size_ + set.elems_size_))
         return false;
 
@@ -185,6 +197,9 @@ bool AuthorizationSet::push_back(const AuthorizationSet& set) {
 }
 
 bool AuthorizationSet::push_back(keymaster_key_param_t elem) {
+    if (is_valid() != OK)
+        return false;
+
     if (elems_size_ >= elems_capacity_)
         if (!reserve_elems(elems_capacity_ ? elems_capacity_ * 2 : STARTING_ELEMS_CAPACITY))
             return false;

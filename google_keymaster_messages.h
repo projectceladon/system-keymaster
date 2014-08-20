@@ -224,7 +224,7 @@ struct ImportKeyRequest : public Serializable {
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
-    AuthorizationSet additional_params;
+    AuthorizationSet key_description;
     keymaster_key_format_t key_format;
     uint8_t* key_data;
     size_t key_data_length;
