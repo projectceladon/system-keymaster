@@ -14,12 +14,19 @@
  * limitations under the License.
  */
 
+#include <openssl/x509.h>
+
 #include "asymmetric_key.h"
 #include "key_blob.h"
+#include "openssl_utils.h"
 
 #include "key.h"
 
 namespace keymaster {
+
+struct PKCS8_PRIV_KEY_INFO_Delete {
+    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
+};
 
 Key::Key(const KeyBlob& blob) {
     authorizations_.push_back(blob.unenforced());
@@ -60,6 +67,49 @@ Key* Key::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;
     }
+}
+
+/* static */
+Key* Key::ImportKey(const AuthorizationSet& key_description, keymaster_key_format_t key_format,
+                    const uint8_t* key_data, size_t key_data_length, keymaster_error_t* error) {
+    *error = KM_ERROR_OK;
+
+    if (key_data == NULL || key_data_length <= 0) {
+        *error = KM_ERROR_INVALID_KEY_BLOB;
+        return NULL;
+    }
+
+    if (key_format != KM_KEY_FORMAT_PKCS8) {
+        *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+        return NULL;
+    }
+
+    UniquePtr<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_Delete> pkcs8(
+        d2i_PKCS8_PRIV_KEY_INFO(NULL, &key_data, key_data_length));
+    if (pkcs8.get() == NULL) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return NULL;
+    }
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKCS82PKEY(pkcs8.get()));
+    if (pkey.get() == NULL) {
+        *error = KM_ERROR_INVALID_KEY_BLOB;
+        return NULL;
+    }
+
+    UniquePtr<Key> key;
+    switch (EVP_PKEY_type(pkey->type)) {
+    case EVP_PKEY_RSA:
+        return RsaKey::ImportKey(key_description, pkey.get(), error);
+    case EVP_PKEY_DSA:
+    case EVP_PKEY_EC:
+    default:
+        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return NULL;
+    }
+
+    *error = KM_ERROR_UNIMPLEMENTED;
+    return NULL;
 }
 
 }  // namespace keymaster

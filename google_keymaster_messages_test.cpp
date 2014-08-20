@@ -245,12 +245,12 @@ TEST(Round_Trip, FinishOperationResponse) {
 
 TEST(RoundTrip, ImportKeyRequest) {
     ImportKeyRequest msg;
-    msg.additional_params.Reinitialize(params, array_length(params));
+    msg.key_description.Reinitialize(params, array_length(params));
     msg.key_format = KM_KEY_FORMAT_X509;
     msg.SetKeyMaterial("foo", 3);
 
     UniquePtr<ImportKeyRequest> deserialized(round_trip(msg, 93));
-    EXPECT_EQ(msg.additional_params, deserialized->additional_params);
+    EXPECT_EQ(msg.key_description, deserialized->key_description);
     EXPECT_EQ(msg.key_format, deserialized->key_format);
     EXPECT_EQ(msg.key_data_length, deserialized->key_data_length);
     EXPECT_EQ(0, memcmp(msg.key_data, deserialized->key_data, msg.key_data_length));

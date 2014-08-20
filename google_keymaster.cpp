@@ -50,16 +50,6 @@ struct AE_CTX_Delete {
 };
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
-struct EVP_PKEY_Delete {
-    void operator()(EVP_PKEY* p) { EVP_PKEY_free(p); }
-};
-typedef UniquePtr<EVP_PKEY, EVP_PKEY_Delete> Unique_EVP_PKEY;
-
-struct PKCS8_PRIV_KEY_INFO_Delete {
-    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
-};
-typedef UniquePtr<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_Delete> Unique_PKCS8_PRIV_KEY_INFO;
-
 keymaster_algorithm_t supported_algorithms[] = {
     KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA,
 };
@@ -176,22 +166,8 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     if (response->error != KM_ERROR_OK)
         return;
 
-    if (!CopyAuthorizations(key->authorizations(), response))
-        return;
-
-    AuthorizationSet hidden_auths;
-    response->error = BuildHiddenAuthorizations(key->authorizations(), &hidden_auths);
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    UniquePtr<uint8_t[]> key_material;
-    size_t key_material_size;
-    response->error = key->key_material(&key_material, &key_material_size);
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    response->error =
-        SerializeKeyToResponse(key_material.get(), key_material_size, hidden_auths, response);
+    response->error = SerializeKey(key.get(), origin(), &response->key_blob, &response->enforced,
+                                   &response->unenforced);
 }
 
 void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
@@ -308,67 +284,48 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
 }
 
 void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
-
-    if (request.key_data == NULL || request.key_data_length <= 0) {
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
+    if (response == NULL)
         return;
-    }
 
-    if (!is_supported_export_format(request.key_format)) {
-        response->error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+    UniquePtr<Key> key(Key::ImportKey(request.key_description, request.key_format, request.key_data,
+                                      request.key_data_length, &response->error));
+    if (response->error != KM_ERROR_OK)
         return;
-    }
 
-    const uint8_t* key_data = request.key_data;
-    Unique_PKCS8_PRIV_KEY_INFO pkcs8(
-        d2i_PKCS8_PRIV_KEY_INFO(NULL, &key_data, request.key_data_length));
-    if (pkcs8.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
-    }
-
-    Unique_EVP_PKEY pkey(EVP_PKCS82PKEY(pkcs8.get()));
-    if (pkey.get() == NULL) {
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
-        return;
-    }
-
-    int len = i2d_PrivateKey(pkey.get(), NULL);
-    if (len <= 0) {
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
-        return;
-    }
-
-    UniquePtr<uint8_t[]> der_encoded_key(new uint8_t[len]);
-    if (der_encoded_key.get() == NULL) {
-        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
-    }
-
-    uint8_t* tmp_der = der_encoded_key.get();
-    if (i2d_PrivateKey(pkey.get(), &tmp_der) != len) {
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
-        return;
-    }
-
-    void* key_material = der_encoded_key.release();
-    response->SetKeyMaterial(key_material, len);
-
-    response->error = KM_ERROR_OK;
+    response->error = SerializeKey(key.get(), KM_ORIGIN_IMPORTED, &response->key_blob,
+                                   &response->enforced, &response->unenforced);
 }
 
-keymaster_error_t GoogleKeymaster::SerializeKeyToResponse(uint8_t* key_bytes, size_t key_length,
-                                                          const AuthorizationSet& hidden_auths,
-                                                          GenerateKeyResponse* response) {
+keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_origin_t origin,
+                                                keymaster_key_blob_t* keymaster_blob,
+                                                AuthorizationSet* enforced,
+                                                AuthorizationSet* unenforced) {
+
+    keymaster_error_t error;
+
+    error = SetAuthorizations(key->authorizations(), origin, enforced, unenforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    AuthorizationSet hidden_auths;
+    error = BuildHiddenAuthorizations(key->authorizations(), &hidden_auths);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    UniquePtr<uint8_t[]> key_material;
+    size_t key_material_size;
+    error = key->key_material(&key_material, &key_material_size);
+    if (error != KM_ERROR_OK)
+        return error;
+
     uint8_t nonce[KeyBlob::NONCE_LENGTH];
     GenerateNonce(nonce, array_size(nonce));
 
-    keymaster_key_blob_t key_data = {key_bytes, key_length};
-    UniquePtr<KeyBlob> blob(new KeyBlob(response->enforced, response->unenforced, hidden_auths,
-                                        key_data, MasterKey(), nonce));
+    keymaster_key_blob_t key_data = {key_material.get(), key_material_size};
+    UniquePtr<KeyBlob> blob(
+        new KeyBlob(*enforced, *unenforced, hidden_auths, key_data, MasterKey(), nonce));
     if (blob.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     if (blob->error() != KM_ERROR_OK)
         return blob->error();
 
@@ -378,8 +335,8 @@ keymaster_error_t GoogleKeymaster::SerializeKeyToResponse(uint8_t* key_bytes, si
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     blob->Serialize(blob_bytes.get(), blob_bytes.get() + size);
-    response->key_blob.key_material_size = size;
-    response->key_blob.key_material = blob_bytes.release();
+    keymaster_blob->key_material_size = size;
+    keymaster_blob->key_material = blob_bytes.release();
 
     return KM_ERROR_OK;
 }
@@ -409,8 +366,8 @@ KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
     return blob.release();
 }
 
-static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
-    switch (set.is_valid()) {
+static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
+    switch (err) {
     case AuthorizationSet::OK:
         return KM_ERROR_OK;
     case AuthorizationSet::ALLOCATION_FAILURE:
@@ -421,37 +378,42 @@ static keymaster_error_t CheckAuthorizationSet(const AuthorizationSet& set) {
     return KM_ERROR_OK;
 }
 
-bool GoogleKeymaster::CopyAuthorizations(const AuthorizationSet& key_description,
-                                         GenerateKeyResponse* response) {
+keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key_description,
+                                                     keymaster_key_origin_t origin,
+                                                     AuthorizationSet* enforced,
+                                                     AuthorizationSet* unenforced) {
     for (size_t i = 0; i < key_description.size(); ++i) {
         switch (key_description[i].tag) {
+        // These cannot be specified by the client.
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_CREATION_DATETIME:
         case KM_TAG_ORIGIN:
-            response->error = KM_ERROR_INVALID_TAG;
-            return false;
+            return KM_ERROR_INVALID_TAG;
+
+        // These don't work.
         case KM_TAG_ROLLBACK_RESISTANT:
-            response->error = KM_ERROR_UNSUPPORTED_TAG;
-            return false;
+            return KM_ERROR_UNSUPPORTED_TAG;
+
+        // These are hidden.
+        case KM_TAG_APPLICATION_ID:
+        case KM_TAG_APPLICATION_DATA:
+            break;
+
+        // Everything else we just copy into the appropriate set.
         default:
-            if (!AddAuthorization(key_description[i], response))
-                return false;
+            AddAuthorization(key_description[i], enforced, unenforced);
             break;
         }
     }
 
-    if (!AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), response) ||
-        !AddAuthorization(Authorization(TAG_ORIGIN, origin()), response))
-        return false;
+    AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), enforced,
+                     unenforced);
+    AddAuthorization(Authorization(TAG_ORIGIN, origin), enforced, unenforced);
 
-    response->error = CheckAuthorizationSet(response->enforced);
-    if (response->error != KM_ERROR_OK)
-        return false;
-    response->error = CheckAuthorizationSet(response->unenforced);
-    if (response->error != KM_ERROR_OK)
-        return false;
+    if (enforced->is_valid() != AuthorizationSet::OK)
+        return TranslateAuthorizationSetError(enforced->is_valid());
 
-    return true;
+    return TranslateAuthorizationSetError(unenforced->is_valid());
 }
 
 keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
@@ -463,23 +425,15 @@ keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const Authorization
         hidden->push_back(TAG_APPLICATION_DATA, entry.data, entry.data_length);
     hidden->push_back(RootOfTrustTag());
 
-    return CheckAuthorizationSet(*hidden);
+    return TranslateAuthorizationSetError(hidden->is_valid());
 }
 
-bool GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
-                                       GenerateKeyResponse* response) {
-    switch (auth.tag) {
-    case KM_TAG_ROOT_OF_TRUST:
-    case KM_TAG_APPLICATION_ID:
-    case KM_TAG_APPLICATION_DATA:
-        // Skip.  We handle these tags separately.
-        return true;
-    default:
-        if (is_enforced(auth.tag))
-            return response->enforced.push_back(auth);
-        else
-            return response->unenforced.push_back(auth);
-    }
+void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
+                                       AuthorizationSet* enforced, AuthorizationSet* unenforced) {
+    if (is_enforced(auth.tag))
+        enforced->push_back(auth);
+    else
+        unenforced->push_back(auth);
 }
 
 keymaster_error_t GoogleKeymaster::AddOperation(Operation* operation,

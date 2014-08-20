@@ -154,6 +154,68 @@ RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_e
     return new_key;
 }
 
+/* static */
+RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                          keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+    *error = KM_ERROR_UNKNOWN_ERROR;
+
+    UniquePtr<RSA, RSA_Delete> rsa_key(EVP_PKEY_get1_RSA(pkey));
+    if (!rsa_key.get())
+        return NULL;
+
+    AuthorizationSet authorizations(key_description);
+
+    uint64_t public_exponent;
+    if (authorizations.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent)) {
+        // public_exponent specified, make sure it matches the key
+        UniquePtr<BIGNUM, BIGNUM_Delete> public_exponent_bn(BN_new());
+        if (!BN_set_word(public_exponent_bn.get(), public_exponent))
+            return NULL;
+        if (BN_cmp(public_exponent_bn.get(), rsa_key->e) != 0) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        // public_exponent not specified, use the one from the key.
+        public_exponent = BN_get_word(rsa_key->e);
+        if (public_exponent == 0xffffffffL) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+        authorizations.push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
+    }
+
+    uint32_t key_size;
+    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
+        // key_size specified, make sure it matches the key.
+        if (RSA_size(rsa_key.get()) != (int)key_size) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        key_size = RSA_size(rsa_key.get()) * 8;
+        authorizations.push_back(TAG_KEY_SIZE, key_size);
+    }
+
+    keymaster_algorithm_t algorithm;
+    if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
+        if (algorithm != KM_ALGORITHM_RSA) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        authorizations.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+    }
+
+    // Don't bother with the other parameters.  If the necessary padding, digest, purpose, etc. are
+    // missing, the error will be diagnosed when the key is used (when auth checking is
+    // implemented).
+    *error = KM_ERROR_OK;
+    return new RsaKey(rsa_key.release(), authorizations);
+}
+
 RsaKey::RsaKey(const KeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
     if (error)
         *error = LoadKey(blob);

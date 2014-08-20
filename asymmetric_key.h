@@ -60,6 +60,8 @@ class AsymmetricKey : public Key {
 class RsaKey : public AsymmetricKey {
   public:
     static RsaKey* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
+    static RsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                             keymaster_error_t* error);
     RsaKey(const KeyBlob& blob, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
