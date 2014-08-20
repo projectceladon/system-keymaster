@@ -4,6 +4,7 @@
 *.gcno
 *.run
 *.memcheck
+*.massif
 /authorization_set_test
 /coverage.info
 /coverage/
