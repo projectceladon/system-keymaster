@@ -40,7 +40,8 @@ class AsymmetricKey : public Key {
     /**
      * Return a copy of raw key material, in the specified format.
      */
-    virtual keymaster_error_t formatted_key_material(UniquePtr<uint8_t[]>* material,
+    virtual keymaster_error_t formatted_key_material(keymaster_key_format_t format,
+                                                     UniquePtr<uint8_t[]>* material,
                                                      size_t* size) const;
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
