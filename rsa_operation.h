@@ -26,31 +26,38 @@ namespace keymaster {
 
 class RsaOperation : public Operation {
   public:
-    RsaOperation(keymaster_purpose_t purpose, const KeyBlob& key);
+    RsaOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                 keymaster_padding_t padding, RSA* key)
+        : Operation(purpose), rsa_key_(key), digest_(digest), padding_(padding) {}
     ~RsaOperation();
 
-    static keymaster_error_t Generate(uint64_t public_exponent, uint32_t key_size_bits,
-                                      UniquePtr<uint8_t[]>* key_data, size_t* key_data_size);
-
-    virtual keymaster_error_t Begin() {
-        // In this case, all of the actual intialization was done in the constructor.
-        return error_;
-    }
+    virtual keymaster_error_t Begin() { return KM_ERROR_OK; }
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output);
-    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
-    virtual keymaster_error_t Abort() {
-        // Nothing to do.
-        return KM_ERROR_OK;
-    }
+    virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
 
-  private:
+  protected:
     keymaster_error_t StoreData(const Buffer& input);
 
-    keymaster_error_t error_;
+    RSA* rsa_key_;
     keymaster_digest_t digest_;
     keymaster_padding_t padding_;
-    RSA* rsa_key_;
     Buffer data_;
+};
+
+class RsaSignOperation : public RsaOperation {
+  public:
+    RsaSignOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                     keymaster_padding_t padding, RSA* key)
+        : RsaOperation(purpose, digest, padding, key) {}
+    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
+};
+
+class RsaVerifyOperation : public RsaOperation {
+  public:
+    RsaVerifyOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                       keymaster_padding_t padding, RSA* key)
+        : RsaOperation(purpose, digest, padding, key) {}
+    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
 
 }  // namespace keymaster

@@ -22,6 +22,7 @@
 
 namespace keymaster {
 
+class Key;
 class KeyBlob;
 class Operation;
 
@@ -82,8 +83,11 @@ class GoogleKeymaster {
     virtual keymaster_key_blob_t MasterKey() = 0;
     virtual void GenerateNonce(uint8_t* nonce, size_t length) = 0;
 
-    bool CreateKeyBlob(GenerateKeyResponse* response, const AuthorizationSet& hidden_auths,
-                       uint8_t* key_material, size_t key_length);
+    keymaster_error_t SerializeKeyToResponse(uint8_t* key_material, size_t key_length,
+                                             const AuthorizationSet& hidden_auths,
+                                             GenerateKeyResponse* response);
+    Key* LoadKey(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
+                 keymaster_error_t* error);
     KeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
                          keymaster_error_t* error);
 

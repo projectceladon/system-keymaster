@@ -157,6 +157,9 @@ class Buffer : public Serializable {
     Buffer(const void* buf, size_t size) : buffer_(NULL) { Reinitialize(buf, size); }
     ~Buffer();
 
+    // Grow the buffer so that at least \p size bytes can be written.
+    bool reserve(size_t size);
+
     bool Reinitialize(size_t size);
     bool Reinitialize(const void* buf, size_t size);
 
