@@ -32,7 +32,7 @@ static inline bool is_blob_tag(keymaster_tag_t tag) {
 const size_t STARTING_ELEMS_CAPACITY = 8;
 
 AuthorizationSet::AuthorizationSet(const AuthorizationSet& set)
-    : elems_(NULL), indirect_data_(NULL) {
+    : Serializable(), elems_(NULL), indirect_data_(NULL) {
     Reinitialize(set.elems_, set.elems_size_);
 }
 
@@ -362,7 +362,8 @@ bool AuthorizationSet::DeserializeElementsData(const uint8_t** buf_ptr, const ui
 
     // Note that the following validation of elements_count is weak, but it prevents allocation of
     // elems_ arrays which are clearly too large to be reasonable.
-    if (elements_size > end - *buf_ptr || elements_count * sizeof(uint32_t) > elements_size) {
+    if (static_cast<ptrdiff_t>(elements_size) > end - *buf_ptr ||
+        elements_count * sizeof(uint32_t) > elements_size) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
