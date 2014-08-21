@@ -268,7 +268,6 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
     if (response == NULL)
         return;
 
-    keymaster_error_t blob_error;
     UniquePtr<Key> to_export(
         LoadKey(request.key_blob, request.additional_params, &response->error));
     if (to_export.get() == NULL)
