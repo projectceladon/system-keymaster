@@ -22,6 +22,8 @@
 
 #include <type_traits>
 
+#include <hardware/keymaster.h>
+
 #include "authorization_set.h"
 #include "google_keymaster_messages.h"
 #include "google_keymaster_utils.h"
@@ -31,19 +33,38 @@ extern "C" {
 #include "trusty_keymaster_lib.h"
 }
 
+struct EntryExitLogger {
+    EntryExitLogger(const char* func, const char* file) : func_(func), file_(file) {
+        printf("Entering %s (%s)\n", func_, file_);
+    }
+    ~EntryExitLogger() { printf("Exiting %s (%s)\n", func_, file_); }
+
+    const char* func_;
+    const char* file_;
+};
+
+#define LOG_ENTRY EntryExitLogger entry_exit_logger(__PRETTY_FUNCTION__, __FILE__)
+
 int main(void) {
+    LOG_ENTRY;
     keymaster::TrustyKeymasterDevice device(NULL);
+    if (device.session_error() != OTE_SUCCESS) {
+        printf("Failed to initialize Trusty session: %d\n", device.session_error());
+        return 1;
+    }
     keymaster_rsa_keygen_params_t params;
     params.public_exponent = 3;
     params.modulus_size = 256;
     uint8_t* ptr;
     size_t size;
+
     return device.generate_keypair(TYPE_RSA, &params, &ptr, &size);
 }
 
 namespace keymaster {
 
 TrustyKeymasterDevice::TrustyKeymasterDevice(const hw_module_t* module) {
+    LOG_ENTRY;
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
     static_assert(std::is_standard_layout<TrustyKeymasterDevice>::value,
                   "KeymasterOpenSsl must be standard layout");
@@ -71,22 +92,14 @@ TrustyKeymasterDevice::TrustyKeymasterDevice(const hw_module_t* module) {
     device_.delete_all = NULL;
     device_.sign_data = sign_data;
     device_.verify_data = verify_data;
-    device_.get_supported_algorithms = NULL;
-    device_.get_supported_block_modes = NULL;
-    device_.get_supported_padding_modes = NULL;
-    device_.get_supported_digests = NULL;
-    device_.get_supported_import_formats = NULL;
-    device_.get_supported_export_formats = NULL;
-    device_.generate_key = NULL;
-    device_.free_characteristics = NULL;
 
     device_.context = NULL;
 
-    trusty_init(&trusty_session);
+    te_error_ = trusty_init(&trusty_session_);
 }
 
 TrustyKeymasterDevice::~TrustyKeymasterDevice() {
-    trusty_deinit(trusty_session);
+    trusty_deinit(trusty_session_);
 }
 
 const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
@@ -94,6 +107,7 @@ const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
 int TrustyKeymasterDevice::generate_keypair(const keymaster_keypair_t key_type,
                                             const void* key_params, uint8_t** /* key_blob */,
                                             size_t* /* key_blob_length */) {
+    LOG_ENTRY;
     UniquePtr<uint8_t[]> send_buf;
     uint32_t req_size, rsp_size;
 
@@ -123,7 +137,8 @@ int TrustyKeymasterDevice::generate_keypair(const keymaster_keypair_t key_type,
     // Send it somehow!
     uint8_t recv_buf[8192];
     rsp_size = 8192;
-    trusty_call(trusty_session, GENERATE_KEY, send_buf.get(), req_size, recv_buf, &rsp_size);
+    te_error_ =
+        trusty_call(trusty_session_, GENERATE_KEY, send_buf.get(), req_size, recv_buf, &rsp_size);
 
     printf("AAAA %d AAAA \n", rsp_size);
     printf("BEGIN\n");
@@ -137,6 +152,7 @@ int TrustyKeymasterDevice::generate_keypair(const keymaster_keypair_t key_type,
 
 int TrustyKeymasterDevice::import_keypair(const uint8_t* /* key */, const size_t /* key_length */,
                                           uint8_t** /* key_blob */, size_t* /* key_blob_length */) {
+    LOG_ENTRY;
     return -1;
 }
 
@@ -144,6 +160,7 @@ int TrustyKeymasterDevice::get_keypair_public(const uint8_t* /* key_blob */,
                                               const size_t /* key_blob_length */,
                                               uint8_t** /* x509_data */,
                                               size_t* /* x509_data_length */) {
+    LOG_ENTRY;
     return -1;
 }
 
@@ -152,6 +169,7 @@ int TrustyKeymasterDevice::sign_data(const void* /* signing_params */,
                                      const size_t /* key_blob_length */, const uint8_t* /* data */,
                                      const size_t /* data_length */, uint8_t** /* signed_data */,
                                      size_t* /* signed_data_length */) {
+    LOG_ENTRY;
     return -1;
 }
 
@@ -162,23 +180,28 @@ int TrustyKeymasterDevice::verify_data(const void* /* signing_params */,
                                        const size_t /* signed_data_length */,
                                        const uint8_t* /* signature */,
                                        const size_t /* signature_length */) {
+    LOG_ENTRY;
     return -1;
 }
 
 keymaster_device* TrustyKeymasterDevice::device() {
+    LOG_ENTRY;
     return &device_;
 }
 
 hw_device_t* TrustyKeymasterDevice::hw_device() {
+    LOG_ENTRY;
     return &device_.common;
 }
 
 static inline TrustyKeymasterDevice* convert_device(const keymaster_device* dev) {
+    LOG_ENTRY;
     return reinterpret_cast<TrustyKeymasterDevice*>(const_cast<keymaster_device*>(dev));
 }
 
 /* static */
 int TrustyKeymasterDevice::close_device(hw_device_t* dev) {
+    LOG_ENTRY;
     delete reinterpret_cast<TrustyKeymasterDevice*>(dev);
     return 0;
 }
@@ -188,6 +211,7 @@ int TrustyKeymasterDevice::generate_keypair(const keymaster_device_t* dev,
                                             const keymaster_keypair_t key_type,
                                             const void* key_params, uint8_t** keyBlob,
                                             size_t* keyBlobLength) {
+    LOG_ENTRY;
     return convert_device(dev)->generate_keypair(key_type, key_params, keyBlob, keyBlobLength);
 }
 
@@ -195,6 +219,7 @@ int TrustyKeymasterDevice::generate_keypair(const keymaster_device_t* dev,
 int TrustyKeymasterDevice::import_keypair(const keymaster_device_t* dev, const uint8_t* key,
                                           const size_t key_length, uint8_t** key_blob,
                                           size_t* key_blob_length) {
+    LOG_ENTRY;
     return convert_device(dev)->import_keypair(key, key_length, key_blob, key_blob_length);
 }
 
@@ -202,6 +227,7 @@ int TrustyKeymasterDevice::import_keypair(const keymaster_device_t* dev, const u
 int TrustyKeymasterDevice::get_keypair_public(const struct keymaster_device* dev,
                                               const uint8_t* key_blob, const size_t key_blob_length,
                                               uint8_t** x509_data, size_t* x509_data_length) {
+    LOG_ENTRY;
     return convert_device(dev)
         ->get_keypair_public(key_blob, key_blob_length, x509_data, x509_data_length);
 }
@@ -211,6 +237,7 @@ int TrustyKeymasterDevice::sign_data(const keymaster_device_t* dev, const void* 
                                      const uint8_t* keyBlob, const size_t keyBlobLength,
                                      const uint8_t* data, const size_t dataLength,
                                      uint8_t** signedData, size_t* signedDataLength) {
+    LOG_ENTRY;
     return convert_device(dev)
         ->sign_data(params, keyBlob, keyBlobLength, data, dataLength, signedData, signedDataLength);
 }
@@ -220,6 +247,7 @@ int TrustyKeymasterDevice::verify_data(const keymaster_device_t* dev, const void
                                        const uint8_t* keyBlob, const size_t keyBlobLength,
                                        const uint8_t* signedData, const size_t signedDataLength,
                                        const uint8_t* signature, const size_t signatureLength) {
+    LOG_ENTRY;
     return convert_device(dev)->verify_data(params, keyBlob, keyBlobLength, signedData,
                                             signedDataLength, signature, signatureLength);
 }
