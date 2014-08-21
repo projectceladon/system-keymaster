@@ -300,7 +300,6 @@ keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_or
                                                 keymaster_key_blob_t* keymaster_blob,
                                                 AuthorizationSet* enforced,
                                                 AuthorizationSet* unenforced) {
-
     keymaster_error_t error;
 
     error = SetAuthorizations(key->authorizations(), origin, enforced, unenforced);
@@ -386,7 +385,6 @@ keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key
         switch (key_description[i].tag) {
         // These cannot be specified by the client.
         case KM_TAG_ROOT_OF_TRUST:
-        case KM_TAG_CREATION_DATETIME:
         case KM_TAG_ORIGIN:
             return KM_ERROR_INVALID_TAG;
 
