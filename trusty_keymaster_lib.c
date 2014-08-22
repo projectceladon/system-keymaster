@@ -57,6 +57,7 @@ te_error_t trusty_call(void* session, uint32_t cmd, void* in_buf, uint32_t in_si
 
     te_oper_set_param_mem_ro(&operation, 0, in_buf, in_size);
     te_oper_set_param_mem_rw(&operation, 1, out_buf, *out_size);
+    te_oper_set_param_int_rw(&operation, 2, *out_size);
     te_oper_set_command(&operation, cmd);
     err = te_launch_operation(session, &operation);
     if (err != OTE_SUCCESS) {
@@ -64,6 +65,6 @@ te_error_t trusty_call(void* session, uint32_t cmd, void* in_buf, uint32_t in_si
         return err;
     }
 
-    te_oper_get_param_mem(&operation, 1, out_buf, out_size);
+    te_oper_get_param_int(&operation, 2, out_size);
     return OTE_SUCCESS;
 }
