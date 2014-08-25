@@ -44,7 +44,7 @@ namespace test {
 
 class KeymasterTest : public testing::Test {
   protected:
-    KeymasterTest() : device(5) { RAND_seed("foobar", 6); }
+    KeymasterTest() : device(5, new StdoutLogger) { RAND_seed("foobar", 6); }
     ~KeymasterTest() {}
 
     GoogleSoftKeymaster device;

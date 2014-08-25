@@ -33,9 +33,9 @@
 
 namespace keymaster {
 
-GoogleKeymaster::GoogleKeymaster(size_t operation_table_size)
+GoogleKeymaster::GoogleKeymaster(size_t operation_table_size, Logger* logger)
     : operation_table_(new OpTableEntry[operation_table_size]),
-      operation_table_size_(operation_table_size) {
+      operation_table_size_(operation_table_size), logger_(logger) {
     if (operation_table_.get() == NULL)
         operation_table_size_ = 0;
 }
@@ -162,7 +162,7 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     if (response == NULL)
         return;
 
-    UniquePtr<Key> key(Key::GenerateKey(request.key_description, &response->error));
+    UniquePtr<Key> key(Key::GenerateKey(request.key_description, logger(), &response->error));
     if (response->error != KM_ERROR_OK)
         return;
 
@@ -287,7 +287,7 @@ void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespon
         return;
 
     UniquePtr<Key> key(Key::ImportKey(request.key_description, request.key_format, request.key_data,
-                                      request.key_data_length, &response->error));
+                                      request.key_data_length, logger(), &response->error));
     if (response->error != KM_ERROR_OK)
         return;
 
@@ -344,7 +344,7 @@ Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
     UniquePtr<KeyBlob> blob(LoadKeyBlob(key, client_params, error));
     if (*error != KM_ERROR_OK)
         return NULL;
-    return Key::CreateKey(*blob, error);
+    return Key::CreateKey(*blob, logger(), error);
 }
 
 KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,

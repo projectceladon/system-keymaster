@@ -121,7 +121,8 @@ Operation* AsymmetricKey::CreateOperation(keymaster_purpose_t purpose, keymaster
 }
 
 /* static */
-RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) {
+RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                            keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -149,14 +150,14 @@ RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_e
         return NULL;
     }
 
-    RsaKey* new_key = new RsaKey(rsa_key.release(), authorizations);
+    RsaKey* new_key = new RsaKey(rsa_key.release(), authorizations, logger);
     *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return new_key;
 }
 
 /* static */
 RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                          keymaster_error_t* error) {
+                          const Logger& logger, keymaster_error_t* error) {
     if (!error)
         return NULL;
     *error = KM_ERROR_UNKNOWN_ERROR;
@@ -213,10 +214,11 @@ RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pke
     // missing, the error will be diagnosed when the key is used (when auth checking is
     // implemented).
     *error = KM_ERROR_OK;
-    return new RsaKey(rsa_key.release(), authorizations);
+    return new RsaKey(rsa_key.release(), authorizations, logger);
 }
 
-RsaKey::RsaKey(const KeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
+RsaKey::RsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+    : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);
 }
@@ -264,7 +266,8 @@ static void SetDsaParamData(AuthorizationSet* auths, TypedTag<KM_BIGNUM, Tag> ta
     delete[] blob.data;
 }
 
-DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) {
+DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                            keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -325,12 +328,13 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_e
         return NULL;
     }
 
-    DsaKey* new_key = new DsaKey(dsa_key.release(), authorizations);
+    DsaKey* new_key = new DsaKey(dsa_key.release(), authorizations, logger);
     *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return new_key;
 }
 
-DsaKey::DsaKey(const KeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
+DsaKey::DsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+    : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);
 }
@@ -363,7 +367,8 @@ bool DsaKey::InternalToEvp(EVP_PKEY* pkey) const {
 }
 
 /* static */
-EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) {
+EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                                keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -396,7 +401,7 @@ EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, keymast
         return NULL;
     }
 
-    EcdsaKey* new_key = new EcdsaKey(ecdsa_key.release(), authorizations);
+    EcdsaKey* new_key = new EcdsaKey(ecdsa_key.release(), authorizations, logger);
     *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return new_key;
 }
@@ -425,7 +430,8 @@ EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
     }
 }
 
-EcdsaKey::EcdsaKey(const KeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
+EcdsaKey::EcdsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+    : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);
 }
