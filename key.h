@@ -55,7 +55,7 @@ class Key {
   protected:
     Key(const KeyBlob& blob, const Logger& logger);
     Key(const AuthorizationSet& authorizations, const Logger& logger)
-        : authorizations_(authorizations), logger_(logger) {}
+        : logger_(logger), authorizations_(authorizations) {}
 
     const Logger& logger_;
 

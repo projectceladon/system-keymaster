@@ -16,6 +16,10 @@
 
 #include "common/ote_error.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 /** Service Identifier for keymaster TA */
 /* {5f902ace-5e5c-4cd8-ae54-87b88c22ddaf} */
 #define SERVICE_KEYMASTER_UUID                                                                     \
@@ -36,3 +40,7 @@ void trusty_deinit(void* opaque_session);
 // Note: output buffer must be large enough to hold data.
 te_error_t trusty_call(void* session, uint32_t cmd, void* in_buf, uint32_t in_size, void* out_buf,
                        uint32_t* out_size);
+
+#ifdef __cplusplus
+}
+#endif  // __cplusplus

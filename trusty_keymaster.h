@@ -23,20 +23,35 @@ namespace keymaster {
 
 class TrustyKeymaster : public GoogleKeymaster {
   public:
-    bool is_enforced(keymaster_tag_t /* tag */) { return false; }
-    keymaster_key_origin_t origin() { return KM_ORIGIN_SOFTWARE; }
+    TrustyKeymaster(size_t operation_table_size, Logger* logger)
+        : GoogleKeymaster(operation_table_size, logger) {
+        logger->log("Created TrustyKeyaster\n");
+    }
 
   private:
-    static uint8_t master_key_[];
+    virtual bool is_enforced(keymaster_tag_t tag);
+    virtual keymaster_key_origin_t origin() { return KM_ORIGIN_HARDWARE; }
+    virtual keymaster_key_param_t RootOfTrustTag() {
+        return Authorization(TAG_ROOT_OF_TRUST, root_of_trust_, root_of_trust_size_);
+    }
 
-    uint8_t* MasterKey() { return master_key_; }
+    /* TODO(swillden): Call secure key derivation function to initialize master key */
+    virtual keymaster_key_blob_t MasterKey() {
+        keymaster_key_blob_t retval;
+        retval.key_material = master_key_;
+        retval.key_material_size = 16;
+        return retval;
+    }
 
-    size_t MasterKeyLength() { return 16; }
-
-    void GetNonce(uint8_t* nonce, size_t length) {
+    /* TODO(swillden): Use Trusty RNG to generate nonce. */
+    virtual void GenerateNonce(uint8_t* nonce, size_t length) {
         for (size_t i = 0; i < length; ++i)
             nonce[i] = 0;
     }
+
+    static uint8_t master_key_[];
+    static uint8_t root_of_trust_[];
+    static size_t root_of_trust_size_;
 };
 
 }  // namespace

@@ -62,7 +62,7 @@ class KeyBlob : public Serializable {
     /**
      * Create a KeyBlob, reconstituting it from the encrypted material in \p encrypted_key,
      * decrypted with key derived from \p master_key.  The KeyBlob takes ownership of the \p
-     * encrypted_key.key_material.
+     * keymaster_blob.key_material.
      *
      * Note, again, that \p master_key here is an abuse of \p keymaster_key_blob_t, since it
      * is just key material, not a full Keymaster blob.
@@ -71,6 +71,14 @@ class KeyBlob : public Serializable {
      */
     KeyBlob(const keymaster_key_blob_t& keymaster_blob, const AuthorizationSet& hidden,
             const keymaster_key_blob_t& master_key);
+
+    /**
+     * Create a KeyBlob, extracting the enforced and unenforced sets, but not decrypting the key, or
+     * even keeping it.  The KeyBlob does *not* take ownership of key_blob.
+     *
+     * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.
+     */
+    KeyBlob(const uint8_t* key_blob, size_t blob_size);
 
     ~KeyBlob() {
         memset_s(key_material_.get(), 0, key_material_length_);

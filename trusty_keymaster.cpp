@@ -22,5 +22,35 @@
 namespace keymaster {
 
 uint8_t TrustyKeymaster::master_key_[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t TrustyKeymaster::root_of_trust_[] = "TrustyKeymaster";
+size_t TrustyKeymaster::root_of_trust_size_ = sizeof(root_of_trust_);
+
+bool TrustyKeymaster::is_enforced(keymaster_tag_t tag) {
+    switch (tag) {
+    // Everything not called out as enforced isn't enforced.
+    default:
+        return false;
+
+    // Enforced because cryptography is performed in TrustZone.
+    case KM_TAG_ALGORITHM:
+    case KM_TAG_KEY_SIZE:
+    case KM_TAG_RSA_PUBLIC_EXPONENT:
+    case KM_TAG_DSA_GENERATOR:
+    case KM_TAG_DSA_P:
+    case KM_TAG_DSA_Q:
+    case KM_TAG_BLOB_USAGE_REQUIREMENTS:
+    case KM_TAG_ORIGIN:
+
+    // Enforced by implementation.
+    case KM_TAG_DIGEST:
+    case KM_TAG_PADDING:
+
+    // Enforced because tags are bound securely.  Rescoping isn't implemented, so rescoping won't
+    // work but can't be done outside of TrustZone.
+    case KM_TAG_RESCOPING_ADD:
+    case KM_TAG_RESCOPING_DEL:
+        return true;
+    }
+}
 
 }  // namespace keymaster
