@@ -38,7 +38,8 @@ const size_t KeyBlob::TAG_LENGTH;
 KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenforced,
                  const AuthorizationSet& hidden, const keymaster_key_blob_t& key,
                  const keymaster_key_blob_t& master_key, const uint8_t nonce[NONCE_LENGTH])
-    : error_(KM_ERROR_OK), enforced_(enforced), unenforced_(unenforced), hidden_(hidden) {
+    : error_(KM_ERROR_OK), nonce_(new uint8_t[NONCE_LENGTH]), tag_(new uint8_t[TAG_LENGTH]),
+      enforced_(enforced), unenforced_(unenforced), hidden_(hidden) {
     if (enforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         unenforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         hidden_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE) {
@@ -56,24 +57,23 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
     if (!ExtractKeyCharacteristics())
         return;
 
-    memcpy(nonce_, nonce, NONCE_LENGTH);
-
     key_material_length_ = key.key_material_size;
     key_material_.reset(new uint8_t[key_material_length_]);
     encrypted_key_material_.reset(new uint8_t[key_material_length_]);
 
-    if (key_material_.get() == NULL || encrypted_key_material_.get() == NULL) {
+    if (!key_material_.get() || !encrypted_key_material_.get() || !nonce_.get() || !tag_.get()) {
         error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return;
     }
 
+    memcpy(nonce_.get(), nonce, NONCE_LENGTH);
     memcpy(key_material_.get(), key.key_material, key_material_length_);
     EncryptKey(master_key);
 }
 
 KeyBlob::KeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& hidden,
                  const keymaster_key_blob_t& master_key)
-    : hidden_(hidden) {
+    : nonce_(new uint8_t[NONCE_LENGTH]), tag_(new uint8_t[TAG_LENGTH]), hidden_(hidden) {
     const uint8_t* p = key.key_material;
     if (!Deserialize(&p, key.key_material + key.key_material_size))
         return;
@@ -97,13 +97,11 @@ uint8_t* KeyBlob::Serialize(uint8_t* buf, const uint8_t* end) const {
 }
 
 bool KeyBlob::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    uint8_t* tmp_key_ptr = NULL;
-    if (!copy_from_buf(buf_ptr, end, nonce_, NONCE_LENGTH) ||
+    UniquePtr<uint8_t[]> tmp_key_ptr;
+    if (!copy_from_buf(buf_ptr, end, nonce_.get(), NONCE_LENGTH) ||
         !copy_size_and_data_from_buf(buf_ptr, end, &key_material_length_, &tmp_key_ptr) ||
-        !copy_from_buf(buf_ptr, end, tag_, TAG_LENGTH) || !enforced_.Deserialize(buf_ptr, end) ||
-        !unenforced_.Deserialize(buf_ptr, end)) {
-        if (tmp_key_ptr != NULL)
-            delete[] tmp_key_ptr;
+        !copy_from_buf(buf_ptr, end, tag_.get(), TAG_LENGTH) ||
+        !enforced_.Deserialize(buf_ptr, end) || !unenforced_.Deserialize(buf_ptr, end)) {
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return false;
     }
@@ -111,7 +109,7 @@ bool KeyBlob::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
     if (!ExtractKeyCharacteristics())
         return false;
 
-    encrypted_key_material_.reset(tmp_key_ptr);
+    encrypted_key_material_.reset(tmp_key_ptr.release());
     key_material_.reset(new uint8_t[key_material_length_]);
     return true;
 }
@@ -121,9 +119,9 @@ void KeyBlob::EncryptKey(const keymaster_key_blob_t& master_key) {
     if (error_ != KM_ERROR_OK)
         return;
 
-    int ae_err = ae_encrypt(ctx.get(), nonce_, key_material(), key_material_length(),
+    int ae_err = ae_encrypt(ctx.get(), nonce_.get(), key_material(), key_material_length(),
                             NULL /* additional data */, 0 /* additional data length */,
-                            encrypted_key_material_.get(), tag_, 1 /* final */);
+                            encrypted_key_material_.get(), tag_.get(), 1 /* final */);
     if (ae_err < 0) {
         error_ = KM_ERROR_UNKNOWN_ERROR;
         return;
@@ -137,9 +135,10 @@ void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
     if (error_ != KM_ERROR_OK)
         return;
 
-    int ae_err = ae_decrypt(ctx.get(), nonce_, encrypted_key_material(), key_material_length(),
-                            NULL /* additional data */, 0 /* additional data length */,
-                            key_material_.get(), tag(), 1 /* final */);
+    int ae_err =
+        ae_decrypt(ctx.get(), nonce_.get(), encrypted_key_material(), key_material_length(),
+                   NULL /* additional data */, 0 /* additional data length */, key_material_.get(),
+                   tag_.get(), 1 /* final */);
     if (ae_err == AE_INVALID) {
         // Authentication failed!  Decryption probably succeeded(ish), but we don't want to return
         // any data when the authentication fails, so clear it.
@@ -150,7 +149,7 @@ void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
         error_ = KM_ERROR_UNKNOWN_ERROR;
         return;
     }
-    assert(ae_err == static_cast<int>(key_material_length_));
+    assert(ae_err == static_cast<int>(key_material_length()));
     error_ = KM_ERROR_OK;
 }
 

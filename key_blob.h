@@ -73,11 +73,12 @@ class KeyBlob : public Serializable {
             const keymaster_key_blob_t& master_key);
 
     ~KeyBlob() {
-        memset_s(nonce_, 0, NONCE_LENGTH);
-        memset_s(tag_, 0, TAG_LENGTH);
-        if (key_material_.get() != NULL)
-            memset_s(key_material_.get(), 0, key_material_length_);
-        // Encrypted key material doesn't matter, and AuthorizationSets clear themselves.
+        memset_s(key_material_.get(), 0, key_material_length_);
+        // The following aren't sensitive, but clear them anyway.
+        memset_s(encrypted_key_material_.get(), 0, key_material_length_);
+        memset_s(nonce_.get(), 0, NONCE_LENGTH);
+        memset_s(tag_.get(), 0, TAG_LENGTH);
+        // AuthorizationSets clear themselves.
     }
 
     size_t SerializedSize() const;
@@ -98,11 +99,11 @@ class KeyBlob : public Serializable {
      */
     inline keymaster_error_t error() { return error_; }
 
-    inline const uint8_t* nonce() const { return nonce_; }
+    inline const uint8_t* nonce() const { return nonce_.get(); }
     inline const uint8_t* key_material() const { return key_material_.get(); }
     inline const uint8_t* encrypted_key_material() const { return encrypted_key_material_.get(); }
     inline size_t key_material_length() const { return key_material_length_; }
-    inline const uint8_t* tag() const { return tag_; }
+    inline const uint8_t* tag() const { return tag_.get(); }
 
     inline const AuthorizationSet& enforced() const { return enforced_; }
     inline const AuthorizationSet& unenforced() const { return unenforced_; }
@@ -124,11 +125,11 @@ class KeyBlob : public Serializable {
     const uint8_t* BuildDerivationData(size_t* derivation_data_len) const;
 
     keymaster_error_t error_;
-    uint8_t nonce_[NONCE_LENGTH];
+    UniquePtr<uint8_t[]> nonce_;
     UniquePtr<uint8_t[]> key_material_;
     UniquePtr<uint8_t[]> encrypted_key_material_;
+    UniquePtr<uint8_t[]> tag_;
     size_t key_material_length_;
-    uint8_t tag_[TAG_LENGTH];
     AuthorizationSet enforced_;
     AuthorizationSet unenforced_;
     AuthorizationSet hidden_;

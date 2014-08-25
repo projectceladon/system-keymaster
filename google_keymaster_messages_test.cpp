@@ -125,7 +125,7 @@ TEST(RoundTrip, GenerateKeyResponse) {
     rsp.key_blob.key_material_size = array_length(TEST_DATA);
     rsp.enforced.Reinitialize(params, array_length(params));
 
-    UniquePtr<GenerateKeyResponse> deserialized(round_trip(rsp, 117));
+    UniquePtr<GenerateKeyResponse> deserialized(round_trip(rsp, 109));
     EXPECT_EQ(KM_ERROR_OK, deserialized->error);
     EXPECT_EQ(deserialized->enforced, rsp.enforced);
     EXPECT_EQ(deserialized->unenforced, rsp.unenforced);
@@ -150,7 +150,7 @@ TEST(RoundTrip, GetKeyCharacteristicsRequest) {
     req.additional_params.Reinitialize(params, array_length(params));
     req.SetKeyMaterial("foo", 3);
 
-    UniquePtr<GetKeyCharacteristicsRequest> deserialized(round_trip(req, 89));
+    UniquePtr<GetKeyCharacteristicsRequest> deserialized(round_trip(req, 85));
     EXPECT_EQ(7U, deserialized->additional_params.size());
     EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
     EXPECT_EQ(0, memcmp(deserialized->key_blob.key_material, "foo", 3));
@@ -162,7 +162,7 @@ TEST(RoundTrip, GetKeyCharacteristicsResponse) {
     msg.enforced.Reinitialize(params, array_length(params));
     msg.unenforced.Reinitialize(params, array_length(params));
 
-    UniquePtr<GetKeyCharacteristicsResponse> deserialized(round_trip(msg, 168));
+    UniquePtr<GetKeyCharacteristicsResponse> deserialized(round_trip(msg, 160));
     EXPECT_EQ(msg.enforced, deserialized->enforced);
     EXPECT_EQ(msg.unenforced, deserialized->unenforced);
 }
@@ -249,7 +249,7 @@ TEST(RoundTrip, ImportKeyRequest) {
     msg.key_format = KM_KEY_FORMAT_X509;
     msg.SetKeyMaterial("foo", 3);
 
-    UniquePtr<ImportKeyRequest> deserialized(round_trip(msg, 93));
+    UniquePtr<ImportKeyRequest> deserialized(round_trip(msg, 89));
     EXPECT_EQ(msg.key_description, deserialized->key_description);
     EXPECT_EQ(msg.key_format, deserialized->key_format);
     EXPECT_EQ(msg.key_data_length, deserialized->key_data_length);
@@ -263,7 +263,7 @@ TEST(RoundTrip, ImportKeyResponse) {
     msg.enforced.Reinitialize(params, array_length(params));
     msg.unenforced.Reinitialize(params, array_length(params));
 
-    UniquePtr<ImportKeyResponse> deserialized(round_trip(msg, 175));
+    UniquePtr<ImportKeyResponse> deserialized(round_trip(msg, 167));
     EXPECT_EQ(msg.error, deserialized->error);
     EXPECT_EQ(msg.key_blob.key_material_size, deserialized->key_blob.key_material_size);
     EXPECT_EQ(0, memcmp(msg.key_blob.key_material, deserialized->key_blob.key_material,
@@ -278,7 +278,7 @@ TEST(RoundTrip, ExportKeyRequest) {
     msg.key_format = KM_KEY_FORMAT_X509;
     msg.SetKeyMaterial("foo", 3);
 
-    UniquePtr<ExportKeyRequest> deserialized(round_trip(msg, 93));
+    UniquePtr<ExportKeyRequest> deserialized(round_trip(msg, 89));
     EXPECT_EQ(msg.additional_params, deserialized->additional_params);
     EXPECT_EQ(msg.key_format, deserialized->key_format);
     EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
@@ -293,6 +293,76 @@ TEST(RoundTrip, ExportKeyResponse) {
     UniquePtr<ExportKeyResponse> deserialized(round_trip(msg, 11));
     EXPECT_EQ(3U, deserialized->key_data_length);
     EXPECT_EQ(0, memcmp("foo", deserialized->key_data, 3));
+}
+
+uint8_t msgbuf[] = {
+    220, 88,  183, 255, 71,  1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   173, 0,   0,   0,   228, 174, 98,  187, 191, 135, 253, 200, 51,  230, 114, 247, 151, 109,
+    237, 79,  87,  32,  94,  5,   204, 46,  154, 30,  91,  6,   103, 148, 254, 129, 65,  171, 228,
+    167, 224, 163, 9,   15,  206, 90,  58,  11,  205, 55,  211, 33,  87,  178, 149, 91,  28,  236,
+    218, 112, 231, 34,  82,  82,  134, 103, 137, 115, 27,  156, 102, 159, 220, 226, 89,  42,  25,
+    37,  9,   84,  239, 76,  161, 198, 72,  167, 163, 39,  91,  148, 191, 17,  191, 87,  169, 179,
+    136, 10,  194, 154, 4,   40,  107, 109, 61,  161, 20,  176, 247, 13,  214, 106, 229, 45,  17,
+    5,   60,  189, 64,  39,  166, 208, 14,  57,  25,  140, 148, 25,  177, 246, 189, 43,  181, 88,
+    204, 29,  126, 224, 100, 143, 93,  60,  57,  249, 55,  0,   87,  83,  227, 224, 166, 59,  214,
+    81,  144, 129, 58,  6,   57,  46,  254, 232, 41,  220, 209, 230, 167, 138, 158, 94,  180, 125,
+    247, 26,  162, 116, 238, 202, 187, 100, 65,  13,  180, 44,  245, 159, 83,  161, 176, 58,  72,
+    236, 109, 105, 160, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   11,  0,   0,   0,   98,  0,   0,   0,   1,   0,   0,   32,  2,   0,   0,   0,   1,   0,
+    0,   32,  3,   0,   0,   0,   2,   0,   0,   16,  1,   0,   0,   0,   3,   0,   0,   48,  0,
+    1,   0,   0,   200, 0,   0,   80,  3,   0,   0,   0,   0,   0,   0,   0,   244, 1,   0,   112,
+    1,   246, 1,   0,   112, 1,   189, 2,   0,   96,  144, 178, 236, 250, 255, 255, 255, 255, 145,
+    1,   0,   96,  144, 226, 33,  60,  222, 2,   0,   0,   189, 2,   0,   96,  0,   0,   0,   0,
+    0,   0,   0,   0,   190, 2,   0,   16,  1,   0,   0,   0,   12,  0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   110, 0,   0,   0,   0,   0,   0,   0,   11,  0,
+    0,   0,   98,  0,   0,   0,   1,   0,   0,   32,  2,   0,   0,   0,   1,   0,   0,   32,  3,
+    0,   0,   0,   2,   0,   0,   16,  1,   0,   0,   0,   3,   0,   0,   48,  0,   1,   0,   0,
+    200, 0,   0,   80,  3,   0,   0,   0,   0,   0,   0,   0,   244, 1,   0,   112, 1,   246, 1,
+    0,   112, 1,   189, 2,   0,   96,  144, 178, 236, 250, 255, 255, 255, 255, 145, 1,   0,   96,
+    144, 226, 33,  60,  222, 2,   0,   0,   189, 2,   0,   96,  0,   0,   0,   0,   0,   0,   0,
+    0,   190, 2,   0,   16,  1,   0,   0,   0,
+};
+
+/*
+ * These tests don't have any assertions or expectations. They just try to parse garbage, to see if
+ * the result will be a crash.  This is especially informative when run under Valgrind memcheck.
+ */
+
+template <typename Message> void parse_garbage() {
+    Message msg;
+    const uint8_t* end = msgbuf + array_length(msgbuf);
+    for (size_t i = 0; i < array_length(msgbuf); ++i) {
+        const uint8_t* begin = msgbuf + i;
+        const uint8_t* p = begin;
+        msg.Deserialize(&p, end);
+    }
+}
+
+#define GARBAGE_TEST(Message)                                                                      \
+    TEST(GarbageTest, Message) { parse_garbage<Message>(); }
+
+GARBAGE_TEST(SupportedAlgorithmsResponse)
+GARBAGE_TEST(GenerateKeyRequest);
+GARBAGE_TEST(GenerateKeyResponse);
+GARBAGE_TEST(GetKeyCharacteristicsRequest);
+GARBAGE_TEST(GetKeyCharacteristicsResponse);
+GARBAGE_TEST(BeginOperationRequest);
+GARBAGE_TEST(BeginOperationResponse);
+GARBAGE_TEST(UpdateOperationRequest);
+GARBAGE_TEST(UpdateOperationResponse);
+GARBAGE_TEST(FinishOperationRequest);
+GARBAGE_TEST(FinishOperationResponse);
+// GARBAGE_TEST(AddEntropyRequest);
+GARBAGE_TEST(ImportKeyRequest);
+GARBAGE_TEST(ImportKeyResponse);
+GARBAGE_TEST(ExportKeyRequest);
+GARBAGE_TEST(ExportKeyResponse);
+// GARBAGE_TEST(RescopeRequest);
+// GARBAGE_TEST(RescopeResponse);
+
+// The macro doesn't work on this one.
+TEST(GarbageTest, SupportedResponse) {
+    parse_garbage<SupportedResponse<keymaster_digest_t>>();
 }
 
 }  // namespace test
