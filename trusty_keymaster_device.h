@@ -17,18 +17,18 @@
 #ifndef EXTERNAL_KEYMASTER_TRUSTY_KEYMASTER_DEVICE_H_
 #define EXTERNAL_KEYMASTER_TRUSTY_KEYMASTER_DEVICE_H_
 
-#include <hardware/keymaster.h>
 #include <common/ote_error.h>
+#include <hardware/keymaster.h>
 
 namespace keymaster {
 
 /**
  * Software OpenSSL-based Keymaster device.
  *
- * IMPORTANT MAINTAINER NOTE: Pointers to instances of this class must be castable to
- * keymaster_device and hw_device_t. This means it must remain a standard layout class (no virtual
- * functions and no data members which aren't standard layout), and device_ must be the first data
- * member. Assertions in the constructor validate compliance with those constraints.
+ * IMPORTANT MAINTAINER NOTE: Pointers to instances of this class must be castable to hw_device_t
+ * and keymaster_device. This means it must remain a standard layout class (no virtual functions and
+ * no data members which aren't standard layout), and device_ must be the first data member.
+ * Assertions in the constructor validate compliance with those constraints.
  */
 class TrustyKeymasterDevice {
   public:
@@ -43,9 +43,7 @@ class TrustyKeymasterDevice {
 
     ~TrustyKeymasterDevice();
 
-    te_error_t session_error() {
-        return te_error_;
-    }
+    te_error_t session_error() { return te_error_; }
 
     int generate_keypair(const keymaster_keypair_t key_type, const void* key_params,
                          uint8_t** key_blob, size_t* key_blob_length);
@@ -66,8 +64,6 @@ class TrustyKeymasterDevice {
      * These static methods are the functions referenced through the function pointers in
      * keymaster_device.  They're all trivial wrappers.
      */
-
-    // v0.1 through v0.3 entry points
     static int close_device(hw_device_t* dev);
     static int generate_keypair(const keymaster_device_t* dev, const keymaster_keypair_t key_type,
                                 const void* key_params, uint8_t** keyBlob, size_t* keyBlobLength);

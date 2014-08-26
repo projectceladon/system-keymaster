@@ -40,6 +40,12 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
                  const keymaster_key_blob_t& master_key, const uint8_t nonce[NONCE_LENGTH])
     : error_(KM_ERROR_OK), nonce_(new uint8_t[NONCE_LENGTH]), tag_(new uint8_t[TAG_LENGTH]),
       enforced_(enforced), unenforced_(unenforced), hidden_(hidden) {
+    if (!nonce_.get() || !tag_.get()) {
+        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+    error_ = KM_ERROR_OK;
+
     if (enforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         unenforced_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE ||
         hidden_.is_valid() == AuthorizationSet::ALLOCATION_FAILURE) {
@@ -74,10 +80,28 @@ KeyBlob::KeyBlob(const AuthorizationSet& enforced, const AuthorizationSet& unenf
 KeyBlob::KeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& hidden,
                  const keymaster_key_blob_t& master_key)
     : nonce_(new uint8_t[NONCE_LENGTH]), tag_(new uint8_t[TAG_LENGTH]), hidden_(hidden) {
+    if (!nonce_.get() || !tag_.get()) {
+        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+    error_ = KM_ERROR_OK;
+
     const uint8_t* p = key.key_material;
     if (!Deserialize(&p, key.key_material + key.key_material_size))
         return;
     DecryptKey(master_key);
+}
+
+KeyBlob::KeyBlob(const uint8_t* key_blob, size_t blob_size)
+    : nonce_(new uint8_t[NONCE_LENGTH]), tag_(new uint8_t[TAG_LENGTH]) {
+    if (!nonce_.get() || !tag_.get()) {
+        error_ = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+    error_ = KM_ERROR_OK;
+
+    if (!Deserialize(&key_blob, key_blob + blob_size))
+        return;
 }
 
 size_t KeyBlob::SerializedSize() const {

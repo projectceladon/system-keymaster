@@ -286,9 +286,6 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
     if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size))
         authorizations.push_back(Authorization(TAG_KEY_SIZE, key_size));
 
-    UniquePtr<uint8_t[]> key_data;
-    size_t key_data_size;
-
     UniquePtr<DSA, DSA_Delete> dsa_key(DSA_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (dsa_key.get() == NULL || pkey.get() == NULL) {
@@ -300,18 +297,19 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
     *error = KM_ERROR_INVALID_DSA_PARAMS;
 
     if (g_blob.data == NULL && p_blob.data == NULL && q_blob.data == NULL) {
-        // No params provided, generate them.
+        logger.log("DSA parameters unspecified, generating them for key size %d\n", key_size);
         if (!DSA_generate_parameters_ex(dsa_key.get(), key_size, NULL /* seed */, 0 /* seed_len */,
                                         NULL /* counter_ret */, NULL /* h_ret */,
-                                        NULL /* callback */))
-            // TODO(swillden): return a more precise error, depending on ERR_get_error();
+                                        NULL /* callback */)) {
+            logger.log("DSA parameter generation failed.\n");
             return NULL;
+        }
 
         SetDsaParamData(&authorizations, TAG_DSA_GENERATOR, dsa_key->g);
         SetDsaParamData(&authorizations, TAG_DSA_P, dsa_key->p);
         SetDsaParamData(&authorizations, TAG_DSA_Q, dsa_key->q);
     } else if (g_blob.data == NULL || p_blob.data == NULL || q_blob.data == NULL) {
-        // Some params provided: that's an error.  Provide them all or provide none.
+        logger.log("Some DSA parameters provided.  Provide all or none\n");
         return NULL;
     } else {
         // All params provided. Use them.
@@ -319,8 +317,9 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         dsa_key->p = BN_bin2bn(p_blob.data, p_blob.data_length, NULL);
         dsa_key->q = BN_bin2bn(q_blob.data, q_blob.data_length, NULL);
 
-        if (dsa_key->g == NULL || dsa_key->p == NULL || dsa_key->q == NULL)
+        if (dsa_key->g == NULL || dsa_key->p == NULL || dsa_key->q == NULL) {
             return NULL;
+        }
     }
 
     if (!DSA_generate_key(dsa_key.get())) {

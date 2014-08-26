@@ -50,56 +50,6 @@ class KeymasterTest : public testing::Test {
     GoogleSoftKeymaster device;
 };
 
-template <keymaster_tag_t Tag, typename KeymasterEnum>
-bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM, Tag, KeymasterEnum> tag,
-              KeymasterEnum val) {
-    int pos = set.find(tag);
-    return pos != -1 && set[pos].enumerated == val;
-}
-
-template <keymaster_tag_t Tag, typename KeymasterEnum>
-bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM_REP, Tag, KeymasterEnum> tag,
-              KeymasterEnum val) {
-    int pos = -1;
-    while ((pos = set.find(tag, pos)) != -1)
-        if (set[pos].enumerated == val)
-            return true;
-    return false;
-}
-
-template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_INT, Tag> tag, uint32_t val) {
-    int pos = set.find(tag);
-    return pos != -1 && set[pos].integer == val;
-}
-
-template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_INT_REP, Tag> tag, uint32_t val) {
-    int pos = -1;
-    while ((pos = set.find(tag, pos)) != -1)
-        if (set[pos].integer == val)
-            return true;
-    return false;
-}
-
-template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_LONG, Tag> tag, uint64_t val) {
-    int pos = set.find(tag);
-    return pos != -1 && set[pos].long_integer == val;
-}
-
-template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_BYTES, Tag> tag, const std::string& val) {
-    int pos = set.find(tag);
-    return pos != -1 &&
-           std::string(reinterpret_cast<const char*>(set[pos].blob.data),
-                       set[pos].blob.data_length) == val;
-}
-
-inline bool contains(const AuthorizationSet& set, keymaster_tag_t tag) {
-    return set.find(tag) != -1;
-}
-
 typedef KeymasterTest CheckSupported;
 TEST_F(CheckSupported, SupportedAlgorithms) {
     // Shouldn't blow up on NULL.
