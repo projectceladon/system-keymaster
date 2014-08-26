@@ -21,17 +21,37 @@
  * Utilities used to help with testing.  Not used in production code.
  */
 
+#include <stdarg.h>
+
 #include <ostream>
 
-#include "keymaster_defs.h"
 #include "authorization_set.h"
+#include "keymaster_defs.h"
+#include "logger.h"
 
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param);
 bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b);
 
 namespace keymaster {
+
 bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
+
 std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set);
+
+namespace test {
+
+class StdoutLogger : public Logger {
+  public:
+    int log(const char* fmt, ...) const {
+        va_list args;
+        va_start(args, fmt);
+        int result = vprintf(fmt, args);
+        va_end(args);
+        return result;
+    }
+};
+
+}  // namespace test
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_TEST_UTILS_H_

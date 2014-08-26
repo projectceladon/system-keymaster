@@ -19,6 +19,7 @@
 
 #include "authorization_set.h"
 #include "google_keymaster_messages.h"
+#include "logger.h"
 
 namespace keymaster {
 
@@ -43,7 +44,7 @@ class Operation;
  */
 class GoogleKeymaster {
   public:
-    GoogleKeymaster(size_t operation_table_size);
+    GoogleKeymaster(size_t operation_table_size, Logger* logger);
     virtual ~GoogleKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
@@ -75,6 +76,9 @@ class GoogleKeymaster {
     void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
     keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
+
+  protected:
+    const Logger& logger() const { return *logger_; }
 
   private:
     virtual bool is_enforced(keymaster_tag_t tag) = 0;
@@ -126,6 +130,7 @@ class GoogleKeymaster {
 
     UniquePtr<OpTableEntry[]> operation_table_;
     size_t operation_table_size_;
+    UniquePtr<Logger> logger_;
 };
 
 }  // namespace keymaster
