@@ -19,9 +19,9 @@
 
 #include <UniquePtr.h>
 
-#include "keymaster_defs.h"
-#include "keymaster_tags.h"
-#include "serializable.h"
+#include <keymaster/keymaster_defs.h>
+#include <keymaster/keymaster_tags.h>
+#include <keymaster/serializable.h>
 
 namespace keymaster {
 

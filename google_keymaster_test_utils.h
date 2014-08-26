@@ -25,9 +25,9 @@
 
 #include <ostream>
 
-#include "authorization_set.h"
-#include "keymaster_defs.h"
-#include "logger.h"
+#include <keymaster/authorization_set.h>
+#include <keymaster/keymaster_defs.h>
+#include <keymaster/logger.h>
 
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param);
 bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b);
@@ -39,7 +39,6 @@ bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
 std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set);
 
 namespace test {
-
 
 template <keymaster_tag_t Tag, typename KeymasterEnum>
 bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM, Tag, KeymasterEnum> tag,

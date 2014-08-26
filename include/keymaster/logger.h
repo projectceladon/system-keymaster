@@ -23,7 +23,7 @@ class Logger {
   public:
     Logger() {}
     virtual ~Logger() {}
-    virtual int log(const char* fmt, ...) const { fmt; return 0; }
+    virtual int log(const char* fmt, ...) const = 0;
 
   private:
     // Disallow copying.

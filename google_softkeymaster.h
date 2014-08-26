@@ -17,7 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
 #define SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
 
-#include "google_keymaster.h"
+#include <keymaster/google_keymaster.h>
 
 namespace keymaster {
 

@@ -16,9 +16,10 @@
 
 #include <gtest/gtest.h>
 
-#include "authorization_set.h"
+#include <keymaster/authorization_set.h>
+#include <keymaster/google_keymaster_utils.h>
+
 #include "google_keymaster_test_utils.h"
-#include "google_keymaster_utils.h"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

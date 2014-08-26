@@ -20,9 +20,10 @@
 
 #include <openssl/engine.h>
 
-#include "authorization_set.h"
-#include "google_keymaster_utils.h"
-#include "keymaster_tags.h"
+#include <keymaster/authorization_set.h>
+#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/keymaster_tags.h>
+
 #include "key_blob.h"
 
 int main(int argc, char** argv) {

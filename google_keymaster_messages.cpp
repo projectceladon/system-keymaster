@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include "google_keymaster_messages.h"
+#include <keymaster/google_keymaster_messages.h>
+#include <keymaster/google_keymaster_utils.h>
 
 namespace keymaster {
 

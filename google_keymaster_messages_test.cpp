@@ -18,10 +18,11 @@
 
 #include <gtest/gtest.h>
 
+#include <keymaster/keymaster_tags.h>
+#include <keymaster/google_keymaster_utils.h>
+
 #include "google_keymaster_test_utils.h"
-#include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"
-#include "keymaster_tags.h"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
