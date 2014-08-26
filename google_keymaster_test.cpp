@@ -21,10 +21,11 @@
 
 #include <openssl/engine.h>
 
+#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/keymaster_tags.h>
+
 #include "google_keymaster_test_utils.h"
-#include "google_keymaster_utils.h"
 #include "google_softkeymaster.h"
-#include "keymaster_tags.h"
 
 using std::string;
 using std::ifstream;

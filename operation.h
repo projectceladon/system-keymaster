@@ -21,8 +21,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "keymaster_defs.h"
-#include "google_keymaster_utils.h"
+#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/keymaster_defs.h>
 
 namespace keymaster {
 

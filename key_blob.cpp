@@ -19,9 +19,10 @@
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 
+#include <keymaster/google_keymaster_utils.h>
+
 #include "ae.h"
 #include "key_blob.h"
-#include "google_keymaster_utils.h"
 
 namespace keymaster {
 

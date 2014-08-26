@@ -20,8 +20,8 @@
 
 #include <assert.h>
 
-#include "authorization_set.h"
-#include "google_keymaster_utils.h"
+#include <keymaster/authorization_set.h>
+#include <keymaster/google_keymaster_utils.h>
 
 namespace keymaster {
 

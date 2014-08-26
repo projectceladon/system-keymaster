@@ -23,11 +23,12 @@
 
 #include <UniquePtr.h>
 
+#include <keymaster/authorization_set.h>
+#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/keymaster_defs.h>
+#include <keymaster/serializable.h>
+
 #include "ae.h"
-#include "authorization_set.h"
-#include "google_keymaster_utils.h"
-#include "keymaster_defs.h"
-#include "serializable.h"
 
 namespace keymaster {
 

@@ -174,6 +174,54 @@ inline bool copy_uint32_array_from_buf(const uint8_t** buf_ptr, const uint8_t* e
     return true;
 }
 
+/**
+ * A simple buffer that supports reading and writing.  Manages its own memory.
+ */
+class Buffer : public Serializable {
+  public:
+    Buffer() : buffer_(NULL), buffer_size_(0), read_position_(0), write_position_(0) {}
+    Buffer(size_t size) : buffer_(NULL) { Reinitialize(size); }
+    Buffer(const void* buf, size_t size) : buffer_(NULL) { Reinitialize(buf, size); }
+
+    // Grow the buffer so that at least \p size bytes can be written.
+    bool reserve(size_t size);
+
+    bool Reinitialize(size_t size);
+    bool Reinitialize(const void* buf, size_t size);
+
+    // Reinitialize with a copy of the provided buffer's readable data.
+    bool Reinitialize(const Buffer& buffer) {
+        return Reinitialize(buffer.peek_read(), buffer.available_read());
+    }
+
+    void Clear();
+
+    size_t available_write() const;
+    size_t available_read() const;
+    size_t buffer_size() const { return buffer_size_; }
+
+    bool write(const uint8_t* src, size_t write_length);
+    bool read(uint8_t* dest, size_t read_length);
+    const uint8_t* peek_read() const { return buffer_.get() + read_position_; }
+    void advance_read(int distance) { read_position_ += distance; }
+    uint8_t* peek_write() { return buffer_.get() + write_position_; }
+    void advance_write(int distance) { write_position_ += distance; }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+  private:
+    // Disallow copy construction and assignment.
+    void operator=(const Buffer& other);
+    Buffer(const Buffer&);
+
+    UniquePtr<uint8_t[]> buffer_;
+    size_t buffer_size_;
+    int read_position_;
+    int write_position_;
+};
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_SERIALIZABLE_H_

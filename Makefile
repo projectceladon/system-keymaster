@@ -5,8 +5,8 @@ SUBS=system/core \
 GTEST=$(BASE)/external/gtest
 
 INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
-	-I $(BASE)/system/core/include/utils \
-	-I $(GTEST)
+	-I $(BASE)/libnativehelper/include/nativehelper \
+	-I $(GTEST) -Iinclude
 
 ifdef USE_CLANG
 CC=/usr/bin/clang
@@ -40,10 +40,7 @@ CPPSRCS=\
 	key_blob.cpp \
 	key_blob_test.cpp \
 	rsa_operation.cpp \
-	serializable.cpp \
-	trusty_keymaster_device.cpp \
-	trusty_keymaster.cpp \
-	trusty_keymaste_device_test.cpp
+	serializable.cpp
 CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -56,10 +53,6 @@ BINARIES=authorization_set_test \
 	google_keymaster_test \
 	google_keymaster_messages_test \
 	key_blob_test
-
-ifdef TRUSTY
-BINARIES += trusty_keymaster_device_test
-endif # TRUSTY
 
 .PHONY: coverage memcheck massif clean run
 
@@ -141,31 +134,6 @@ google_keymaster_test: google_keymaster_test.o \
 	rsa_operation.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
-
-ifdef TRUSTY
-BINARIES += trusty_keymaster_device_test
-
-trusty_keymaster_device_test: trusty_keymaster_device_test.o \
-	asymmetric_key.o \
-	authorization_set.o \
-	dsa_operation.o \
-	trusty_keymaster_device.o \
-	ecdsa_operation.o \
-	google_keymaster.o \
-	google_keymaster_messages.o \
-	google_keymaster_test_utils.o \
-	google_keymaster_utils.o \
-	key.o \
-	key_blob.o \
-	ocb.o \
-	rsa_operation.o \
-	serializable.o \
-	trusty_keymaster.o \
-	$(GTEST)/src/gtest-all.o
-
-THIRD_PARTY_DIR=$(abspath $(PWD)/..)
-trusty_keymaster_device_test: CPPFLAGS += -I$(THIRD_PARTY_DIR)/ote/lib/include
-endif # TRUSTY
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
 ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)

@@ -24,9 +24,10 @@
 
 #include <UniquePtr.h>
 
+#include <keymaster/google_keymaster.h>
+#include <keymaster/google_keymaster_utils.h>
+
 #include "ae.h"
-#include "google_keymaster.h"
-#include "google_keymaster_utils.h"
 #include "key.h"
 #include "key_blob.h"
 #include "operation.h"

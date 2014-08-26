@@ -17,9 +17,9 @@
 #ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
 #define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
 
-#include "authorization_set.h"
-#include "google_keymaster_messages.h"
-#include "logger.h"
+#include <keymaster/authorization_set.h>
+#include <keymaster/google_keymaster_messages.h>
+#include <keymaster/logger.h>
 
 namespace keymaster {
 
