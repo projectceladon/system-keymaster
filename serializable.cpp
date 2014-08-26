@@ -33,18 +33,18 @@ bool copy_from_buf(const uint8_t** buf_ptr, const uint8_t* end, void* dest, size
 }
 
 bool copy_size_and_data_from_buf(const uint8_t** buf_ptr, const uint8_t* end, size_t* size,
-                                 uint8_t** dest) {
+                                 UniquePtr<uint8_t[]>* dest) {
     if (!copy_uint32_from_buf(buf_ptr, end, size) || *buf_ptr + *size > end) {
         return false;
     }
     if (*size == 0) {
-        *dest = NULL;
+        dest->reset();
         return true;
     }
-    *dest = new uint8_t[*size];
-    if (*dest == NULL)
+    dest->reset(new uint8_t[*size]);
+    if (dest->get() == NULL)
         return false;
-    return copy_from_buf(buf_ptr, end, *dest, *size);
+    return copy_from_buf(buf_ptr, end, dest->get(), *size);
 }
 
 }  // namespace keymaster

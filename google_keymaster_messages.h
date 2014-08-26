@@ -81,7 +81,13 @@ template <typename T> struct SupportedResponse : public KeymasterResponse {
         return append_uint32_array_to_buf(buf, end, results, results_length);
     }
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-        return copy_uint32_array_from_buf(buf_ptr, end, &results, &results_length);
+        delete[] results;
+        results = NULL;
+        UniquePtr<T[]> tmp;
+        if (!copy_uint32_array_from_buf(buf_ptr, end, &tmp, &results_length))
+            return false;
+        results = tmp.release();
+        return true;
     }
 
     T* results;

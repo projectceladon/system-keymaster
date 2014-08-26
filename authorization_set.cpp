@@ -344,10 +344,12 @@ uint8_t* AuthorizationSet::Serialize(uint8_t* buf, const uint8_t* end) const {
 }
 
 bool AuthorizationSet::DeserializeIndirectData(const uint8_t** buf_ptr, const uint8_t* end) {
-    if (!copy_size_and_data_from_buf(buf_ptr, end, &indirect_data_size_, &indirect_data_)) {
+    UniquePtr<uint8_t[]> indirect_buf;
+    if (!copy_size_and_data_from_buf(buf_ptr, end, &indirect_data_size_, &indirect_buf)) {
         set_invalid(MALFORMED_DATA);
         return false;
     }
+    indirect_data_ = indirect_buf.release();
     return true;
 }
 

@@ -21,6 +21,8 @@
 #include <string.h>
 #include <time.h>  // for time_t.
 
+#include <UniquePtr.h>
+
 #include "serializable.h"
 
 namespace keymaster {
@@ -102,7 +104,7 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
 /**
  * Variant of memset() that uses GCC-specific pragmas to disable optimizations, so effect is not
  * optimized away.  This is important because we often need to wipe blocks of sensitive data from
- * memory.
+ * memory.  As an additional convenience, this implementation avoids writing to NULL pointers.
  */
 #ifdef KEYMASTER_CLANG_TEST_BUILD
 #define OPTIMIZE(x)
@@ -110,6 +112,8 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
 #define OPTIMIZE(x) __attribute__((optimize(x)))
 #endif  // not KEYMASTER_CLANG_TEST_BUILD
 inline OPTIMIZE("O0") void* memset_s(void* s, int c, size_t n) {
+    if (!s)
+        return s;
     return memset(s, c, n);
 }
 #undef OPTIMIZE
@@ -155,7 +159,6 @@ class Buffer : public Serializable {
     Buffer() : buffer_(NULL), buffer_size_(0), read_position_(0), write_position_(0) {}
     Buffer(size_t size) : buffer_(NULL) { Reinitialize(size); }
     Buffer(const void* buf, size_t size) : buffer_(NULL) { Reinitialize(buf, size); }
-    ~Buffer();
 
     // Grow the buffer so that at least \p size bytes can be written.
     bool reserve(size_t size);
@@ -168,15 +171,17 @@ class Buffer : public Serializable {
         return Reinitialize(buffer.peek_read(), buffer.available_read());
     }
 
+    void Clear();
+
     size_t available_write() const;
     size_t available_read() const;
     size_t buffer_size() const { return buffer_size_; }
 
     bool write(const uint8_t* src, size_t write_length);
     bool read(uint8_t* dest, size_t read_length);
-    const uint8_t* peek_read() const { return buffer_ + read_position_; }
+    const uint8_t* peek_read() const { return buffer_.get() + read_position_; }
     void advance_read(int distance) { read_position_ += distance; }
-    uint8_t* peek_write() { return buffer_ + write_position_; }
+    uint8_t* peek_write() { return buffer_.get() + write_position_; }
     void advance_write(int distance) { write_position_ += distance; }
 
     size_t SerializedSize() const;
@@ -188,7 +193,7 @@ class Buffer : public Serializable {
     void operator=(const Buffer& other);
     Buffer(const Buffer&);
 
-    uint8_t* buffer_;
+    UniquePtr<uint8_t[]> buffer_;
     size_t buffer_size_;
     int read_position_;
     int write_position_;

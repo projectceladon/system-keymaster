@@ -23,6 +23,8 @@
 
 #include <cstddef>
 
+#include <UniquePtr.h>
+
 namespace keymaster {
 
 class Serializable {
@@ -131,7 +133,7 @@ bool copy_from_buf(const uint8_t** buf_ptr, const uint8_t* end, void* dest, size
  * See \p append_size_and_data_to_buf().
  */
 bool copy_size_and_data_from_buf(const uint8_t** buf_ptr, const uint8_t* end, size_t* size,
-                                 uint8_t** dest);
+                                 UniquePtr<uint8_t[]>* dest);
 
 /**
  * Copies a value convertible from uint32_t from \p *buf_ptr.  Returns false if there are less than
@@ -161,13 +163,13 @@ inline bool copy_uint64_from_buf(const uint8_t** buf_ptr, const uint8_t* end, ui
  * *buf_ptr to the next byte to be read.
  */
 template <typename T>
-inline bool copy_uint32_array_from_buf(const uint8_t** buf_ptr, const uint8_t* end, T** data,
-                                       size_t* count) {
+inline bool copy_uint32_array_from_buf(const uint8_t** buf_ptr, const uint8_t* end,
+                                       UniquePtr<T[]>* data, size_t* count) {
     if (!copy_uint32_from_buf(buf_ptr, end, count) || *buf_ptr + *count * sizeof(uint32_t) > end)
         return false;
-    *data = new T[*count];
+    data->reset(new T[*count]);
     for (size_t i = 0; i < *count; ++i)
-        if (!copy_uint32_from_buf(buf_ptr, end, *data + i))
+        if (!copy_uint32_from_buf(buf_ptr, end, &(*data)[i]))
             return false;
     return true;
 }
