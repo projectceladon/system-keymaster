@@ -785,6 +785,8 @@ TEST_F(ExportKeyTest, RsaSuccess) {
     device.ExportKey(request, &response);
     ASSERT_EQ(KM_ERROR_OK, response.error);
     EXPECT_TRUE(response.key_data != NULL);
+
+    // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
 
 TEST_F(ExportKeyTest, DsaSuccess) {
@@ -799,6 +801,8 @@ TEST_F(ExportKeyTest, DsaSuccess) {
     device.ExportKey(request, &response);
     ASSERT_EQ(KM_ERROR_OK, response.error);
     EXPECT_TRUE(response.key_data != NULL);
+
+    // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
 
 TEST_F(ExportKeyTest, EcdsaSuccess) {
@@ -813,6 +817,8 @@ TEST_F(ExportKeyTest, EcdsaSuccess) {
     device.ExportKey(request, &response);
     ASSERT_EQ(KM_ERROR_OK, response.error);
     EXPECT_TRUE(response.key_data != NULL);
+
+    // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
 
 TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
