@@ -105,7 +105,9 @@ Key* Key::ImportKey(const AuthorizationSet& key_description, keymaster_key_forma
     case EVP_PKEY_RSA:
         return RsaKey::ImportKey(key_description, pkey.get(), logger, error);
     case EVP_PKEY_DSA:
+        return DsaKey::ImportKey(key_description, pkey.get(), logger, error);
     case EVP_PKEY_EC:
+        return EcdsaKey::ImportKey(key_description, pkey.get(), logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;

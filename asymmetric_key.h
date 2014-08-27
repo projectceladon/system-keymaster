@@ -87,12 +87,16 @@ class DsaKey : public AsymmetricKey {
   public:
     static DsaKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
                                keymaster_error_t* error);
+    static DsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                             const Logger& logger, keymaster_error_t* error);
     DsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
                                        keymaster_padding_t padding, keymaster_error_t* error);
+    static size_t key_size_bits(DSA* dsa_key);
 
   private:
+
     DsaKey(DSA* dsa_key, const AuthorizationSet auths, const Logger& logger)
         : AsymmetricKey(auths, logger), dsa_key_(dsa_key) {}
 
@@ -111,6 +115,8 @@ class EcdsaKey : public AsymmetricKey {
   public:
     static EcdsaKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
                                  keymaster_error_t* error);
+    static EcdsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                             const Logger& logger, keymaster_error_t* error);
     EcdsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
@@ -121,6 +127,7 @@ class EcdsaKey : public AsymmetricKey {
         : AsymmetricKey(auths, logger), ecdsa_key_(ecdsa_key) {}
 
     static EC_GROUP* choose_group(size_t key_size_bits);
+    static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
 
     virtual int evp_key_type() { return EVP_PKEY_EC; }
     virtual bool InternalToEvp(EVP_PKEY* pkey) const;
