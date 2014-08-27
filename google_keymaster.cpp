@@ -26,10 +26,10 @@
 
 #include <keymaster/google_keymaster.h>
 #include <keymaster/google_keymaster_utils.h>
+#include <keymaster/key_blob.h>
 
 #include "ae.h"
 #include "key.h"
-#include "key_blob.h"
 #include "operation.h"
 
 namespace keymaster {

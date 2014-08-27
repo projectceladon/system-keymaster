@@ -20,17 +20,24 @@
 #include <openssl/sha.h>
 
 #include <keymaster/google_keymaster_utils.h>
+#include <keymaster/key_blob.h>
 
 #include "ae.h"
-#include "key_blob.h"
 
 namespace keymaster {
 
-struct AeCtxDelete {
-    void operator()(ae_ctx* p) {
-        ae_clear(p);
-        ae_free(p);
+class KeyBlob::AeCtx {
+  public:
+    AeCtx() : ctx_(ae_allocate(NULL)) {}
+    ~AeCtx() {
+        ae_clear(ctx_);
+        ae_free(ctx_);
     }
+
+    ae_ctx* get() { return ctx_; }
+
+  private:
+    ae_ctx* ctx_;
 };
 
 const size_t KeyBlob::NONCE_LENGTH;
@@ -140,11 +147,11 @@ bool KeyBlob::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
 }
 
 void KeyBlob::EncryptKey(const keymaster_key_blob_t& master_key) {
-    UniquePtr<ae_ctx, AeCtxDelete> ctx(InitializeKeyWrappingContext(master_key, &error_));
+    UniquePtr<AeCtx> ctx(InitializeKeyWrappingContext(master_key, &error_));
     if (error_ != KM_ERROR_OK)
         return;
 
-    int ae_err = ae_encrypt(ctx.get(), nonce_.get(), key_material(), key_material_length(),
+    int ae_err = ae_encrypt(ctx->get(), nonce_.get(), key_material(), key_material_length(),
                             NULL /* additional data */, 0 /* additional data length */,
                             encrypted_key_material_.get(), tag_.get(), 1 /* final */);
     if (ae_err < 0) {
@@ -156,12 +163,12 @@ void KeyBlob::EncryptKey(const keymaster_key_blob_t& master_key) {
 }
 
 void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
-    UniquePtr<ae_ctx, AeCtxDelete> ctx(InitializeKeyWrappingContext(master_key, &error_));
+    UniquePtr<AeCtx> ctx(InitializeKeyWrappingContext(master_key, &error_));
     if (error_ != KM_ERROR_OK)
         return;
 
     int ae_err =
-        ae_decrypt(ctx.get(), nonce_.get(), encrypted_key_material(), key_material_length(),
+        ae_decrypt(ctx->get(), nonce_.get(), encrypted_key_material(), key_material_length(),
                    NULL /* additional data */, 0 /* additional data length */, key_material_.get(),
                    tag_.get(), 1 /* final */);
     if (ae_err == AE_INVALID) {
@@ -178,8 +185,8 @@ void KeyBlob::DecryptKey(const keymaster_key_blob_t& master_key) {
     error_ = KM_ERROR_OK;
 }
 
-ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
-                                              keymaster_error_t* error) const {
+KeyBlob::AeCtx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
+                                                      keymaster_error_t* error) const {
     size_t derivation_data_length;
     UniquePtr<const uint8_t[]> derivation_data(BuildDerivationData(&derivation_data_length));
     if (derivation_data.get() == NULL) {
@@ -188,7 +195,7 @@ ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master
     }
 
     *error = KM_ERROR_OK;
-    UniquePtr<ae_ctx, AeCtxDelete> ctx(ae_allocate(NULL));
+    UniquePtr<AeCtx> ctx(new AeCtx);
 
     SHA256_CTX sha256_ctx;
     UniquePtr<uint8_t[]> hash_buf(new uint8_t[SHA256_DIGEST_LENGTH]);
@@ -219,7 +226,7 @@ ae_ctx* KeyBlob::InitializeKeyWrappingContext(const keymaster_key_blob_t& master
     AES_encrypt(hash_buf.get(), derived_key.get(), &aes_key);
 
     // Set up AES OCB context using derived key.
-    if (ae_init(ctx.get(), derived_key.get(), AES_BLOCK_SIZE, NONCE_LENGTH, TAG_LENGTH) ==
+    if (ae_init(ctx->get(), derived_key.get(), AES_BLOCK_SIZE, NONCE_LENGTH, TAG_LENGTH) ==
         AE_SUCCESS)
         return ctx.release();
     else {
