@@ -37,7 +37,7 @@ keymaster_error_t DsaOperation::Update(const Buffer& input, Buffer* /* output */
 }
 
 keymaster_error_t DsaOperation::StoreData(const Buffer& input) {
-    if (!data_.reserve(input.available_read()) ||
+    if (!data_.reserve(data_.available_read() + input.available_read()) ||
         !data_.write(input.peek_read(), input.available_read()))
         return KM_ERROR_INVALID_INPUT_LENGTH;
     return KM_ERROR_OK;
