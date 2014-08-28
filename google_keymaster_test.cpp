@@ -438,8 +438,8 @@ class SigningOperationsTest : public KeymasterTest {
     const keymaster_key_blob_t& key_blob() { return generate_response_.key_blob; }
 
     const keymaster_key_blob_t& corrupt_key_blob() {
-        ++generate_response_.key_blob
-              .key_material[generate_response_.key_blob.key_material_size / 2];
+        uint8_t* tmp = const_cast<uint8_t*>(generate_response_.key_blob.key_material);
+        ++tmp[generate_response_.key_blob.key_material_size / 2];
         return generate_response_.key_blob;
     }
 
