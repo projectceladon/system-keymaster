@@ -293,7 +293,7 @@ typedef struct {
 } keymaster_key_characteristics_t;
 
 typedef struct {
-    uint8_t* key_material;
+    const uint8_t* key_material;
     size_t key_material_size;
 } keymaster_key_blob_t;
 
