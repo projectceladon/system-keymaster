@@ -77,7 +77,6 @@ class GoogleKeymaster {
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
     keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
 
-  protected:
     const Logger& logger() const { return *logger_; }
 
   private:
