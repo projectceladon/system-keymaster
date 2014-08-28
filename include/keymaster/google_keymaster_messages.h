@@ -27,6 +27,12 @@ namespace keymaster {
 
 // Commands
 const uint32_t GENERATE_KEY = 0;
+const uint32_t BEGIN_OPERATION = 1;
+const uint32_t UPDATE_OPERATION = 2;
+const uint32_t FINISH_OPERATION = 3;
+const uint32_t ABORT_OPERATION = 4;
+const uint32_t IMPORT_KEY = 5;
+const uint32_t EXPORT_KEY = 6;
 
 /**
  * All responses include an error value, and if the error is not KM_ERROR_OK, return no additional
