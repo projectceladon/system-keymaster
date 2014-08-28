@@ -333,6 +333,95 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
     return new_key;
 }
 
+template <keymaster_tag_t T>
+keymaster_error_t GetOrCheckDsaParam(TypedTag<KM_BIGNUM, T> tag, BIGNUM* bn,
+                                     AuthorizationSet* auths) {
+    keymaster_blob_t blob;
+    if (auths->GetTagValue(tag, &blob)) {
+        // value specified, make sure it matches
+        UniquePtr<BIGNUM, BIGNUM_Delete> extracted_bn(BN_bin2bn(blob.data, blob.data_length, NULL));
+        if (extracted_bn.get() == NULL)
+            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        if (BN_cmp(extracted_bn.get(), bn) != 0)
+            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+    } else {
+        // value not specified, add it
+        UniquePtr<uint8_t[]> data(new uint8_t[BN_num_bytes(bn)]);
+        BN_bn2bin(bn, data.get());
+        auths->push_back(tag, data.get(), BN_num_bytes(bn));
+    }
+    return KM_ERROR_OK;
+}
+
+/* static */
+size_t DsaKey::key_size_bits(DSA* dsa_key) {
+    // Openssl provides no convenient way to get a DSA key size, but dsa_key->p is L bits long.
+    // There may be some leading zeros that mess up this calculation, but DSA key sizes are also
+    // constrained to be multiples of 64 bits.  So the key size is the bit length of p rounded up to
+    // the nearest 64.
+    return ((BN_num_bytes(dsa_key->p) * 8) + 63) / 64 * 64;
+}
+
+/* static */
+DsaKey* DsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                          const Logger& logger, keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+    *error = KM_ERROR_UNKNOWN_ERROR;
+
+    UniquePtr<DSA, DSA_Delete> dsa_key(EVP_PKEY_get1_DSA(pkey));
+    if (!dsa_key.get())
+        return NULL;
+
+    AuthorizationSet authorizations(key_description);
+
+    *error = GetOrCheckDsaParam(TAG_DSA_GENERATOR, dsa_key->g, &authorizations);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    *error = GetOrCheckDsaParam(TAG_DSA_P, dsa_key->p, &authorizations);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    *error = GetOrCheckDsaParam(TAG_DSA_Q, dsa_key->q, &authorizations);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    // There's no convenient way to get a DSA key size, but dsa_key->p is L bits long.  There may be
+    // some leading zeros that mess up this calculation, but DSA key sizes are also constrained to
+    // be multiples of 64 bits.  So the bit length of p, rounded up to the nearest 64 bits, is the
+    // key size.
+    uint32_t extracted_key_size_bits = ((BN_num_bytes(dsa_key->p) * 8) + 63) / 64 * 64;
+
+    uint32_t key_size_bits;
+    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
+        // key_size_bits specified, make sure it matches the key.
+        if (key_size_bits != extracted_key_size_bits) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        // key_size_bits not specified, add it.
+        authorizations.push_back(TAG_KEY_SIZE, extracted_key_size_bits);
+    }
+
+    keymaster_algorithm_t algorithm;
+    if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
+        if (algorithm != KM_ALGORITHM_DSA) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        authorizations.push_back(TAG_ALGORITHM, KM_ALGORITHM_DSA);
+    }
+
+    // Don't bother with the other parameters.  If the necessary padding, digest, purpose, etc. are
+    // missing, the error will be diagnosed when the key is used (when auth checking is
+    // implemented).
+    *error = KM_ERROR_OK;
+    return new DsaKey(dsa_key.release(), authorizations, logger);
+}
+
 DsaKey::DsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
     : AsymmetricKey(blob, logger) {
     if (error)
@@ -407,6 +496,53 @@ EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const L
 }
 
 /* static */
+EcdsaKey* EcdsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
+                              const Logger& logger, keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+    *error = KM_ERROR_UNKNOWN_ERROR;
+
+    UniquePtr<EC_KEY, ECDSA_Delete> ecdsa_key(EVP_PKEY_get1_EC_KEY(pkey));
+    if (!ecdsa_key.get())
+        return NULL;
+
+    AuthorizationSet authorizations(key_description);
+
+    size_t extracted_key_size_bits;
+    *error = get_group_size(*EC_KEY_get0_group(ecdsa_key.get()), &extracted_key_size_bits);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    uint32_t key_size_bits;
+    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
+        // key_size_bits specified, make sure it matches the key.
+        if (key_size_bits != extracted_key_size_bits) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        // key_size_bits not specified, add it.
+        authorizations.push_back(TAG_KEY_SIZE, extracted_key_size_bits);
+    }
+
+    keymaster_algorithm_t algorithm;
+    if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
+        if (algorithm != KM_ALGORITHM_ECDSA) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
+    } else {
+        authorizations.push_back(TAG_ALGORITHM, KM_ALGORITHM_ECDSA);
+    }
+
+    // Don't bother with the other parameters.  If the necessary padding, digest, purpose, etc. are
+    // missing, the error will be diagnosed when the key is used (when auth checking is
+    // implemented).
+    *error = KM_ERROR_OK;
+    return new EcdsaKey(ecdsa_key.release(), authorizations, logger);
+}
+
+/* static */
 EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
     switch (key_size_bits) {
     case 192:
@@ -428,6 +564,30 @@ EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
         return NULL;
         break;
     }
+}
+
+/* static */
+keymaster_error_t EcdsaKey::get_group_size(const EC_GROUP& group, size_t* key_size_bits) {
+    switch (EC_GROUP_get_curve_name(&group)) {
+    case NID_X9_62_prime192v1:
+        *key_size_bits = 192;
+        break;
+    case NID_secp224r1:
+        *key_size_bits = 224;
+        break;
+    case NID_X9_62_prime256v1:
+        *key_size_bits = 256;
+        break;
+    case NID_secp384r1:
+        *key_size_bits = 384;
+        break;
+    case NID_secp521r1:
+        *key_size_bits = 521;
+        break;
+    default:
+        return KM_ERROR_UNSUPPORTED_EC_FIELD;
+    }
+    return KM_ERROR_OK;
 }
 
 EcdsaKey::EcdsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
