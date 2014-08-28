@@ -23,12 +23,6 @@ namespace keymaster {
 
 class GoogleSoftKeymaster : public GoogleKeymaster {
   public:
-    GoogleSoftKeymaster(size_t operation_table_size)
-        : GoogleKeymaster(operation_table_size, new Logger) {
-        root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
-        root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("SW");
-        root_of_trust.blob.data_length = 2;
-    }
     GoogleSoftKeymaster(size_t operation_table_size, Logger* logger)
         : GoogleKeymaster(operation_table_size, logger) {
         root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;

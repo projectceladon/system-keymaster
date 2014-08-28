@@ -21,7 +21,8 @@
 
 #include <UniquePtr.h>
 
-#include "key_blob.h"
+#include <keymaster/key_blob.h>
+
 #include "operation.h"
 
 namespace keymaster {
@@ -37,7 +38,7 @@ class DsaOperation : public Operation {
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output);
     virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
 
-protected:
+  protected:
     keymaster_error_t StoreData(const Buffer& input);
 
     DSA* dsa_key_;
@@ -45,7 +46,6 @@ protected:
     keymaster_padding_t padding_;
     Buffer data_;
 };
-
 
 class DsaSignOperation : public DsaOperation {
   public:
@@ -62,8 +62,6 @@ class DsaVerifyOperation : public DsaOperation {
         : DsaOperation(purpose, digest, padding, key) {}
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
-
-
 
 }  // namespace keymaster
 

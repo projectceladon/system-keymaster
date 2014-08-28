@@ -28,8 +28,6 @@
 #include <keymaster/keymaster_defs.h>
 #include <keymaster/serializable.h>
 
-#include "ae.h"
-
 namespace keymaster {
 
 /**
@@ -128,8 +126,9 @@ class KeyBlob : public Serializable {
      * Create an AES_OCB context initialized with a key derived using \p master_key and the
      * authorizations.
      */
-    ae_ctx* InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
-                                         keymaster_error_t* error) const;
+    class AeCtx;
+    AeCtx* InitializeKeyWrappingContext(const keymaster_key_blob_t& master_key,
+                                        keymaster_error_t* error) const;
 
     const uint8_t* BuildDerivationData(size_t* derivation_data_len) const;
 

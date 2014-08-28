@@ -17,12 +17,12 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+#include <keymaster/key_blob.h>
 #include <keymaster/keymaster_defs.h>
 
 #include "asymmetric_key.h"
 #include "dsa_operation.h"
 #include "ecdsa_operation.h"
-#include "key_blob.h"
 #include "openssl_utils.h"
 #include "rsa_operation.h"
 
