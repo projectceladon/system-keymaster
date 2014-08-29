@@ -15,6 +15,9 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
+ifeq ($(USE_32_BIT_KEYSTORE), true)
+LOCAL_MULTILIB := 32
+endif
 LOCAL_MODULE:= libkeymaster
 LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
@@ -35,4 +38,4 @@ LOCAL_CFLAGS = -Wall -Werror
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
-include $(BUILD_STATIC_LIBRARY)
+include $(BUILD_SHARED_LIBRARY)
