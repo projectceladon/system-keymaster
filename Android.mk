@@ -14,21 +14,24 @@
 
 LOCAL_PATH := $(call my-dir)
 
+###
+# libkeymaster_messages contains just the code necessary to communicate with a
+# GoogleKeymaster implementation, e.g. one running in TrustZone.
+#
+# Note that this library is too large; it should not include ocb.c and not use
+# openssl.  At present it must, because the code needs refactoring to separate
+# concerns a bit better.
+#
+# TODO(swillden@google.com): Refactor and pare this down.
+##
 include $(CLEAR_VARS)
-ifeq ($(USE_32_BIT_KEYSTORE), true)
-LOCAL_MULTILIB := 32
-endif
-LOCAL_MODULE:= libkeymaster
+LOCAL_MODULE:= libkeymaster_messages
 LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
-		dsa_operation.cpp \
-		ecdsa_operation.cpp \
-		google_keymaster \
 		google_keymaster_messages.cpp \
 		google_keymaster_utils.cpp \
-		key_blob.cpp \
 		ocb.c \
-		rsa_operation.cpp \
+		key_blob.cpp \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include \
@@ -38,4 +41,24 @@ LOCAL_CFLAGS = -Wall -Werror
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
-include $(BUILD_SHARED_LIBRARY)
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE:= libkeymaster
+LOCAL_SRC_FILES:= \
+		authorization_set.cpp \
+		google_keymaster_messages.cpp \
+		google_keymaster.cpp \
+		google_keymaster_utils.cpp \
+		ocb.c \
+		key_blob.cpp \
+		serializable.cpp
+LOCAL_C_INCLUDES := \
+	$(LOCAL_PATH)/include \
+	external/openssl/include
+LOCAL_SHARED_LIBRARIES := libcrypto
+LOCAL_CFLAGS = -Wall -Werror
+LOCAL_MODULE_TAGS := optional
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_STATIC_LIBRARY)
