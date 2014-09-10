@@ -45,9 +45,6 @@ keymaster_error_t DsaOperation::StoreData(const Buffer& input) {
 
 keymaster_error_t DsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
     output->Reinitialize(DSA_size(dsa_key_));
-    if (data_.available_read() != output->buffer_size())
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
     unsigned int siglen;
     if (!DSA_sign(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
                   output->peek_write(), &siglen, dsa_key_))
