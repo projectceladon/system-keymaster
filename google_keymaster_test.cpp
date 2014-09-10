@@ -657,7 +657,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     finish_request.op_handle = begin_response.op_handle;
     FinishOperationResponse finish_response;
     device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, finish_response.error);
+    ASSERT_EQ(KM_ERROR_UNKNOWN_ERROR, finish_response.error);
     EXPECT_EQ(0U, finish_response.output.available_read());
 
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
