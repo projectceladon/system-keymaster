@@ -23,7 +23,7 @@ class Logger {
   public:
     Logger() {}
     virtual ~Logger() {}
-    virtual int log(const char* fmt, ...) const = 0;
+    virtual int debug(const char* fmt, ...) const = 0;
     virtual int info(const char* fmt, ...) const = 0;
     virtual int error(const char* fmt, ...) const = 0;
     virtual int severe(const char* fmt, ...) const = 0;
