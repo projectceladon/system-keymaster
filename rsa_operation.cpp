@@ -50,9 +50,6 @@ keymaster_error_t RsaOperation::StoreData(const Buffer& input) {
 
 keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
     output->Reinitialize(RSA_size(rsa_key_));
-    if (data_.available_read() != output->buffer_size())
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
     int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
                                               output->peek_write(), rsa_key_, RSA_NO_PADDING);
     if (bytes_encrypted < 0)
