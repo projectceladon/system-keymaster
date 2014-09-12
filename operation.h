@@ -23,6 +23,7 @@
 
 #include <keymaster/google_keymaster_utils.h>
 #include <keymaster/keymaster_defs.h>
+#include <keymaster/logger.h>
 
 namespace keymaster {
 
@@ -31,14 +32,13 @@ namespace keymaster {
  */
 class Operation {
   public:
-    Operation(keymaster_purpose_t purpose) : purpose_(purpose) {
-    }
-    virtual ~Operation() {
-    }
+    Operation(keymaster_purpose_t purpose, const Logger& logger)
+        : purpose_(purpose), logger_(logger) {}
+    virtual ~Operation() {}
 
-    keymaster_purpose_t purpose() const {
-        return purpose_;
-    }
+    keymaster_purpose_t purpose() const { return purpose_; }
+
+    const Logger& logger() { return logger_; }
 
     virtual keymaster_error_t Begin() = 0;
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output) = 0;
@@ -47,6 +47,7 @@ class Operation {
 
   private:
     const keymaster_purpose_t purpose_;
+    const Logger& logger_;
 };
 
 }  // namespace keymaster

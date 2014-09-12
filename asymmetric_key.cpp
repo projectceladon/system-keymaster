@@ -229,10 +229,10 @@ Operation* RsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_digest
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new RsaSignOperation(purpose, digest, padding, rsa_key_.release());
+        op = new RsaSignOperation(purpose, logger_, digest, padding, rsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new RsaVerifyOperation(purpose, digest, padding, rsa_key_.release());
+        op = new RsaVerifyOperation(purpose, logger_, digest, padding, rsa_key_.release());
         break;
     default:
         *error = KM_ERROR_UNIMPLEMENTED;
@@ -433,10 +433,10 @@ Operation* DsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_digest
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new DsaSignOperation(purpose, digest, padding, dsa_key_.release());
+        op = new DsaSignOperation(purpose, logger_, digest, padding, dsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new DsaVerifyOperation(purpose, digest, padding, dsa_key_.release());
+        op = new DsaVerifyOperation(purpose, logger_, digest, padding, dsa_key_.release());
         break;
     default:
         *error = KM_ERROR_UNIMPLEMENTED;
@@ -601,10 +601,10 @@ Operation* EcdsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_dige
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new EcdsaSignOperation(purpose, digest, padding, ecdsa_key_.release());
+        op = new EcdsaSignOperation(purpose, logger_, digest, padding, ecdsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new EcdsaVerifyOperation(purpose, digest, padding, ecdsa_key_.release());
+        op = new EcdsaVerifyOperation(purpose, logger_, digest, padding, ecdsa_key_.release());
         break;
     default:
         *error = KM_ERROR_UNIMPLEMENTED;
