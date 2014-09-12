@@ -298,11 +298,11 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
     *error = KM_ERROR_INVALID_DSA_PARAMS;
 
     if (g_blob.data == NULL && p_blob.data == NULL && q_blob.data == NULL) {
-        logger.log("DSA parameters unspecified, generating them for key size %d\n", key_size);
+        logger.info("DSA parameters unspecified, generating them for key size %d", key_size);
         if (!DSA_generate_parameters_ex(dsa_key.get(), key_size, NULL /* seed */, 0 /* seed_len */,
                                         NULL /* counter_ret */, NULL /* h_ret */,
                                         NULL /* callback */)) {
-            logger.log("DSA parameter generation failed.\n");
+            logger.severe("DSA parameter generation failed.");
             return NULL;
         }
 
@@ -310,7 +310,7 @@ DsaKey* DsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         SetDsaParamData(&authorizations, TAG_DSA_P, dsa_key->p);
         SetDsaParamData(&authorizations, TAG_DSA_Q, dsa_key->q);
     } else if (g_blob.data == NULL || p_blob.data == NULL || q_blob.data == NULL) {
-        logger.log("Some DSA parameters provided.  Provide all or none\n");
+        logger.severe("Some DSA parameters provided.  Provide all or none");
         return NULL;
     } else {
         // All params provided. Use them.

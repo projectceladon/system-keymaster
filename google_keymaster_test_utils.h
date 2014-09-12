@@ -92,10 +92,11 @@ inline bool contains(const AuthorizationSet& set, keymaster_tag_t tag) {
 
 class StdoutLogger : public Logger {
   public:
-    int log(const char* fmt, ...) const {
+    int debug(const char* fmt, ...) const {
         va_list args;
         va_start(args, fmt);
         int result = vprintf(fmt, args);
+        result += printf("\n");
         va_end(args);
         return result;
     }
@@ -104,6 +105,7 @@ class StdoutLogger : public Logger {
         va_list args;
         va_start(args, fmt);
         int result = vprintf(fmt, args);
+        result += printf("\n");
         va_end(args);
         return result;
     }
@@ -112,6 +114,7 @@ class StdoutLogger : public Logger {
         va_list args;
         va_start(args, fmt);
         int result = vfprintf(stderr, fmt, args);
+        result += printf("\n");
         va_end(args);
         return result;
     }
@@ -120,6 +123,7 @@ class StdoutLogger : public Logger {
         va_list args;
         va_start(args, fmt);
         int result = vfprintf(stderr, fmt, args);
+        result += printf("\n");
         va_end(args);
         return result;
     }
