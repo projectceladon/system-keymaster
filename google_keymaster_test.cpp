@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
     int result = RUN_ALL_TESTS();
     // Clean up stuff OpenSSL leaves around, so Valgrind doesn't complain.
     CRYPTO_cleanup_all_ex_data();
+    ERR_remove_thread_state(NULL);
     ERR_free_strings();
     return result;
 }
