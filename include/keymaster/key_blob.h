@@ -100,6 +100,9 @@ class KeyBlob : public Serializable {
         if (tag_.get())
             memset_s(tag_.get(), 0, TAG_LENGTH);
     }
+
+    bool DeserializeUnversionedBlob(const uint8_t** buf_ptr, const uint8_t* end);
+
     bool ExtractKeyCharacteristics();
 
     UniquePtr<uint8_t[]> nonce_;
