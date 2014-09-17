@@ -26,11 +26,11 @@
 
 #include <keymaster/google_keymaster.h>
 #include <keymaster/google_keymaster_utils.h>
-#include <keymaster/key_blob.h>
 
 #include "ae.h"
 #include "key.h"
 #include "operation.h"
+#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
@@ -320,9 +320,10 @@ keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_or
     uint8_t nonce[KeyBlob::NONCE_LENGTH];
     GenerateNonce(nonce, array_size(nonce));
 
-    keymaster_key_blob_t key_data = {key_material.get(), key_material_size};
-    UniquePtr<KeyBlob> blob(
-        new KeyBlob(*enforced, *unenforced, hidden_auths, key_data, MasterKey(), nonce));
+    keymaster_key_blob_t master_key = MasterKey();
+    UniquePtr<KeyBlob> blob(new UnencryptedKeyBlob(
+        *enforced, *unenforced, hidden_auths, key_material.get(), key_material_size,
+        master_key.key_material, master_key.key_material_size, nonce));
     if (blob.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     if (blob->error() != KM_ERROR_OK)
@@ -342,18 +343,20 @@ keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_or
 
 Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
                               const AuthorizationSet& client_params, keymaster_error_t* error) {
-    UniquePtr<KeyBlob> blob(LoadKeyBlob(key, client_params, error));
+    UniquePtr<UnencryptedKeyBlob> blob(LoadKeyBlob(key, client_params, error));
     if (*error != KM_ERROR_OK)
         return NULL;
     return Key::CreateKey(*blob, logger(), error);
 }
 
-KeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
-                                      const AuthorizationSet& client_params,
-                                      keymaster_error_t* error) {
+UnencryptedKeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
+                                                 const AuthorizationSet& client_params,
+                                                 keymaster_error_t* error) {
     AuthorizationSet hidden;
     BuildHiddenAuthorizations(client_params, &hidden);
-    UniquePtr<KeyBlob> blob(new KeyBlob(key, hidden, MasterKey()));
+    keymaster_key_blob_t master_key = MasterKey();
+    UniquePtr<UnencryptedKeyBlob> blob(
+        new UnencryptedKeyBlob(key, hidden, master_key.key_material, master_key.key_material_size));
     if (blob.get() == NULL) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return NULL;

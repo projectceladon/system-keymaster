@@ -24,8 +24,8 @@
 namespace keymaster {
 
 class Key;
-class KeyBlob;
 class Operation;
+class UnencryptedKeyBlob;
 
 /**
  * OpenSSL-based Keymaster backing implementation, for use as a pure software implmentation
@@ -91,8 +91,9 @@ class GoogleKeymaster {
                                    AuthorizationSet* unenforced);
     Key* LoadKey(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
                  keymaster_error_t* error);
-    KeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
-                         keymaster_error_t* error);
+    UnencryptedKeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key,
+                                    const AuthorizationSet& client_params,
+                                    keymaster_error_t* error);
 
     keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
                                         keymaster_key_origin_t origin, AuthorizationSet* enforced,

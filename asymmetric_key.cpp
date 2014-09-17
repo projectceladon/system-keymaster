@@ -17,7 +17,6 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
-#include <keymaster/key_blob.h>
 #include <keymaster/keymaster_defs.h>
 
 #include "asymmetric_key.h"
@@ -25,6 +24,7 @@
 #include "ecdsa_operation.h"
 #include "openssl_utils.h"
 #include "rsa_operation.h"
+#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
@@ -35,13 +35,13 @@ const uint32_t DSA_DEFAULT_KEY_SIZE = 2048;
 
 const uint32_t ECDSA_DEFAULT_KEY_SIZE = 192;
 
-keymaster_error_t AsymmetricKey::LoadKey(const KeyBlob& blob) {
+keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> evp_key(EVP_PKEY_new());
     if (evp_key.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     EVP_PKEY* tmp_pkey = evp_key.get();
-    const uint8_t* key_material = blob.key_material();
+    const uint8_t* key_material = blob.unencrypted_key_material();
     if (d2i_PrivateKey(evp_key_type(), &tmp_pkey, &key_material, blob.key_material_length()) ==
         NULL) {
         return KM_ERROR_INVALID_KEY_BLOB;
@@ -218,7 +218,7 @@ RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pke
     return new RsaKey(rsa_key.release(), authorizations, logger);
 }
 
-RsaKey::RsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+RsaKey::RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
     : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);
@@ -422,7 +422,7 @@ DsaKey* DsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pke
     return new DsaKey(dsa_key.release(), authorizations, logger);
 }
 
-DsaKey::DsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+DsaKey::DsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
     : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);
@@ -590,7 +590,7 @@ keymaster_error_t EcdsaKey::get_group_size(const EC_GROUP& group, size_t* key_si
     return KM_ERROR_OK;
 }
 
-EcdsaKey::EcdsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error)
+EcdsaKey::EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
     : AsymmetricKey(blob, logger) {
     if (error)
         *error = LoadKey(blob);

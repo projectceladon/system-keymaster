@@ -30,7 +30,7 @@ class AsymmetricKey : public Key {
   public:
   protected:
     AsymmetricKey(const KeyBlob& blob, const Logger& logger) : Key(blob, logger) {}
-    keymaster_error_t LoadKey(const KeyBlob& blob);
+    keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
 
     /**
      * Return a copy of raw key material, in the key's preferred binary format.
@@ -63,7 +63,7 @@ class RsaKey : public AsymmetricKey {
                                keymaster_error_t* error);
     static RsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
                              const Logger& logger, keymaster_error_t* error);
-    RsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+    RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
                                        keymaster_padding_t padding, keymaster_error_t* error);
@@ -89,14 +89,13 @@ class DsaKey : public AsymmetricKey {
                                keymaster_error_t* error);
     static DsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
                              const Logger& logger, keymaster_error_t* error);
-    DsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+    DsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
                                        keymaster_padding_t padding, keymaster_error_t* error);
     static size_t key_size_bits(DSA* dsa_key);
 
   private:
-
     DsaKey(DSA* dsa_key, const AuthorizationSet auths, const Logger& logger)
         : AsymmetricKey(auths, logger), dsa_key_(dsa_key) {}
 
@@ -116,8 +115,8 @@ class EcdsaKey : public AsymmetricKey {
     static EcdsaKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
                                  keymaster_error_t* error);
     static EcdsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                             const Logger& logger, keymaster_error_t* error);
-    EcdsaKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+                               const Logger& logger, keymaster_error_t* error);
+    EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
                                        keymaster_padding_t padding, keymaster_error_t* error);

@@ -25,10 +25,12 @@ namespace keymaster {
 
 class KeyBlob;
 class Operation;
+class UnencryptedKeyBlob;
 
 class Key {
   public:
-    static Key* CreateKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+    static Key* CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                          keymaster_error_t* error);
     static Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
                             keymaster_error_t* error);
     static Key* ImportKey(const AuthorizationSet& key_description,

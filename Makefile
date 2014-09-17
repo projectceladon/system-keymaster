@@ -40,7 +40,8 @@ CPPSRCS=\
 	key_blob.cpp \
 	key_blob_test.cpp \
 	rsa_operation.cpp \
-	serializable.cpp
+	serializable.cpp \
+	unencrypted_key_blob.cpp
 CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -109,6 +110,7 @@ key_blob_test: key_blob_test.o \
 	key_blob.o \
 	ocb.o \
 	serializable.o \
+	unencrypted_key_blob.o \
 	$(GTEST)/src/gtest-all.o
 
 google_keymaster_messages_test: google_keymaster_messages_test.o \
@@ -133,6 +135,7 @@ google_keymaster_test: google_keymaster_test.o \
 	ocb.o \
 	rsa_operation.o \
 	serializable.o \
+	unencrypted_key_blob.o \
 	$(GTEST)/src/gtest-all.o
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
