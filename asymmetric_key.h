@@ -93,7 +93,6 @@ class DsaKey : public AsymmetricKey {
 
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
                                        keymaster_padding_t padding, keymaster_error_t* error);
-    static size_t key_size_bits(DSA* dsa_key);
 
   private:
     DsaKey(DSA* dsa_key, const AuthorizationSet auths, const Logger& logger)

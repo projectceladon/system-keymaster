@@ -353,8 +353,7 @@ keymaster_error_t GetOrCheckDsaParam(TypedTag<KM_BIGNUM, T> tag, BIGNUM* bn,
     return KM_ERROR_OK;
 }
 
-/* static */
-size_t DsaKey::key_size_bits(DSA* dsa_key) {
+static size_t calculate_key_size_in_bits(DSA* dsa_key) {
     // Openssl provides no convenient way to get a DSA key size, but dsa_key->p is L bits long.
     // There may be some leading zeros that mess up this calculation, but DSA key sizes are also
     // constrained to be multiples of 64 bits.  So the key size is the bit length of p rounded up to
@@ -387,22 +386,16 @@ DsaKey* DsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pke
     if (*error != KM_ERROR_OK)
         return NULL;
 
-    // There's no convenient way to get a DSA key size, but dsa_key->p is L bits long.  There may be
-    // some leading zeros that mess up this calculation, but DSA key sizes are also constrained to
-    // be multiples of 64 bits.  So the bit length of p, rounded up to the nearest 64 bits, is the
-    // key size.
-    uint32_t extracted_key_size_bits = ((BN_num_bytes(dsa_key->p) * 8) + 63) / 64 * 64;
-
-    uint32_t key_size_bits;
-    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
-        // key_size_bits specified, make sure it matches the key.
-        if (key_size_bits != extracted_key_size_bits) {
+    uint32_t key_size_in_bits;
+    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_in_bits)) {
+        // key_bits specified, make sure it matches the key.
+        if (key_size_in_bits != calculate_key_size_in_bits(dsa_key.get())) {
             *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
             return NULL;
         }
     } else {
         // key_size_bits not specified, add it.
-        authorizations.push_back(TAG_KEY_SIZE, extracted_key_size_bits);
+        authorizations.push_back(TAG_KEY_SIZE, calculate_key_size_in_bits(dsa_key.get()));
     }
 
     keymaster_algorithm_t algorithm;
