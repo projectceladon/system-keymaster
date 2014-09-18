@@ -16,8 +16,10 @@
 
 #include <openssl/x509.h>
 
-#include "asymmetric_key.h"
+#include "dsa_key.h"
+#include "ecdsa_key.h"
 #include "openssl_utils.h"
+#include "rsa_key.h"
 #include "unencrypted_key_blob.h"
 
 #include "key.h"
