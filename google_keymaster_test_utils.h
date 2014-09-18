@@ -86,6 +86,14 @@ bool contains(const AuthorizationSet& set, TypedTag<KM_BYTES, Tag> tag, const st
                        set[pos].blob.data_length) == val;
 }
 
+template <keymaster_tag_t Tag>
+bool contains(const AuthorizationSet& set, TypedTag<KM_BIGNUM, Tag> tag, const std::string& val) {
+    int pos = set.find(tag);
+    return pos != -1 &&
+           std::string(reinterpret_cast<const char*>(set[pos].blob.data),
+                       set[pos].blob.data_length) == val;
+}
+
 inline bool contains(const AuthorizationSet& set, keymaster_tag_t tag) {
     return set.find(tag) != -1;
 }
