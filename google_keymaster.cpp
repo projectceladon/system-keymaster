@@ -243,28 +243,6 @@ keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_hand
     return KM_ERROR_OK;
 }
 
-bool GoogleKeymaster::is_supported_export_format(keymaster_key_format_t test_format) {
-    unsigned int index;
-    for (index = 0; index < array_length(supported_export_formats); index++) {
-        if (test_format == supported_export_formats[index]) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool GoogleKeymaster::is_supported_import_format(keymaster_key_format_t test_format) {
-    unsigned int index;
-    for (index = 0; index < array_length(supported_import_formats); index++) {
-        if (test_format == supported_import_formats[index]) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response) {
     if (response == NULL)
         return;
