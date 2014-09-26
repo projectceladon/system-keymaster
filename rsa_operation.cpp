@@ -60,9 +60,14 @@ keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer
 }
 
 keymaster_error_t RsaVerifyOperation::Finish(const Buffer& signature, Buffer* /* output */) {
-
+#if defined(OPENSSL_IS_BORINGSSL)
+    if (data_.available_read() != RSA_size(rsa_key_))
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+#else
     if ((int)data_.available_read() != RSA_size(rsa_key_))
         return KM_ERROR_INVALID_INPUT_LENGTH;
+#endif
+
     if (data_.available_read() != signature.available_read())
         return KM_ERROR_VERIFICATION_FAILED;
 
