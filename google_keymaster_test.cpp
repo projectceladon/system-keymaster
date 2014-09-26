@@ -492,7 +492,6 @@ class SigningOperationsTest : public KeymasterTest {
         return NULL;
     }
 
-  private:
     GenerateKeyResponse generate_response_;
     FinishOperationResponse finish_response_;
 };
@@ -500,98 +499,19 @@ class SigningOperationsTest : public KeymasterTest {
 TEST_F(SigningOperationsTest, RsaSuccess) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
     const char message[] = "12345678901234567890123456789012";
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_SIGN;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message, array_size(message) - 1);
-    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_GT(finish_response.output.available_read(), 0U);
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    SignMessage(message, array_size(message) - 1);
 }
 
 TEST_F(SigningOperationsTest, DsaSuccess) {
     GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_SIGN;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize("123456789012345678901234567890123456789012345678", 48);
-    EXPECT_EQ(48U, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_GT(finish_response.output.available_read(), 0U);
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    const char message[] = "123456789012345678901234567890123456789012345678";
+    SignMessage(message, array_size(message) - 1);
 }
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_SIGN;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize("123456789012345678901234567890123456789012345678", 48);
-    EXPECT_EQ(48U, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_GT(finish_response.output.available_read(), 0U);
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    const char message[] = "123456789012345678901234567890123456789012345678";
+    SignMessage(message, array_size(message) - 1);
 }
 
 TEST_F(SigningOperationsTest, RsaAbort) {
@@ -706,113 +626,67 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
 }
 
-typedef SigningOperationsTest VerificationOperationsTest;
+class VerificationOperationsTest : public SigningOperationsTest {
+  protected:
+    void VerifyMessage(const void* message, size_t message_len) {
+        VerifyMessage(generate_response_.key_blob, message, message_len);
+    }
+
+    void VerifyMessage(const keymaster_key_blob_t& key_blob, const void* message,
+                       size_t message_len) {
+        ASSERT_TRUE(signature() != NULL);
+
+        BeginOperationRequest begin_request;
+        BeginOperationResponse begin_response;
+        begin_request.SetKeyMaterial(key_blob);
+        begin_request.purpose = KM_PURPOSE_VERIFY;
+        AddClientParams(&begin_request.additional_params);
+
+        device.BeginOperation(begin_request, &begin_response);
+        ASSERT_EQ(KM_ERROR_OK, begin_response.error);
+
+        UpdateOperationRequest update_request;
+        UpdateOperationResponse update_response;
+        update_request.op_handle = begin_response.op_handle;
+        update_request.input.Reinitialize(message, message_len);
+        EXPECT_EQ(message_len, update_request.input.available_read());
+
+        device.UpdateOperation(update_request, &update_response);
+        ASSERT_EQ(KM_ERROR_OK, update_response.error);
+        EXPECT_EQ(0U, update_response.output.available_read());
+
+        FinishOperationRequest finish_request;
+        finish_request.op_handle = begin_response.op_handle;
+        finish_request.signature.Reinitialize(*signature());
+        FinishOperationResponse finish_response;
+        device.FinishOperation(finish_request, &finish_response);
+        ASSERT_EQ(KM_ERROR_OK, finish_response.error);
+        EXPECT_EQ(0U, finish_response.output.available_read());
+
+        EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE,
+                  device.AbortOperation(begin_response.op_handle));
+    }
+};
+
 TEST_F(VerificationOperationsTest, RsaSuccess) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
     const char message[] = "12345678901234567890123456789012";
     SignMessage(message, array_size(message) - 1);
-    ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message, array_size(message) - 1);
-    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(message, array_size(message) - 1);
 }
 
 TEST_F(VerificationOperationsTest, DsaSuccess) {
     GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
     SignMessage(message, array_size(message) - 1);
-    ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message, array_size(message) - 1);
-    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(message, array_size(message) - 1);
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
     SignMessage(message, array_size(message) - 1);
-    ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(key_blob());
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message, array_size(message) - 1);
-    EXPECT_EQ(array_size(message) - 1, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(message, array_size(message) - 1);
 }
 
 typedef SigningOperationsTest ExportKeyTest;
@@ -901,7 +775,7 @@ static string read_file(const string& file_name) {
     return string(file_begin, file_end);
 }
 
-typedef SigningOperationsTest ImportKeyTest;
+typedef VerificationOperationsTest ImportKeyTest;
 TEST_F(ImportKeyTest, RsaSuccess) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
@@ -942,35 +816,7 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     std::fill(message.get(), message.get() + message_len, 'a');
     SignMessage(import_response.key_blob, message.get(), message_len);
     ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(import_response.key_blob);
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message.get(), message_len);
-    EXPECT_EQ(message_len, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
 }
 
 TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
@@ -1060,35 +906,7 @@ TEST_F(ImportKeyTest, DsaSuccess) {
     std::fill(message.get(), message.get() + message_len, 'a');
     SignMessage(import_response.key_blob, message.get(), message_len);
     ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(import_response.key_blob);
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message.get(), message_len);
-    EXPECT_EQ(message_len, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
 }
 
 TEST_F(ImportKeyTest, DsaParametersMatch) {
@@ -1134,35 +952,7 @@ TEST_F(ImportKeyTest, DsaParametersMatch) {
     std::fill(message.get(), message.get() + message_len, 'a');
     SignMessage(import_response.key_blob, message.get(), message_len);
     ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(import_response.key_blob);
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message.get(), message_len);
-    EXPECT_EQ(message_len, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
 }
 
 uint8_t dsa_wrong_q[] = {
@@ -1262,35 +1052,7 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     std::fill(message.get(), message.get() + message_len, 'a');
     SignMessage(import_response.key_blob, message.get(), message_len);
     ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(import_response.key_blob);
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message.get(), message_len);
-    EXPECT_EQ(message_len, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
 }
 
 TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
@@ -1333,35 +1095,7 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     std::fill(message.get(), message.get() + message_len, 'a');
     SignMessage(import_response.key_blob, message.get(), message_len);
     ASSERT_TRUE(signature() != NULL);
-
-    BeginOperationRequest begin_request;
-    BeginOperationResponse begin_response;
-    begin_request.SetKeyMaterial(import_response.key_blob);
-    begin_request.purpose = KM_PURPOSE_VERIFY;
-    AddClientParams(&begin_request.additional_params);
-
-    device.BeginOperation(begin_request, &begin_response);
-    ASSERT_EQ(KM_ERROR_OK, begin_response.error);
-
-    UpdateOperationRequest update_request;
-    UpdateOperationResponse update_response;
-    update_request.op_handle = begin_response.op_handle;
-    update_request.input.Reinitialize(message.get(), message_len);
-    EXPECT_EQ(message_len, update_request.input.available_read());
-
-    device.UpdateOperation(update_request, &update_response);
-    ASSERT_EQ(KM_ERROR_OK, update_response.error);
-    EXPECT_EQ(0U, update_response.output.available_read());
-
-    FinishOperationRequest finish_request;
-    finish_request.op_handle = begin_response.op_handle;
-    finish_request.signature.Reinitialize(*signature());
-    FinishOperationResponse finish_response;
-    device.FinishOperation(finish_request, &finish_response);
-    ASSERT_EQ(KM_ERROR_OK, finish_response.error);
-    EXPECT_EQ(0U, finish_response.output.available_read());
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device.AbortOperation(begin_response.op_handle));
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
 }
 
 TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
