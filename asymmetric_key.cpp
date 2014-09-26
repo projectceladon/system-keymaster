@@ -94,20 +94,4 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
     return KM_ERROR_OK;
 }
 
-Operation* AsymmetricKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    keymaster_digest_t digest;
-    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_NONE) {
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
-        return NULL;
-    }
-
-    keymaster_padding_t padding;
-    if (!authorizations().GetTagValue(TAG_PADDING, &padding) || padding != KM_PAD_NONE) {
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        return NULL;
-    }
-
-    return CreateOperation(purpose, digest, padding, error);
-}
-
 }  // namespace keymaster

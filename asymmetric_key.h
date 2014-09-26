@@ -41,8 +41,6 @@ class AsymmetricKey : public Key {
                                                      UniquePtr<uint8_t[]>* material,
                                                      size_t* size) const;
 
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
-
   protected:
     AsymmetricKey(const AuthorizationSet& auths, const Logger& logger) : Key(auths, logger) {}
 
@@ -50,8 +48,6 @@ class AsymmetricKey : public Key {
     virtual int evp_key_type() = 0;
     virtual bool InternalToEvp(EVP_PKEY* pkey) const = 0;
     virtual bool EvpToInternal(const EVP_PKEY* pkey) = 0;
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                       keymaster_padding_t padding, keymaster_error_t* error) = 0;
 };
 
 }  // namespace keymaster

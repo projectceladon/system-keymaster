@@ -127,8 +127,18 @@ RsaKey::RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_e
         *error = LoadKey(blob);
 }
 
-Operation* RsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                   keymaster_padding_t padding, keymaster_error_t* error) {
+Operation* RsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
+    keymaster_digest_t digest = KM_DIGEST_NONE;
+    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_NONE) {
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+        return NULL;
+    }
+    keymaster_padding_t padding = KM_PAD_NONE;
+    if (!authorizations().GetTagValue(TAG_PADDING, &padding) || padding != KM_PAD_NONE) {
+        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+        return NULL;
+    }
+
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:

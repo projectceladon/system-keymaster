@@ -190,18 +190,23 @@ DsaKey::DsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_e
         *error = LoadKey(blob);
 }
 
-Operation* DsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                   keymaster_padding_t padding, keymaster_error_t* error) {
+Operation* DsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
+    keymaster_digest_t digest = KM_DIGEST_NONE;
+    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_NONE) {
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+        return NULL;
+    }
+
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new DsaSignOperation(purpose, logger_, digest, padding, dsa_key_.release());
+        op = new DsaSignOperation(purpose, logger_, digest, dsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new DsaVerifyOperation(purpose, logger_, digest, padding, dsa_key_.release());
+        op = new DsaVerifyOperation(purpose, logger_, digest, dsa_key_.release());
         break;
     default:
-        *error = KM_ERROR_UNIMPLEMENTED;
+        *error = KM_ERROR_INCOMPATIBLE_PURPOSE;
         return NULL;
     }
     *error = op ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;

@@ -30,8 +30,8 @@ namespace keymaster {
 class EcdsaOperation : public Operation {
   public:
     EcdsaOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_digest_t digest,
-                   keymaster_padding_t padding, EC_KEY* key)
-        : Operation(purpose, logger), ecdsa_key_(key), digest_(digest), padding_(padding) {}
+                   EC_KEY* key)
+        : Operation(purpose, logger), ecdsa_key_(key), digest_(digest) {}
     ~EcdsaOperation();
 
     virtual keymaster_error_t Begin() { return KM_ERROR_OK; }
@@ -50,16 +50,16 @@ class EcdsaOperation : public Operation {
 class EcdsaSignOperation : public EcdsaOperation {
   public:
     EcdsaSignOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_digest_t digest,
-                       keymaster_padding_t padding, EC_KEY* key)
-        : EcdsaOperation(purpose, logger, digest, padding, key) {}
+                       EC_KEY* key)
+        : EcdsaOperation(purpose, logger, digest, key) {}
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
 
 class EcdsaVerifyOperation : public EcdsaOperation {
   public:
     EcdsaVerifyOperation(keymaster_purpose_t purpose, const Logger& logger,
-                         keymaster_digest_t digest, keymaster_padding_t padding, EC_KEY* key)
-        : EcdsaOperation(purpose, logger, digest, padding, key) {}
+                         keymaster_digest_t digest, EC_KEY* key)
+        : EcdsaOperation(purpose, logger, digest, key) {}
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
 

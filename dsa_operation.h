@@ -30,8 +30,8 @@ namespace keymaster {
 class DsaOperation : public Operation {
   public:
     DsaOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_digest_t digest,
-                 keymaster_padding_t padding, DSA* key)
-        : Operation(purpose, logger), dsa_key_(key), digest_(digest), padding_(padding) {}
+                 DSA* key)
+        : Operation(purpose, logger), dsa_key_(key), digest_(digest) {}
     ~DsaOperation();
 
     virtual keymaster_error_t Begin() { return KM_ERROR_OK; }
@@ -43,23 +43,22 @@ class DsaOperation : public Operation {
 
     DSA* dsa_key_;
     keymaster_digest_t digest_;
-    keymaster_padding_t padding_;
     Buffer data_;
 };
 
 class DsaSignOperation : public DsaOperation {
   public:
     DsaSignOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_digest_t digest,
-                     keymaster_padding_t padding, DSA* key)
-        : DsaOperation(purpose, logger, digest, padding, key) {}
+                     DSA* key)
+        : DsaOperation(purpose, logger, digest, key) {}
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
 
 class DsaVerifyOperation : public DsaOperation {
   public:
     DsaVerifyOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_digest_t digest,
-                       keymaster_padding_t padding, DSA* key)
-        : DsaOperation(purpose, logger, digest, padding, key) {}
+                       DSA* key)
+        : DsaOperation(purpose, logger, digest, key) {}
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
 };
 

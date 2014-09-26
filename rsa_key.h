@@ -31,8 +31,7 @@ class RsaKey : public AsymmetricKey {
                              const Logger& logger, keymaster_error_t* error);
     RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                       keymaster_padding_t padding, keymaster_error_t* error);
+    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
 
   private:
     RsaKey(RSA* rsa_key, const AuthorizationSet& auths, const Logger& logger)

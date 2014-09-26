@@ -31,8 +31,7 @@ class EcdsaKey : public AsymmetricKey {
                                const Logger& logger, keymaster_error_t* error);
     EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
 
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                       keymaster_padding_t padding, keymaster_error_t* error);
+    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
 
   private:
     EcdsaKey(EC_KEY* ecdsa_key, const AuthorizationSet auths, const Logger& logger)
