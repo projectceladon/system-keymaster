@@ -116,8 +116,6 @@ class GoogleKeymaster {
     keymaster_error_t AddOperation(Operation* operation, keymaster_operation_handle_t* op_handle);
     OpTableEntry* FindOperation(keymaster_operation_handle_t op_handle);
     void DeleteOperation(OpTableEntry* entry);
-    bool is_supported_export_format(keymaster_key_format_t test_format);
-    bool is_supported_import_format(keymaster_key_format_t test_format);
 
     UniquePtr<OpTableEntry[]> operation_table_;
     size_t operation_table_size_;

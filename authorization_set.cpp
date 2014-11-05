@@ -125,60 +125,6 @@ keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     return empty;
 }
 
-template <typename T> int comparator(const T& a, const T& b) {
-    if (a < b)
-        return -1;
-    else if (a > b)
-        return 1;
-    else
-        return 0;
-}
-
-static int param_comparator(const void* a, const void* b) {
-    const keymaster_key_param_t* lhs = static_cast<const keymaster_key_param_t*>(a);
-    const keymaster_key_param_t* rhs = static_cast<const keymaster_key_param_t*>(b);
-
-    if (lhs->tag < rhs->tag)
-        return -1;
-    else if (lhs->tag > rhs->tag)
-        return 1;
-    else
-        switch (keymaster_tag_get_type(lhs->tag)) {
-        default:
-        case KM_INVALID:
-            return 0;
-        case KM_ENUM:
-        case KM_ENUM_REP:
-            return comparator(lhs->enumerated, rhs->enumerated);
-        case KM_INT:
-        case KM_INT_REP:
-            return comparator(lhs->integer, rhs->integer);
-        case KM_LONG:
-            return comparator(lhs->long_integer, rhs->long_integer);
-        case KM_DATE:
-            return comparator(lhs->date_time, rhs->date_time);
-        case KM_BOOL:
-            return comparator(lhs->boolean, rhs->boolean);
-        case KM_BIGNUM:
-        case KM_BYTES: {
-            size_t min_len = lhs->blob.data_length;
-            if (rhs->blob.data_length < min_len)
-                min_len = rhs->blob.data_length;
-
-            if (lhs->blob.data_length == rhs->blob.data_length && min_len > 0)
-                return memcmp(lhs->blob.data, rhs->blob.data, min_len);
-            int cmp_result = memcmp(lhs->blob.data, rhs->blob.data, min_len);
-            if (cmp_result == 0) {
-                // The blobs are equal up to the length of the shortest (which may have length 0),
-                // so the shorter is less, the longer is greater and if they have the same length
-                // they're identical.
-                return comparator(lhs->blob.data_length, rhs->blob.data_length);
-            }
-            return cmp_result;
-        } break;
-        }
-}
-
 bool AuthorizationSet::push_back(const AuthorizationSet& set) {
     if (is_valid() != OK)
         return false;
