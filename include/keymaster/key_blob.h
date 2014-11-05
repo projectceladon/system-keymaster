@@ -42,6 +42,14 @@ class KeyBlob : public Serializable {
 
     /**
      * Create a KeyBlob, extracting the enforced and unenforced sets.  The KeyBlob does *not* take
+     * ownership of \p key_blob.
+     *
+     * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.
+     */
+    KeyBlob(const uint8_t* key_blob, size_t key_blob_length);
+
+    /**
+     * Create a KeyBlob, extracting the enforced and unenforced sets.  The KeyBlob does *not* take
      * ownership of \p key_blob's contents.
      *
      * IMPORTANT: After constructing a KeyBlob, call error() to verify that the blob is usable.

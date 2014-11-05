@@ -24,10 +24,13 @@ namespace keymaster {
 const size_t KeyBlob::NONCE_LENGTH;
 const size_t KeyBlob::TAG_LENGTH;
 
+KeyBlob::KeyBlob(const uint8_t* key_blob, size_t key_blob_length) : error_(KM_ERROR_OK) {
+    Deserialize(&key_blob, key_blob + key_blob_length);
+}
+
 KeyBlob::KeyBlob(const keymaster_key_blob_t& key_blob) : error_(KM_ERROR_OK) {
     const uint8_t* key_material = key_blob.key_material;
-    if (!Deserialize(&key_material, key_blob.key_material + key_blob.key_material_size))
-        return;
+    Deserialize(&key_material, key_blob.key_material + key_blob.key_material_size);
 }
 
 size_t KeyBlob::SerializedSize() const {
