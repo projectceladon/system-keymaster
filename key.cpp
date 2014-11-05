@@ -16,10 +16,9 @@
 
 #include <openssl/x509.h>
 
-#include <keymaster/key_blob.h>
-
 #include "asymmetric_key.h"
 #include "openssl_utils.h"
+#include "unencrypted_key_blob.h"
 
 #include "key.h"
 
@@ -35,7 +34,8 @@ Key::Key(const KeyBlob& blob, const Logger& logger) : logger_(logger) {
 }
 
 /* static */
-Key* Key::CreateKey(const KeyBlob& blob, const Logger& logger, keymaster_error_t* error) {
+Key* Key::CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                    keymaster_error_t* error) {
     switch (blob.algorithm()) {
     case KM_ALGORITHM_RSA:
         return new RsaKey(blob, logger, error);
