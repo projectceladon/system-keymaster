@@ -21,8 +21,6 @@ LOCAL_PATH := $(call my-dir)
 # Note that this library is too large; it should not include ocb.c and not use
 # openssl.  At present it must, because the code needs refactoring to separate
 # concerns a bit better.
-#
-# TODO(swillden@google.com): Refactor and pare this down.
 ##
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster_messages
@@ -30,19 +28,21 @@ LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
 		google_keymaster_messages.cpp \
 		google_keymaster_utils.cpp \
-		ocb.c \
 		key_blob.cpp \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
-	$(LOCAL_PATH)/include \
-	external/openssl/include
-LOCAL_SHARED_LIBRARIES := libcrypto
+	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_STATIC_LIBRARY)
 
+###
+# libkeymaster contains almost everything needed for a keymaster implementation,
+# lacking only a subclass of the (abstract) GoogleKeymaster class to provide
+# environment-specific services.
+###
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster
 LOCAL_SRC_FILES:= \
@@ -52,7 +52,8 @@ LOCAL_SRC_FILES:= \
 		google_keymaster_utils.cpp \
 		ocb.c \
 		key_blob.cpp \
-		serializable.cpp
+		serializable.cpp \
+		unencrypted_key_blob.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include \
 	external/openssl/include
