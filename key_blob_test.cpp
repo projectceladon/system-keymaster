@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include <openssl/engine.h>
+#include <openssl/rand.h>
 
 #include <keymaster/authorization_set.h>
 #include <keymaster/google_keymaster_utils.h>
@@ -41,7 +42,6 @@ namespace test {
 
 const uint8_t master_key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 const uint8_t key_data[5] = {21, 22, 23, 24, 25};
-const uint8_t nonce[KeyBlob::NONCE_LENGTH]{12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
 
 class KeyBlobTest : public testing::Test {
   protected:
@@ -62,9 +62,11 @@ class KeyBlobTest : public testing::Test {
         hidden_.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
         hidden_.push_back(TAG_APPLICATION_ID, "my_app", 6);
 
+        EXPECT_EQ(1, RAND_bytes(nonce_, array_size(nonce_)));
+
         blob_.reset(new UnencryptedKeyBlob(enforced_, unenforced_, hidden_, key_data,
                                            array_size(key_data), master_key_data,
-                                           array_size(master_key_data), nonce));
+                                           array_size(master_key_data), nonce_));
     }
 
     AuthorizationSet enforced_;
@@ -72,6 +74,7 @@ class KeyBlobTest : public testing::Test {
     AuthorizationSet hidden_;
 
     UniquePtr<UnencryptedKeyBlob> blob_;
+    uint8_t nonce_[KeyBlob::NONCE_LENGTH];
 };
 
 TEST_F(KeyBlobTest, EncryptDecrypt) {
@@ -115,9 +118,9 @@ TEST_F(KeyBlobTest, WrongNonce) {
     // Find the nonce, then modify it.
     uint8_t* begin = serialized_blob.get();
     uint8_t* end = begin + size;
-    auto nonce_ptr = std::search(begin, end, nonce, nonce + array_size(nonce));
+    auto nonce_ptr = std::search(begin, end, nonce_, nonce_ + array_size(nonce_));
     ASSERT_NE(nonce_ptr, end);
-    EXPECT_EQ(end, std::search(nonce_ptr + 1, end, nonce, nonce + array_size(nonce)));
+    EXPECT_EQ(end, std::search(nonce_ptr + 1, end, nonce_, nonce_ + array_size(nonce_)));
     (*nonce_ptr)++;
 
     // Decrypting with wrong nonce should fail.
@@ -292,6 +295,33 @@ TEST_F(KeyBlobTest, WrongAppId) {
     UnencryptedKeyBlob deserialized(encrypted_blob, wrong_hidden, master_key_data,
                                     array_size(master_key_data));
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+}
+
+TEST_F(KeyBlobTest, UnversionedBlob) {
+    // Manually construct an unversioned blob serialization.
+    size_t unversioned_blob_size =
+        KeyBlob::NONCE_LENGTH +                // nonce data
+        sizeof(uint32_t) +                     // length of key material
+        blob_->key_material_length() +         // key material data
+        KeyBlob::TAG_LENGTH +                  // tag data
+        blob_->enforced().SerializedSize() +   // serialization of enforced set
+        blob_->unenforced().SerializedSize();  // serialization of unenforced set
+    UniquePtr<uint8_t[]> unversioned_serialized_blob(new uint8_t[unversioned_blob_size]);
+    uint8_t* buf = unversioned_serialized_blob.get();
+    const uint8_t* end = buf + unversioned_blob_size;
+    buf = append_to_buf(buf, end, blob_->nonce(), KeyBlob::NONCE_LENGTH);
+    buf = append_size_and_data_to_buf(buf, end, blob_->encrypted_key_material(),
+                                      blob_->key_material_length());
+    buf = append_to_buf(buf, end, blob_->tag(), KeyBlob::TAG_LENGTH);
+    buf = blob_->enforced().Serialize(buf, end);
+    buf = blob_->unenforced().Serialize(buf, end);
+    EXPECT_EQ(buf, end);
+
+    keymaster_key_blob_t unversioned_blob = {unversioned_serialized_blob.get(),
+                                             unversioned_blob_size};
+    UnencryptedKeyBlob deserialized(unversioned_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_OK, deserialized.error());
 }
 
 }  // namespace test
