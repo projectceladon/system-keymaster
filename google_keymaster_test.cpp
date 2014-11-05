@@ -344,14 +344,14 @@ TEST_F(NewKeyGeneration, Dsa_SomeParamsSpecified) {
 
 TEST_F(NewKeyGeneration, Ecdsa) {
     req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
-    req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 192));
+    req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 224));
     device.GenerateKey(req_, &rsp_);
 
     CheckBaseParams(rsp_);
 
     // Check specified tags are all present in unenforced characteristics
     EXPECT_TRUE(contains(rsp_.unenforced, TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
-    EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 192));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 224));
 }
 
 TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
@@ -375,7 +375,7 @@ TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
 }
 
 TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
-    size_t valid_sizes[] = {192, 224, 256, 384, 521};
+    size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
         req_.key_description.Reinitialize(key_generation_base_params,
                                           array_length(key_generation_base_params));
@@ -563,7 +563,7 @@ TEST_F(SigningOperationsTest, DsaSuccess) {
 }
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
-    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 192 /* key size */);
+    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
 
     BeginOperationRequest begin_request;
     BeginOperationResponse begin_response;
@@ -780,7 +780,7 @@ TEST_F(VerificationOperationsTest, DsaSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
-    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 192 /* key size */);
+    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
     SignMessage(message, array_size(message) - 1);
     ASSERT_TRUE(signature() != NULL);
@@ -849,7 +849,7 @@ TEST_F(ExportKeyTest, DsaSuccess) {
 }
 
 TEST_F(ExportKeyTest, EcdsaSuccess) {
-    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 192 /* key size */);
+    GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
 
     ExportKeyRequest request;
     ExportKeyResponse response;
@@ -1374,7 +1374,7 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
         Authorization(TAG_USER_AUTH_ID, 8),
         Authorization(TAG_APPLICATION_ID, "app_id", 6),
         Authorization(TAG_AUTH_TIMEOUT, 300),
-        Authorization(TAG_KEY_SIZE, 192),
+        Authorization(TAG_KEY_SIZE, 224),
     };
 
     string pk8_key = read_file("ec_privkey_pk8.der");

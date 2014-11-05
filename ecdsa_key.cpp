@@ -113,9 +113,6 @@ EcdsaKey* EcdsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY*
 /* static */
 EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
     switch (key_size_bits) {
-    case 192:
-        return EC_GROUP_new_by_curve_name(NID_X9_62_prime192v1);
-        break;
     case 224:
         return EC_GROUP_new_by_curve_name(NID_secp224r1);
         break;
@@ -137,9 +134,6 @@ EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
 /* static */
 keymaster_error_t EcdsaKey::get_group_size(const EC_GROUP& group, size_t* key_size_bits) {
     switch (EC_GROUP_get_curve_name(&group)) {
-    case NID_X9_62_prime192v1:
-        *key_size_bits = 192;
-        break;
     case NID_secp224r1:
         *key_size_bits = 224;
         break;
