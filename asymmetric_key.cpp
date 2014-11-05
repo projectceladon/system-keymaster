@@ -33,7 +33,7 @@ const uint64_t RSA_DEFAULT_EXPONENT = 65537;
 
 const uint32_t DSA_DEFAULT_KEY_SIZE = 2048;
 
-const uint32_t ECDSA_DEFAULT_KEY_SIZE = 192;
+const uint32_t ECDSA_DEFAULT_KEY_SIZE = 224;
 
 keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> evp_key(EVP_PKEY_new());
