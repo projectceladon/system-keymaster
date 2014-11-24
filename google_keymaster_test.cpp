@@ -1078,5 +1078,16 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH, import_response.error);
 }
 
+typedef KeymasterTest VersionTest;
+TEST_F(VersionTest, GetVersion) {
+    GetVersionRequest req;
+    GetVersionResponse rsp;
+    device.GetVersion(req, &rsp);
+    EXPECT_EQ(KM_ERROR_OK, rsp.error);
+    EXPECT_EQ(1, rsp.major_ver);
+    EXPECT_EQ(0, rsp.minor_ver);
+    EXPECT_EQ(0, rsp.subminor_ver);
+}
+
 }  // namespace test
 }  // namespace keymaster

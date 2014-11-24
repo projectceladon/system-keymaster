@@ -34,6 +34,10 @@
 
 namespace keymaster {
 
+const uint8_t MAJOR_VER = 1;
+const uint8_t MINOR_VER = 0;
+const uint8_t SUBMINOR_VER = 0;
+
 GoogleKeymaster::GoogleKeymaster(size_t operation_table_size, Logger* logger)
     : operation_table_(new OpTableEntry[operation_table_size]),
       operation_table_size_(operation_table_size), logger_(logger) {
@@ -62,6 +66,16 @@ bool check_supported(keymaster_algorithm_t algorithm, SupportedResponse<T>* resp
         return false;
     }
     return true;
+}
+
+void GoogleKeymaster::GetVersion(const GetVersionRequest&, GetVersionResponse* rsp) {
+    if (rsp == NULL)
+        return;
+
+    rsp->major_ver = MAJOR_VER;
+    rsp->minor_ver = MINOR_VER;
+    rsp->subminor_ver = SUBMINOR_VER;
+    rsp->error = KM_ERROR_OK;
 }
 
 void GoogleKeymaster::SupportedAlgorithms(
