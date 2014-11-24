@@ -17,6 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
 #define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,6 +34,42 @@ const uint32_t FINISH_OPERATION = 3;
 const uint32_t ABORT_OPERATION = 4;
 const uint32_t IMPORT_KEY = 5;
 const uint32_t EXPORT_KEY = 6;
+const uint32_t GET_VERSION = 7;
+
+/**
+ * Keymaster message versions are tied to keymaster versions.  We map the keymaster
+ * major.minor.subminor version to a sequential "message version".
+ *
+ * Rather than encoding a version number into each message we rely on the client -- who initiates
+ * all requests -- to check the version of the keymaster implementation with the GET_VERSION command
+ * and to send only requests that the implementation can understand.  This means that only the
+ * client side needs to manage version compatibility; the implementation can always expect/produce
+ * messages of its format.
+ *
+ * Because message version selection is purely a client-side issue, all messages default to using
+ * the latest version (MAX_MESSAGE_VERSION).  Client code must take care to check versions and pass
+ * correct version values to message constructors.  The GoogleKeymaster implementation always uses
+ * the default, latest.
+ *
+ * Note that this approach implies that GetVersionRequest and GetVersionResponse cannot be
+ * versioned.
+ */
+const int32_t MAX_MESSAGE_VERSION = 0;
+inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t subminor_ver) {
+    uint32_t composite_ver = (major_ver << 16) | (minor_ver << 8) | subminor_ver;
+    switch (composite_ver) {
+    case 0x000:
+    case 0x100:
+        return 0;
+    default:
+        return -1;
+    }
+}
+
+struct KeymasterMessage : public Serializable {
+    KeymasterMessage(int32_t ver) : message_version(ver) { assert(ver >= 0); }
+    uint32_t message_version;
+};
 
 /**
  * All responses include an error value, and if the error is not KM_ERROR_OK, return no additional
@@ -40,7 +77,9 @@ const uint32_t EXPORT_KEY = 6;
  * responses, so we only have to implement it once.  Inheritance for reuse is generally not a great
  * structure, but in this case it's the cleanest option.
  */
-struct KeymasterResponse : public Serializable {
+struct KeymasterResponse : public KeymasterMessage {
+    KeymasterResponse(int32_t ver) : KeymasterMessage(ver), error(KM_ERROR_UNKNOWN_ERROR) {}
+
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -53,7 +92,8 @@ struct KeymasterResponse : public Serializable {
 };
 
 struct SupportedAlgorithmsResponse : public KeymasterResponse {
-    SupportedAlgorithmsResponse() : algorithms(NULL), algorithms_length(0) {}
+    SupportedAlgorithmsResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : KeymasterResponse(ver), algorithms(NULL), algorithms_length(0) {}
     ~SupportedAlgorithmsResponse() { delete[] algorithms; }
 
     size_t NonErrorSerializedSize() const;
@@ -65,10 +105,11 @@ struct SupportedAlgorithmsResponse : public KeymasterResponse {
 };
 
 template <typename T> struct SupportedResponse : public KeymasterResponse {
-    SupportedResponse() : results(NULL), results_length(0) {}
+    SupportedResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : KeymasterResponse(ver), results(NULL), results_length(0) {}
     ~SupportedResponse() { delete[] results; }
 
-    template <size_t N> void SetResults(const T (&arr)[N]) {
+    template <size_t N> void SetResults(const T(&arr)[N]) {
         delete[] results;
         results_length = 0;
         results = dup_array(arr);
@@ -100,9 +141,8 @@ template <typename T> struct SupportedResponse : public KeymasterResponse {
     size_t results_length;
 };
 
-struct GenerateKeyRequest : public Serializable {
-    GenerateKeyRequest() {}
-    GenerateKeyRequest(uint8_t* buf, size_t size) : key_description(buf, size) {}
+struct GenerateKeyRequest : public KeymasterMessage {
+    GenerateKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
 
     size_t SerializedSize() const { return key_description.SerializedSize(); }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
@@ -116,8 +156,7 @@ struct GenerateKeyRequest : public Serializable {
 };
 
 struct GenerateKeyResponse : public KeymasterResponse {
-    GenerateKeyResponse() {
-        error = KM_ERROR_OK;
+    GenerateKeyResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {
         key_blob.key_material = NULL;
         key_blob.key_material_size = 0;
     }
@@ -132,8 +171,10 @@ struct GenerateKeyResponse : public KeymasterResponse {
     AuthorizationSet unenforced;
 };
 
-struct GetKeyCharacteristicsRequest : public Serializable {
-    GetKeyCharacteristicsRequest() { key_blob.key_material = NULL; }
+struct GetKeyCharacteristicsRequest : public KeymasterMessage {
+    GetKeyCharacteristicsRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
+        key_blob.key_material = NULL;
+    }
     ~GetKeyCharacteristicsRequest();
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -150,6 +191,7 @@ struct GetKeyCharacteristicsRequest : public Serializable {
 };
 
 struct GetKeyCharacteristicsResponse : public KeymasterResponse {
+    GetKeyCharacteristicsResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -158,8 +200,10 @@ struct GetKeyCharacteristicsResponse : public KeymasterResponse {
     AuthorizationSet unenforced;
 };
 
-struct BeginOperationRequest : public Serializable {
-    BeginOperationRequest() { key_blob.key_material = NULL; }
+struct BeginOperationRequest : public KeymasterMessage {
+    BeginOperationRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
+        key_blob.key_material = NULL;
+    }
     ~BeginOperationRequest() { delete[] key_blob.key_material; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -177,6 +221,8 @@ struct BeginOperationRequest : public Serializable {
 };
 
 struct BeginOperationResponse : public KeymasterResponse {
+    BeginOperationResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -184,7 +230,9 @@ struct BeginOperationResponse : public KeymasterResponse {
     keymaster_operation_handle_t op_handle;
 };
 
-struct UpdateOperationRequest : public Serializable {
+struct UpdateOperationRequest : public KeymasterMessage {
+    UpdateOperationRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -194,6 +242,8 @@ struct UpdateOperationRequest : public Serializable {
 };
 
 struct UpdateOperationResponse : public KeymasterResponse {
+    UpdateOperationResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -201,7 +251,9 @@ struct UpdateOperationResponse : public KeymasterResponse {
     Buffer output;
 };
 
-struct FinishOperationRequest : public Serializable {
+struct FinishOperationRequest : public KeymasterMessage {
+    FinishOperationRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -211,6 +263,8 @@ struct FinishOperationRequest : public Serializable {
 };
 
 struct FinishOperationResponse : public KeymasterResponse {
+    FinishOperationResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -218,7 +272,9 @@ struct FinishOperationResponse : public KeymasterResponse {
     Buffer output;
 };
 
-struct AddEntropyRequest : public Serializable {
+struct AddEntropyRequest : public KeymasterMessage {
+    AddEntropyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -226,8 +282,8 @@ struct AddEntropyRequest : public Serializable {
     Buffer random_data;
 };
 
-struct ImportKeyRequest : public Serializable {
-    ImportKeyRequest() : key_data(NULL) {}
+struct ImportKeyRequest : public KeymasterMessage {
+    ImportKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver), key_data(NULL) {}
     ~ImportKeyRequest() { delete[] key_data; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -243,7 +299,9 @@ struct ImportKeyRequest : public Serializable {
 };
 
 struct ImportKeyResponse : public KeymasterResponse {
-    ImportKeyResponse() { key_blob.key_material = NULL; }
+    ImportKeyResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {
+        key_blob.key_material = NULL;
+    }
     ~ImportKeyResponse() { delete[] key_blob.key_material; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -260,8 +318,10 @@ struct ImportKeyResponse : public KeymasterResponse {
     AuthorizationSet unenforced;
 };
 
-struct ExportKeyRequest : public Serializable {
-    ExportKeyRequest() { key_blob.key_material = NULL; }
+struct ExportKeyRequest : public KeymasterMessage {
+    ExportKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
+        key_blob.key_material = NULL;
+    }
     ~ExportKeyRequest() { delete[] key_blob.key_material; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -279,7 +339,7 @@ struct ExportKeyRequest : public Serializable {
 };
 
 struct ExportKeyResponse : public KeymasterResponse {
-    ExportKeyResponse() : key_data(NULL) {}
+    ExportKeyResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver), key_data(NULL) {}
     ~ExportKeyResponse() { delete[] key_data; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
@@ -292,8 +352,29 @@ struct ExportKeyResponse : public KeymasterResponse {
     size_t key_data_length;
 };
 
+struct GetVersionRequest : public KeymasterMessage {
+    GetVersionRequest() : KeymasterMessage(0 /* not versionable */) {}
+
+    size_t SerializedSize() const { return 0; }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t*) const { return buf; }
+    bool Deserialize(const uint8_t**, const uint8_t*) { return true; };
+};
+
+struct GetVersionResponse : public KeymasterResponse {
+    GetVersionResponse()
+        : KeymasterResponse(0 /* not versionable */), major_ver(0), minor_ver(0), subminor_ver(0) {}
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    uint8_t major_ver;
+    uint8_t minor_ver;
+    uint8_t subminor_ver;
+};
+
 // The structs below are trivial because they're not implemented yet.
-struct RescopeRequest : public Serializable {};
+struct RescopeRequest : public KeymasterMessage {};
 struct RescopeResponse : public KeymasterResponse {};
 
 }  // namespace keymaster
