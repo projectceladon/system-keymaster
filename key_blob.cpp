@@ -42,7 +42,7 @@ size_t KeyBlob::SerializedSize() const {
 const uint8_t BLOB_VERSION = 0;
 
 uint8_t* KeyBlob::Serialize(uint8_t* buf, const uint8_t* end) const {
-    const uint8_t* start __unused = buf;
+    const uint8_t* start __attribute__((__unused__)) = buf;
     *buf++ = BLOB_VERSION;
     buf = append_size_and_data_to_buf(buf, end, nonce(), NONCE_LENGTH);
     buf = append_size_and_data_to_buf(buf, end, encrypted_key_material(), key_material_length());
