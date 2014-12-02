@@ -105,55 +105,55 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
 
 TEST_F(CheckSupported, SupportedBlockModes) {
     // Shouldn't blow up on NULL.
-    device.SupportedBlockModes(KM_ALGORITHM_RSA, NULL);
+    device.SupportedBlockModes(KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT, NULL);
 
     SupportedResponse<keymaster_block_mode_t> response;
-    device.SupportedBlockModes(KM_ALGORITHM_RSA, &response);
-    ExpectEmptyResponse(response);
+    device.SupportedBlockModes(KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT, &response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, response.error);
 
-    device.SupportedBlockModes(KM_ALGORITHM_DSA, &response);
-    ExpectEmptyResponse(response);
+    device.SupportedBlockModes(KM_ALGORITHM_DSA, KM_PURPOSE_ENCRYPT, &response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, response.error);
 
-    device.SupportedBlockModes(KM_ALGORITHM_ECDSA, &response);
-    ExpectEmptyResponse(response);
+    device.SupportedBlockModes(KM_ALGORITHM_ECDSA, KM_PURPOSE_ENCRYPT, &response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, response.error);
 
-    device.SupportedBlockModes(KM_ALGORITHM_AES, &response);
+    device.SupportedBlockModes(KM_ALGORITHM_AES, KM_PURPOSE_ENCRYPT, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedPaddingModes) {
     // Shouldn't blow up on NULL.
-    device.SupportedPaddingModes(KM_ALGORITHM_RSA, NULL);
+    device.SupportedPaddingModes(KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT, NULL);
 
     SupportedResponse<keymaster_padding_t> response;
-    device.SupportedPaddingModes(KM_ALGORITHM_RSA, &response);
+    device.SupportedPaddingModes(KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_PAD_NONE, response);
 
-    device.SupportedPaddingModes(KM_ALGORITHM_DSA, &response);
+    device.SupportedPaddingModes(KM_ALGORITHM_DSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_PAD_NONE, response);
 
-    device.SupportedPaddingModes(KM_ALGORITHM_ECDSA, &response);
+    device.SupportedPaddingModes(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_PAD_NONE, response);
 
-    device.SupportedPaddingModes(KM_ALGORITHM_AES, &response);
+    device.SupportedPaddingModes(KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedDigests) {
     // Shouldn't blow up on NULL.
-    device.SupportedDigests(KM_ALGORITHM_RSA, NULL);
+    device.SupportedDigests(KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, NULL);
 
     SupportedResponse<keymaster_digest_t> response;
-    device.SupportedDigests(KM_ALGORITHM_RSA, &response);
+    device.SupportedDigests(KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_DIGEST_NONE, response);
 
-    device.SupportedDigests(KM_ALGORITHM_DSA, &response);
+    device.SupportedDigests(KM_ALGORITHM_DSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_DIGEST_NONE, response);
 
-    device.SupportedDigests(KM_ALGORITHM_ECDSA, &response);
+    device.SupportedDigests(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN, &response);
     ExpectResponseContains(KM_DIGEST_NONE, response);
 
-    device.SupportedDigests(KM_ALGORITHM_AES, &response);
+    device.SupportedDigests(KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &response);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
@@ -194,13 +194,10 @@ TEST_F(CheckSupported, SupportedExportFormats) {
 }
 
 keymaster_key_param_t key_generation_base_params[] = {
-    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-    Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-    Authorization(TAG_USER_ID, 7),
-    Authorization(TAG_USER_AUTH_ID, 8),
+    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+    Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
     Authorization(TAG_APPLICATION_ID, "app_id", 6),
-    Authorization(TAG_APPLICATION_DATA, "app_data", 8),
-    Authorization(TAG_AUTH_TIMEOUT, 300),
+    Authorization(TAG_APPLICATION_DATA, "app_data", 8), Authorization(TAG_AUTH_TIMEOUT, 300),
 };
 
 class NewKeyGeneration : public KeymasterTest {
@@ -389,14 +386,10 @@ TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
 typedef KeymasterTest GetKeyCharacteristics;
 TEST_F(GetKeyCharacteristics, SimpleRsa) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_KEY_SIZE, 256),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
     GenerateKeyRequest gen_req;
@@ -427,12 +420,9 @@ class SigningOperationsTest : public KeymasterTest {
                      keymaster_padding_t padding, uint32_t key_size) {
         keymaster_key_param_t params[] = {
             Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-            Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-            Authorization(TAG_ALGORITHM, algorithm),
-            Authorization(TAG_KEY_SIZE, key_size),
-            Authorization(TAG_USER_ID, 7),
-            Authorization(TAG_USER_AUTH_ID, 8),
-            Authorization(TAG_APPLICATION_ID, "app_id", 6),
+            Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY), Authorization(TAG_ALGORITHM, algorithm),
+            Authorization(TAG_KEY_SIZE, key_size), Authorization(TAG_USER_ID, 7),
+            Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "app_id", 6),
             Authorization(TAG_AUTH_TIMEOUT, 300),
         };
         GenerateKeyRequest generate_request;
@@ -778,14 +768,10 @@ static string read_file(const string& file_name) {
 typedef VerificationOperationsTest ImportKeyTest;
 TEST_F(ImportKeyTest, RsaSuccess) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
     string pk8_key = read_file("rsa_privkey_pk8.der");
@@ -821,15 +807,11 @@ TEST_F(ImportKeyTest, RsaSuccess) {
 
 TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
         Authorization(TAG_KEY_SIZE, 2048),  // Doesn't match key
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
     string pk8_key = read_file("rsa_privkey_pk8.der");
@@ -848,9 +830,9 @@ TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
 TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),   Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_RSA_PUBLIC_EXPONENT, 3),   Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),          Authorization(TAG_APPLICATION_ID, "app_id", 6),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_RSA_PUBLIC_EXPONENT, 3), Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "app_id", 6),
         Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
@@ -869,14 +851,10 @@ TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
 
 TEST_F(ImportKeyTest, DsaSuccess) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
     string pk8_key = read_file("dsa_privkey_pk8.der");
@@ -911,14 +889,10 @@ TEST_F(ImportKeyTest, DsaSuccess) {
 
 TEST_F(ImportKeyTest, DsaParametersMatch) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
         Authorization(TAG_KEY_SIZE, 1024),
         Authorization(TAG_DSA_GENERATOR, dsa_g, array_size(dsa_g)),
         Authorization(TAG_DSA_P, dsa_p, array_size(dsa_p)),
@@ -962,14 +936,10 @@ uint8_t dsa_wrong_q[] = {
 
 TEST_F(ImportKeyTest, DsaParameterMismatch) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
         Authorization(TAG_KEY_SIZE, 1024),
         Authorization(TAG_DSA_Q, dsa_wrong_q, array_size(dsa_wrong_q)),
     };
@@ -989,14 +959,10 @@ TEST_F(ImportKeyTest, DsaParameterMismatch) {
 
 TEST_F(ImportKeyTest, DsaKeySizeMismatch) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
         Authorization(TAG_KEY_SIZE, 2048),
     };
 
@@ -1015,14 +981,10 @@ TEST_F(ImportKeyTest, DsaKeySizeMismatch) {
 
 TEST_F(ImportKeyTest, EcdsaSuccess) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
 
     string pk8_key = read_file("ec_privkey_pk8.der");
@@ -1057,14 +1019,10 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
 
 TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
         Authorization(TAG_KEY_SIZE, 256),
     };
 
@@ -1100,14 +1058,10 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
 
 TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_DIGEST, KM_DIGEST_NONE),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "app_id", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
         Authorization(TAG_KEY_SIZE, 224),
     };
 

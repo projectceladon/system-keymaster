@@ -48,11 +48,11 @@ class GoogleKeymaster {
     virtual ~GoogleKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
-    void SupportedBlockModes(keymaster_algorithm_t algorithm,
+    void SupportedBlockModes(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
                              SupportedResponse<keymaster_block_mode_t>* response) const;
-    void SupportedPaddingModes(keymaster_algorithm_t algorithm,
+    void SupportedPaddingModes(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
                                SupportedResponse<keymaster_padding_t>* response) const;
-    void SupportedDigests(keymaster_algorithm_t algorithm,
+    void SupportedDigests(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
                           SupportedResponse<keymaster_digest_t>* response) const;
     void SupportedImportFormats(keymaster_algorithm_t algorithm,
                                 SupportedResponse<keymaster_key_format_t>* response) const;

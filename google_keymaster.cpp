@@ -64,25 +64,26 @@ bool check_supported(keymaster_algorithm_t algorithm, SupportedResponse<T>* resp
     return true;
 }
 
-void
-GoogleKeymaster::SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const {
+void GoogleKeymaster::SupportedAlgorithms(
+    SupportedResponse<keymaster_algorithm_t>* response) const {
     if (response == NULL)
         return;
     response->SetResults(supported_algorithms);
 }
 
-void
-GoogleKeymaster::SupportedBlockModes(keymaster_algorithm_t algorithm,
-                                     SupportedResponse<keymaster_block_mode_t>* response) const {
+void GoogleKeymaster::SupportedBlockModes(
+    keymaster_algorithm_t algorithm, keymaster_purpose_t /* purpose */,
+    SupportedResponse<keymaster_block_mode_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
-    response->error = KM_ERROR_OK;
+    response->error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
 }
 
 keymaster_padding_t supported_padding[] = {KM_PAD_NONE};
-void
-GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
-                                       SupportedResponse<keymaster_padding_t>* response) const {
+
+void GoogleKeymaster::SupportedPaddingModes(
+    keymaster_algorithm_t algorithm, keymaster_purpose_t /* purpose */,
+    SupportedResponse<keymaster_padding_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
 
@@ -101,6 +102,7 @@ GoogleKeymaster::SupportedPaddingModes(keymaster_algorithm_t algorithm,
 
 keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
 void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
+                                       keymaster_purpose_t /* purpose */,
                                        SupportedResponse<keymaster_digest_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
@@ -119,9 +121,8 @@ void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
 }
 
 keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
-void
-GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
-                                        SupportedResponse<keymaster_key_format_t>* response) const {
+void GoogleKeymaster::SupportedImportFormats(
+    keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
 
@@ -139,9 +140,8 @@ GoogleKeymaster::SupportedImportFormats(keymaster_algorithm_t algorithm,
 }
 
 keymaster_key_format_t supported_export_formats[] = {KM_KEY_FORMAT_X509};
-void
-GoogleKeymaster::SupportedExportFormats(keymaster_algorithm_t algorithm,
-                                        SupportedResponse<keymaster_key_format_t>* response) const {
+void GoogleKeymaster::SupportedExportFormats(
+    keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
 
