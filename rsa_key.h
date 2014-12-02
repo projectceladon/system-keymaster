@@ -41,6 +41,9 @@ class RsaKey : public AsymmetricKey {
     virtual bool InternalToEvp(EVP_PKEY* pkey) const;
     virtual bool EvpToInternal(const EVP_PKEY* pkey);
 
+    bool SupportedMode(keymaster_purpose_t purpose, keymaster_padding_t padding);
+    bool SupportedMode(keymaster_purpose_t purpose, keymaster_digest_t digest);
+
     struct RSA_Delete {
         void operator()(RSA* p) { RSA_free(p); }
     };
