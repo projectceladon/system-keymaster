@@ -26,6 +26,7 @@ LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
 	aes_key.cpp \
+	aes_operation.cpp \
 	asymmetric_key.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
@@ -125,6 +126,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 
 google_keymaster_test: google_keymaster_test.o \
 	aes_key.o \
+	aes_operation.o \
 	asymmetric_key.o \
 	authorization_set.o \
 	ecdsa_key.o \
