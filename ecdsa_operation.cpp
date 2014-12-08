@@ -26,24 +26,28 @@ EcdsaOperation::~EcdsaOperation() {
         EC_KEY_free(ecdsa_key_);
 }
 
-keymaster_error_t EcdsaOperation::Update(const Buffer& input, Buffer* /* output */) {
+keymaster_error_t EcdsaOperation::Update(const Buffer& input, Buffer* /* output */,
+                                         size_t* input_consumed) {
+    assert(input_consumed);
     switch (purpose()) {
     default:
         return KM_ERROR_UNIMPLEMENTED;
     case KM_PURPOSE_SIGN:
     case KM_PURPOSE_VERIFY:
-        return StoreData(input);
+        return StoreData(input, input_consumed);
     }
 }
 
-keymaster_error_t EcdsaOperation::StoreData(const Buffer& input) {
+keymaster_error_t EcdsaOperation::StoreData(const Buffer& input, size_t* input_consumed) {
     if (!data_.reserve(data_.available_read() + input.available_read()) ||
         !data_.write(input.peek_read(), input.available_read()))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    *input_consumed = input.available_read();
     return KM_ERROR_OK;
 }
 
 keymaster_error_t EcdsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+    assert(output);
     output->Reinitialize(ECDSA_size(ecdsa_key_));
     unsigned int siglen;
     if (!ECDSA_sign(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),

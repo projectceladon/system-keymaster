@@ -197,11 +197,14 @@ struct UpdateOperationRequest : public Serializable {
 };
 
 struct UpdateOperationResponse : public KeymasterResponse {
+    UpdateOperationResponse() : input_consumed(0) {}
+
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     Buffer output;
+    size_t input_consumed;
 };
 
 struct FinishOperationRequest : public Serializable {
