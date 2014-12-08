@@ -54,13 +54,14 @@ const uint32_t GET_VERSION = 7;
  * Note that this approach implies that GetVersionRequest and GetVersionResponse cannot be
  * versioned.
  */
-const int32_t MAX_MESSAGE_VERSION = 0;
+const int32_t MAX_MESSAGE_VERSION = 1;
 inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t subminor_ver) {
     uint32_t composite_ver = (major_ver << 16) | (minor_ver << 8) | subminor_ver;
     switch (composite_ver) {
     case 0x000:
-    case 0x100:
         return 0;
+    case 0x100:
+        return 1;
     default:
         return -1;
     }
@@ -242,13 +243,15 @@ struct UpdateOperationRequest : public KeymasterMessage {
 };
 
 struct UpdateOperationResponse : public KeymasterResponse {
-    UpdateOperationResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+    UpdateOperationResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : KeymasterResponse(ver), input_consumed(0) {}
 
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     Buffer output;
+    size_t input_consumed;
 };
 
 struct FinishOperationRequest : public KeymasterMessage {

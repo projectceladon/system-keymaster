@@ -35,11 +35,11 @@ class EcdsaOperation : public Operation {
     ~EcdsaOperation();
 
     virtual keymaster_error_t Begin() { return KM_ERROR_OK; }
-    virtual keymaster_error_t Update(const Buffer& input, Buffer* output);
+    virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
 
   protected:
-    keymaster_error_t StoreData(const Buffer& input);
+    keymaster_error_t StoreData(const Buffer& input, size_t* input_consumed);
 
     EC_KEY* ecdsa_key_;
     keymaster_digest_t digest_;

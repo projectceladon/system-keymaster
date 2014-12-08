@@ -188,15 +188,24 @@ bool UpdateOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t*
 }
 
 size_t UpdateOperationResponse::NonErrorSerializedSize() const {
-    return output.SerializedSize();
+    if (message_version == 0)
+        return output.SerializedSize();
+    else
+        return output.SerializedSize() + sizeof(uint32_t);
 }
 
 uint8_t* UpdateOperationResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    return output.Serialize(buf, end);
+    buf = output.Serialize(buf, end);
+    if (message_version > 0)
+        buf = append_uint32_to_buf(buf, end, input_consumed);
+    return buf;
 }
 
 bool UpdateOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return output.Deserialize(buf_ptr, end);
+    bool retval = output.Deserialize(buf_ptr, end);
+    if (retval && message_version > 0)
+        retval = copy_uint32_from_buf(buf_ptr, end, &input_consumed);
+    return retval;
 }
 
 size_t FinishOperationRequest::SerializedSize() const {
