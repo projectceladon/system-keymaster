@@ -43,6 +43,8 @@ Key* Key::CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
         return new RsaKey(blob, logger, error);
     case KM_ALGORITHM_ECDSA:
         return new EcdsaKey(blob, logger, error);
+    case KM_ALGORITHM_AES:
+        return new AesKey(blob, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;
