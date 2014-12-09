@@ -23,6 +23,8 @@ LOCAL_PATH := $(call my-dir)
 # concerns a bit better.
 ##
 include $(CLEAR_VARS)
+# Disable clang until we find a way to suppress clang optmization in google_keymaster_utils.h.
+LOCAL_CLANG := false
 LOCAL_MODULE:= libkeymaster_messages
 LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
@@ -44,6 +46,8 @@ include $(BUILD_STATIC_LIBRARY)
 # environment-specific services.
 ###
 include $(CLEAR_VARS)
+# Disable clang until we find a way to suppress clang optmization in google_keymaster_utils.h.
+LOCAL_CLANG := false
 LOCAL_MODULE:= libkeymaster
 LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
