@@ -62,6 +62,11 @@ class AuthorizationSet : public Serializable {
     AuthorizationSet(const AuthorizationSet&);
 
     /**
+     * Clear existing authorization set data
+     */
+    void Clear();
+
+    /**
      * Reinitialize an AuthorizationSet as a dynamically-allocated, growable copy of the data in the
      * provided array (and the data referenced by its embedded pointers, if any).  If the allocation
      * of the needed storage fails this method will return false and \p is_valid() will return
