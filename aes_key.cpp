@@ -64,7 +64,7 @@ AesKey* AesKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         return NULL;
     }
 
-    // Check required for some modes.
+    // Mac required for some modes.
     uint32_t mac_length;
     if (mac_length_required(block_mode)) {
         if (!authorizations.GetTagValue(TAG_MAC_LENGTH, &mac_length) ||
@@ -102,9 +102,9 @@ bool AesKey::ModeAndPurposesAreCompatible(const AuthorizationSet& authorizations
         switch (purpose) {
         case KM_PURPOSE_SIGN:
         case KM_PURPOSE_VERIFY:
-            if (block_mode < KM_MODE_FIRST_AUTHENTICATED) {
-                logger.error("Only MACing or authenticated modes are supported for signing and "
-                             "verification purposes.");
+            if (block_mode < KM_MODE_FIRST_MAC) {
+                logger.error("Only MACing modes are supported for signing and verification "
+                             "purposes.");
                 return false;
             }
             break;
@@ -182,8 +182,9 @@ Operation* AesKey::CreateOcbOperation(keymaster_purpose_t purpose, keymaster_err
     Operation* op = NULL;
     switch (purpose) {
     case KM_PURPOSE_ENCRYPT:
-        op = new AesOcbEncryptOperation(logger_, key_data_, key_data_size_, chunk_length,
-                                        tag_length, additional_data);
+    case KM_PURPOSE_DECRYPT:
+        op = new AesOcbOperation(purpose, logger_, key_data_, key_data_size_, chunk_length,
+                                 tag_length, additional_data);
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_PURPOSE;
