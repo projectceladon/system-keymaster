@@ -29,7 +29,7 @@ class AesOcbOperation : public AeadModeOperation {
     static const size_t MAX_TAG_LENGTH = 16;
     static const size_t MAX_KEY_LENGTH = 32;
 
-    AesOcbOperation(keymaster_purpose_t purpose, const Logger& logger, uint8_t* key,
+    AesOcbOperation(keymaster_purpose_t purpose, const Logger& logger, const uint8_t* key,
                     size_t key_size, size_t chunk_length, size_t tag_length,
                     keymaster_blob_t additional_data)
         : AeadModeOperation(purpose, logger, key, key_size, chunk_length, tag_length, NONCE_LENGTH,
