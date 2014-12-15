@@ -469,60 +469,6 @@ TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
     }
 }
 
-TEST_F(NewKeyGeneration, AesOcbNoChunkLength) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    params_.Reinitialize(params, array_length(params));
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT,
-              device()->generate_key(device(), params_.data(), params_.size(), &blob_,
-                                     &characteristics_));
-}
-
-TEST_F(NewKeyGeneration, AesEcbUnsupported) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_ECB), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    params_.Reinitialize(params, array_length(params));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
-              device()->generate_key(device(), params_.data(), params_.size(), &blob_,
-                                     &characteristics_));
-}
-
-TEST_F(NewKeyGeneration, AesOcbPaddingUnsupported) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_PADDING, KM_PAD_ZERO),
-    };
-    params_.Reinitialize(params, array_length(params));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE,
-              device()->generate_key(device(), params_.data(), params_.size(), &blob_,
-                                     &characteristics_));
-}
-
-TEST_F(NewKeyGeneration, AesOcbInvalidMacLength) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_MAC_LENGTH, 17), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    params_.Reinitialize(params, array_length(params));
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT,
-              device()->generate_key(device(), params_.data(), params_.size(), &blob_,
-                                     &characteristics_));
-}
-
 typedef KeymasterTest GetKeyCharacteristics;
 TEST_F(GetKeyCharacteristics, SimpleRsa) {
     keymaster_key_param_t params[] = {
@@ -923,6 +869,14 @@ TEST_F(VersionTest, GetVersion) {
  */
 class EncryptionOperationsTest : public KeymasterTest {
   protected:
+    void GenerateKey(AuthorizationSet* params) {
+        FreeKeyBlob();
+        FreeCharacteristics();
+        AddClientParams(params);
+        EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params->data(), params->size(),
+                                                      &blob_, &characteristics_));
+    }
+
     void GenerateKey(keymaster_algorithm_t algorithm, keymaster_padding_t padding,
                      uint32_t key_size) {
         params_.Clear();
@@ -932,15 +886,11 @@ class EncryptionOperationsTest : public KeymasterTest {
         params_.push_back(Authorization(TAG_KEY_SIZE, key_size));
         params_.push_back(Authorization(TAG_USER_ID, 7));
         params_.push_back(Authorization(TAG_USER_AUTH_ID, 8));
-        params_.push_back(Authorization(TAG_APPLICATION_ID, "app_id", 6));
         params_.push_back(Authorization(TAG_AUTH_TIMEOUT, 300));
         if (static_cast<int>(padding) != -1)
             params_.push_back(TAG_PADDING, padding);
 
-        FreeKeyBlob();
-        FreeCharacteristics();
-        EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params_.data(), params_.size(),
-                                                      &blob_, &characteristics_));
+        GenerateKey(&params_);
     }
 
     void GenerateSymmetricKey(keymaster_algorithm_t algorithm, uint32_t key_size,
@@ -955,13 +905,9 @@ class EncryptionOperationsTest : public KeymasterTest {
         params_.push_back(Authorization(TAG_MAC_LENGTH, 16));
         params_.push_back(Authorization(TAG_USER_ID, 7));
         params_.push_back(Authorization(TAG_USER_AUTH_ID, 8));
-        params_.push_back(Authorization(TAG_APPLICATION_ID, "app_id", 6));
         params_.push_back(Authorization(TAG_AUTH_TIMEOUT, 300));
 
-        FreeKeyBlob();
-        FreeCharacteristics();
-        EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params_.data(), params_.size(),
-                                                      &blob_, &characteristics_));
+        GenerateKey(&params_);
     }
 
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose,
@@ -1287,6 +1233,67 @@ TEST_F(EncryptionOperationsTest, AesOcbAbort) {
               UpdateOperation(op_handle, message, strlen(message), &result, &input_consumed));
     EXPECT_EQ(strlen(message), input_consumed);
     EXPECT_EQ(KM_ERROR_OK, device()->abort(device(), op_handle));
+}
+
+TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    params_.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES));
+    params_.push_back(Authorization(TAG_KEY_SIZE, 128));
+    params_.push_back(Authorization(TAG_MAC_LENGTH, 16));
+    params_.push_back(Authorization(TAG_BLOCK_MODE, KM_MODE_OCB));
+    params_.push_back(Authorization(TAG_PADDING, KM_PAD_NONE));
+
+    GenerateKey(&params_);
+    uint64_t op_handle;
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT,
+              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+}
+
+TEST_F(EncryptionOperationsTest, AesEcbUnsupported) {
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    params_.push_back(Authorization(TAG_MAC_LENGTH, 16));
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    params_.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES));
+    params_.push_back(Authorization(TAG_KEY_SIZE, 128));
+    params_.push_back(Authorization(TAG_BLOCK_MODE, KM_MODE_ECB));
+    params_.push_back(Authorization(TAG_PADDING, KM_PAD_NONE));
+
+    GenerateKey(&params_);
+    uint64_t op_handle;
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
+              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+}
+
+TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    params_.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES));
+    params_.push_back(Authorization(TAG_KEY_SIZE, 128));
+    params_.push_back(Authorization(TAG_MAC_LENGTH, 16));
+    params_.push_back(Authorization(TAG_BLOCK_MODE, KM_MODE_OCB));
+    params_.push_back(Authorization(TAG_CHUNK_LENGTH, 4096));
+    params_.push_back(Authorization(TAG_PADDING, KM_PAD_ZERO));
+
+    GenerateKey(&params_);
+    uint64_t op_handle;
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE,
+              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+}
+
+TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    params_.push_back(Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    params_.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES));
+    params_.push_back(Authorization(TAG_KEY_SIZE, 128));
+    params_.push_back(Authorization(TAG_MAC_LENGTH, 17));
+    params_.push_back(Authorization(TAG_BLOCK_MODE, KM_MODE_OCB));
+    params_.push_back(Authorization(TAG_CHUNK_LENGTH, 4096));
+
+    GenerateKey(&params_);
+    uint64_t op_handle;
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
+              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
 }
 
 }  // namespace test
