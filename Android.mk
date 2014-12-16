@@ -57,6 +57,8 @@ LOCAL_SRC_FILES:= \
 		google_keymaster.cpp \
 		google_keymaster_messages.cpp \
 		google_keymaster_utils.cpp \
+		hmac_key.cpp \
+		hmac_operation.cpp \
 		key.cpp \
 		key_blob.cpp \
 		ocb.c \

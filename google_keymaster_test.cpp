@@ -85,6 +85,14 @@ class KeymasterTest : public testing::Test {
 
     keymaster_device* device() { return reinterpret_cast<keymaster_device*>(device_.hw_device()); }
 
+    void GenerateKey(AuthorizationSet* params) {
+        FreeKeyBlob();
+        FreeCharacteristics();
+        AddClientParams(params);
+        EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params->data(), params->size(),
+                                                      &blob_, &characteristics_));
+    }
+
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose,
                                      const keymaster_key_blob_t& key_blob) {
         return device()->begin(device(), purpose, &key_blob, client_params_,
@@ -132,6 +140,8 @@ class KeymasterTest : public testing::Test {
         free(const_cast<uint8_t*>(blob_.key_material));
         blob_.key_material = NULL;
     }
+
+    void AddClientParams(AuthorizationSet* set) { set->push_back(TAG_APPLICATION_ID, "app_id", 6); }
 
     const keymaster_key_blob_t& key_blob() { return blob_; }
 
@@ -488,7 +498,6 @@ TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
         Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_PADDING, KM_PAD_NONE),
     };
     params_.Reinitialize(params, array_length(params));
-    params_.Reinitialize(params, array_length(params));
     EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params_.data(), params_.size(), &blob_,
                                                   &characteristics_));
 
@@ -531,6 +540,16 @@ TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
     }
 }
 
+TEST_F(NewKeyGeneration, HmacSha256) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256),
+    };
+    EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params, array_length(params), &blob_,
+                                                  &characteristics_));
+}
+
 typedef KeymasterTest GetKeyCharacteristics;
 TEST_F(GetKeyCharacteristics, SimpleRsa) {
     keymaster_key_param_t params[] = {
@@ -563,6 +582,9 @@ class SigningOperationsTest : public KeymasterTest {
         // Clean up so (most) tests won't have to.
         FreeSignature();
     }
+
+    // TODO(swillden): Refactor and move common test utils to KeymasterTest
+    using KeymasterTest::GenerateKey;
 
     void GenerateKey(keymaster_algorithm_t algorithm, keymaster_digest_t digest,
                      keymaster_padding_t padding, uint32_t key_size) {
@@ -601,6 +623,8 @@ class SigningOperationsTest : public KeymasterTest {
         free(signature_);
         signature_ = NULL;
     }
+
+    const keymaster_key_blob_t& key_blob() { return blob_; }
 
     void corrupt_key_blob() {
         uint8_t* tmp = const_cast<uint8_t*>(blob_.key_material);
@@ -669,6 +693,54 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle_));
 }
 
+TEST_F(SigningOperationsTest, HmacSha256Success) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 32), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "12345678901234567890123456789012";
+    string signature;
+    SignMessage(message, array_size(message) - 1);
+    ASSERT_EQ(32, signature_length_);
+}
+
+// TODO(swillden): Add an HMACSHA256 test that validates against the test vectors from RFC4231.
+//                 Doing that requires being able to import keys, rather than just generate them
+//                 randomly.
+
+TEST_F(SigningOperationsTest, HmacSha256NoTag) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "12345678901234567890123456789012";
+    string signature;
+    SignMessage(message, array_size(message) - 1);
+}
+
+TEST_F(SigningOperationsTest, HmacSha256TooLargeTag) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 33), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN, key_blob()));
+}
+
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, key_blob()));
@@ -714,6 +786,22 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
+    SignMessage(message, array_size(message) - 1);
+    VerifyMessage(message, array_size(message) - 1);
+}
+
+TEST_F(VerificationOperationsTest, HmacSha256Success) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "123456789012345678901234567890123456789012345678";
+    string signature;
     SignMessage(message, array_size(message) - 1);
     VerifyMessage(message, array_size(message) - 1);
 }
@@ -900,13 +988,8 @@ TEST_F(VersionTest, GetVersion) {
  */
 class EncryptionOperationsTest : public KeymasterTest {
   protected:
-    void GenerateKey(AuthorizationSet* params) {
-        FreeKeyBlob();
-        FreeCharacteristics();
-        AddClientParams(params);
-        EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params->data(), params->size(),
-                                                      &blob_, &characteristics_));
-    }
+    // TODO(swillden): Refactor and move common test utils to KeymasterTest
+    using KeymasterTest::GenerateKey;
 
     void GenerateKey(keymaster_algorithm_t algorithm, keymaster_padding_t padding,
                      uint32_t key_size) {
@@ -961,8 +1044,6 @@ class EncryptionOperationsTest : public KeymasterTest {
     string DecryptMessage(const string& ciphertext) {
         return ProcessMessage(KM_PURPOSE_DECRYPT, blob_, ciphertext.c_str(), ciphertext.length());
     }
-
-    void AddClientParams(AuthorizationSet* set) { set->push_back(TAG_APPLICATION_ID, "app_id", 6); }
 
     const void corrupt_key_blob() {
         uint8_t* tmp = const_cast<uint8_t*>(blob_.key_material);
