@@ -693,6 +693,21 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle_));
 }
 
+TEST_F(SigningOperationsTest, HmacSha224Success) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 28), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_224),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "12345678901234567890123456789012";
+    SignMessage(message, array_size(message) - 1);
+    ASSERT_EQ(28, signature_length_);
+}
+
 TEST_F(SigningOperationsTest, HmacSha256Success) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
@@ -704,14 +719,44 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
     params_.Reinitialize(params, array_length(params));
     GenerateKey(&params_);
     const char message[] = "12345678901234567890123456789012";
-    string signature;
     SignMessage(message, array_size(message) - 1);
     ASSERT_EQ(32, signature_length_);
 }
 
-// TODO(swillden): Add an HMACSHA256 test that validates against the test vectors from RFC4231.
-//                 Doing that requires being able to import keys, rather than just generate them
-//                 randomly.
+TEST_F(SigningOperationsTest, HmacSha384Success) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 48), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_384),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "12345678901234567890123456789012";
+    SignMessage(message, array_size(message) - 1);
+    ASSERT_EQ(48, signature_length_);
+}
+
+TEST_F(SigningOperationsTest, HmacSha512Success) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC), Authorization(TAG_KEY_SIZE, 128),
+        Authorization(TAG_MAC_LENGTH, 64), Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_512),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+    params_.Reinitialize(params, array_length(params));
+    GenerateKey(&params_);
+    const char message[] = "12345678901234567890123456789012";
+    string signature;
+    SignMessage(message, array_size(message) - 1);
+    ASSERT_EQ(64, signature_length_);
+}
+
+// TODO(swillden): Add HMACSHA{224|256|384|512} tests that validates against the test vectors from
+//                 RFC4231.  Doing that requires being able to import keys, rather than just
+//                 generate them randomly.
 
 TEST_F(SigningOperationsTest, HmacSha256NoTag) {
     keymaster_key_param_t params[] = {

@@ -30,8 +30,17 @@ HmacOperation::HmacOperation(keymaster_purpose_t purpose, const Logger& logger,
 
     const EVP_MD* md;
     switch (digest) {
+    case KM_DIGEST_SHA_2_224:
+        md = EVP_sha224();
+        break;
     case KM_DIGEST_SHA_2_256:
         md = EVP_sha256();
+        break;
+    case KM_DIGEST_SHA_2_384:
+        md = EVP_sha384();
+        break;
+    case KM_DIGEST_SHA_2_512:
+        md = EVP_sha512();
         break;
     default:
         error_ = KM_ERROR_UNSUPPORTED_DIGEST;
