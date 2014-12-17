@@ -161,19 +161,13 @@ EcdsaKey::EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymast
 }
 
 Operation* EcdsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    keymaster_digest_t digest = KM_DIGEST_NONE;
-    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_NONE) {
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
-        return NULL;
-    }
-
     Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new EcdsaSignOperation(purpose, logger_, digest, ecdsa_key_.release());
+        op = new EcdsaSignOperation(purpose, logger_, ecdsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new EcdsaVerifyOperation(purpose, logger_, digest, ecdsa_key_.release());
+        op = new EcdsaVerifyOperation(purpose, logger_, ecdsa_key_.release());
         break;
     default:
         *error = KM_ERROR_UNIMPLEMENTED;
