@@ -243,6 +243,9 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
 
 void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
                                       UpdateOperationResponse* response) {
+    if (response == NULL)
+        return;
+
     OpTableEntry* entry = FindOperation(request.op_handle);
     if (entry == NULL) {
         response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
@@ -259,6 +262,9 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
 
 void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
                                       FinishOperationResponse* response) {
+    if (response == NULL)
+        return;
+
     OpTableEntry* entry = FindOperation(request.op_handle);
     if (entry == NULL) {
         response->error = KM_ERROR_INVALID_OPERATION_HANDLE;

@@ -70,9 +70,11 @@ const uint8_t dsa_q[] = {
     0x07, 0x82, 0x8F, 0xAB, 0xFE, 0x88, 0x71, 0x68, 0xF7, 0xE3,
 };
 
+const uint64_t OP_HANDLE_SENTINEL = 0xFFFFFFFFFFFFFFFF;
 class KeymasterTest : public testing::Test {
   protected:
-    KeymasterTest() : device_(new StdoutLogger), characteristics_(NULL) {
+    KeymasterTest()
+        : device_(new StdoutLogger), out_params_(NULL), signature_(NULL), characteristics_(NULL) {
         blob_.key_material = NULL;
         RAND_seed("foobar", 6);
     }
@@ -82,6 +84,38 @@ class KeymasterTest : public testing::Test {
     }
 
     keymaster_device* device() { return reinterpret_cast<keymaster_device*>(device_.hw_device()); }
+
+    keymaster_error_t BeginOperation(keymaster_purpose_t purpose,
+                                     const keymaster_key_blob_t& key_blob) {
+        return device()->begin(device(), purpose, &key_blob, client_params_,
+                               array_length(client_params_), &out_params_, &out_params_count_,
+                               &op_handle_);
+    }
+
+    keymaster_error_t UpdateOperation(const void* message, size_t size, string* output,
+                                      size_t* input_consumed) {
+        uint8_t* out_tmp = NULL;
+        size_t out_length;
+        keymaster_error_t error =
+            device()->update(device(), op_handle_, reinterpret_cast<const uint8_t*>(message), size,
+                             input_consumed, &out_tmp, &out_length);
+        if (out_tmp)
+            output->append(reinterpret_cast<char*>(out_tmp), out_length);
+        free(out_tmp);
+        return error;
+    }
+
+    keymaster_error_t FinishOperation(string* output) {
+        uint8_t* out_tmp = NULL;
+        size_t out_length;
+        keymaster_error_t error =
+            device()->finish(device(), op_handle_, reinterpret_cast<const uint8_t*>(signature_),
+                             signature_length_, &out_tmp, &out_length);
+        if (out_tmp)
+            output->append(reinterpret_cast<char*>(out_tmp), out_length);
+        free(out_tmp);
+        return error;
+    }
 
     template <typename T> void ExpectContains(T val, T* vals, size_t len) {
         EXPECT_EQ(1U, len);
@@ -102,6 +136,18 @@ class KeymasterTest : public testing::Test {
     const keymaster_key_blob_t& key_blob() { return blob_; }
 
     SoftKeymasterDevice device_;
+
+    keymaster_blob_t client_id_ = {.data = reinterpret_cast<const uint8_t*>("app_id"),
+                                   .data_length = 6};
+    keymaster_key_param_t client_params_[1] = {
+        Authorization(TAG_APPLICATION_ID, client_id_.data, client_id_.data_length)};
+
+    keymaster_key_param_t* out_params_;
+    size_t out_params_count_;
+    uint64_t op_handle_;
+    size_t input_consumed_;
+    uint8_t* signature_;
+    size_t signature_length_;
 
     AuthorizationSet params_;
     keymaster_key_blob_t blob_;
@@ -512,10 +558,9 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
  */
 class SigningOperationsTest : public KeymasterTest {
   protected:
-    SigningOperationsTest() : out_params_(NULL), output_(NULL), signature_(NULL) {}
+    SigningOperationsTest() {}
     ~SigningOperationsTest() {
         // Clean up so (most) tests won't have to.
-        FreeOutput();
         FreeSignature();
     }
 
@@ -539,15 +584,10 @@ class SigningOperationsTest : public KeymasterTest {
     }
 
     void SignMessage(const void* message, size_t size) {
-        EXPECT_EQ(KM_ERROR_OK, device()->begin(device(), KM_PURPOSE_SIGN, &blob_, client_params_,
-                                               array_length(client_params_), &out_params_,
-                                               &out_params_count_, &op_handle_));
-
-        EXPECT_EQ(KM_ERROR_OK,
-                  device()->update(device(), op_handle_, reinterpret_cast<const uint8_t*>(message),
-                                   size, &input_consumed_, &output_, &output_length_));
-        EXPECT_EQ(0, output_length_);
-        FreeOutput();
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, blob_));
+        string result;
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, size, &result, &input_consumed_));
+        EXPECT_EQ(0, result.length());
         EXPECT_EQ(size, input_consumed_);
 
         EXPECT_EQ(KM_ERROR_OK,
@@ -555,13 +595,6 @@ class SigningOperationsTest : public KeymasterTest {
                                    0 /* signature to verify length */, &signature_,
                                    &signature_length_));
         EXPECT_GT(signature_length_, 0);
-    }
-
-    void FreeOutput() {
-        free(out_params_);
-        out_params_ = NULL;
-        free(output_);
-        output_ = NULL;
     }
 
     void FreeSignature() {
@@ -573,19 +606,6 @@ class SigningOperationsTest : public KeymasterTest {
         uint8_t* tmp = const_cast<uint8_t*>(blob_.key_material);
         ++tmp[blob_.key_material_size / 2];
     }
-
-    keymaster_blob_t client_id_ = {.data = reinterpret_cast<const uint8_t*>("app_id"),
-                                   .data_length = 6};
-    keymaster_key_param_t client_params_[1] = {
-        Authorization(TAG_APPLICATION_ID, client_id_.data, client_id_.data_length)};
-    keymaster_key_param_t* out_params_;
-    size_t out_params_count_;
-    uint64_t op_handle_;
-    size_t input_consumed_;
-    uint8_t* output_;
-    size_t output_length_;
-    uint8_t* signature_;
-    size_t signature_length_;
 };
 
 TEST_F(SigningOperationsTest, RsaSuccess) {
@@ -597,6 +617,7 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
+    string signature;
     SignMessage(message, array_size(message) - 1);
 }
 
@@ -650,20 +671,19 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
-    ASSERT_EQ(KM_ERROR_OK, device()->begin(device(), KM_PURPOSE_SIGN, &blob_, client_params_,
-                                           array_length(client_params_), &out_params_,
-                                           &out_params_count_, &op_handle_));
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, key_blob()));
+
+    const char message[] = "012345678901234567890123456789";
+    string result;
+    size_t input_consumed;
     ASSERT_EQ(KM_ERROR_OK,
-              device()->update(device(), op_handle_,
-                               reinterpret_cast<const uint8_t*>("01234567890123456789012345678901"),
-                               31, &input_consumed_, &output_, &output_length_));
-    EXPECT_EQ(0U, output_length_);
-    EXPECT_EQ(31U, input_consumed_);
+              UpdateOperation(message, array_length(message), &result, &input_consumed));
+    EXPECT_EQ(0U, result.size());
+    EXPECT_EQ(31U, input_consumed);
 
-    ASSERT_EQ(KM_ERROR_UNKNOWN_ERROR,
-              device()->finish(device(), op_handle_, NULL, 0, &signature_, &signature_length_));
-
-    EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle_));
+    string signature;
+    ASSERT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&signature));
+    EXPECT_EQ(0U, signature.length());
 }
 
 class VerificationOperationsTest : public SigningOperationsTest {
@@ -671,19 +691,14 @@ class VerificationOperationsTest : public SigningOperationsTest {
     void VerifyMessage(const void* message, size_t message_len) {
         EXPECT_TRUE(signature_ != NULL);
 
-        EXPECT_EQ(KM_ERROR_OK, device()->begin(device(), KM_PURPOSE_VERIFY, &blob_, client_params_,
-                                               array_length(client_params_), &out_params_,
-                                               &out_params_count_, &op_handle_));
-        ASSERT_EQ(KM_ERROR_OK,
-                  device()->update(device(), op_handle_, reinterpret_cast<const uint8_t*>(message),
-                                   message_len, &input_consumed_, &output_, &output_length_));
-        EXPECT_EQ(0U, output_length_);
-        FreeOutput();
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, blob_));
+        string output;
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, message_len, &output, &input_consumed_));
+        EXPECT_EQ(0U, output.size());
         EXPECT_EQ(message_len, input_consumed_);
-
-        ASSERT_EQ(KM_ERROR_OK, device()->finish(device(), op_handle_, signature_, signature_length_,
-                                                &output_, &output_length_));
-        EXPECT_EQ(0U, output_length_);
+        output.clear();
+        EXPECT_EQ(KM_ERROR_OK, FinishOperation(&output));
+        EXPECT_EQ(0U, output.size());
 
         EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle_));
     }
@@ -926,48 +941,16 @@ class EncryptionOperationsTest : public KeymasterTest {
         GenerateKey(&params_);
     }
 
-    keymaster_error_t BeginOperation(keymaster_purpose_t purpose,
-                                     const keymaster_key_blob_t& key_blob, uint64_t* op_handle) {
-        return device()->begin(device(), purpose, &key_blob, client_params_,
-                               array_length(client_params_), &out_params_, &out_params_count_,
-                               op_handle);
-    }
-
-    keymaster_error_t UpdateOperation(uint64_t op_handle, const void* message, size_t size,
-                                      string* output, size_t* input_consumed) {
-        uint8_t* out_tmp = NULL;
-        size_t out_length;
-        keymaster_error_t error =
-            device()->update(device(), op_handle, reinterpret_cast<const uint8_t*>(message), size,
-                             input_consumed, &out_tmp, &out_length);
-        if (out_tmp)
-            output->append(reinterpret_cast<char*>(out_tmp), out_length);
-        free(out_tmp);
-        return error;
-    }
-
-    keymaster_error_t FinishOperation(uint64_t op_handle, string* output) {
-        uint8_t* out_tmp = NULL;
-        size_t out_length;
-        keymaster_error_t error = device()->finish(device(), op_handle, NULL /* signature */,
-                                                   0 /* signature_length */, &out_tmp, &out_length);
-        if (out_tmp)
-            output->append(reinterpret_cast<char*>(out_tmp), out_length);
-        free(out_tmp);
-        return error;
-    }
-
     string ProcessMessage(keymaster_purpose_t purpose, const keymaster_key_blob_t& key_blob,
                           const void* message, size_t size) {
-        uint64_t op_handle;
-        EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, key_blob, &op_handle));
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, key_blob));
 
         string result;
         size_t input_consumed;
-        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, message, size, &result, &input_consumed));
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, size, &result, &input_consumed));
         EXPECT_EQ(size, input_consumed);
-        EXPECT_EQ(KM_ERROR_OK, FinishOperation(op_handle, &result));
-        EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle));
+        EXPECT_EQ(KM_ERROR_OK, FinishOperation(&result));
+        EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, device()->abort(device(), op_handle_));
         return result;
     }
 
@@ -1021,14 +1004,12 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
 TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
     GenerateKey(KM_ALGORITHM_RSA, KM_PAD_RSA_OAEP, 512);
     const char message[] = "12345678901234567890123";
-    uint64_t op_handle;
     string result;
     size_t input_consumed;
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, blob_, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK,
-              UpdateOperation(op_handle, message, array_size(message), &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, blob_));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, array_size(message), &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
     EXPECT_EQ(0, result.size());
 }
 
@@ -1041,13 +1022,12 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
     // Corrupt the ciphertext
     ciphertext[512 / 8 / 2]++;
 
-    uint64_t op_handle;
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, blob_, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result,
-                                           &input_consumed));
-    EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, blob_));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.data(), ciphertext.size(), &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
     EXPECT_EQ(0, result.size());
 }
 
@@ -1077,14 +1057,12 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
 TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     GenerateKey(KM_ALGORITHM_RSA, KM_PAD_RSA_PKCS1_1_5_ENCRYPT, 512);
     const char message[] = "1234567890123456789012345678901234567890123456789012";
-    uint64_t op_handle;
     string result;
     size_t input_consumed;
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, blob_, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK,
-              UpdateOperation(op_handle, message, array_size(message), &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, blob_));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, array_size(message), &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
     EXPECT_EQ(0, result.size());
 }
 
@@ -1097,13 +1075,12 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     // Corrupt the ciphertext
     ciphertext[512 / 8 / 2]++;
 
-    uint64_t op_handle;
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, blob_, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result,
-                                           &input_consumed));
-    EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, blob_));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.data(), ciphertext.size(), &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
     EXPECT_EQ(0, result.size());
 }
 
@@ -1138,44 +1115,41 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripCorrupted) {
 
     ciphertext[ciphertext.size() / 2]++;
 
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob()));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.c_str(), ciphertext.length(),
-                                           &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.c_str(), ciphertext.length(), &result, &input_consumed));
     EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
 }
 
 TEST_F(EncryptionOperationsTest, AesDecryptGarbage) {
     GenerateSymmetricKey(KM_ALGORITHM_AES, 128, KM_MODE_OCB, 4096);
     string ciphertext(128, 'a');
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob()));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.c_str(), ciphertext.length(),
-                                           &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.c_str(), ciphertext.length(), &result, &input_consumed));
     EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
 }
 
 TEST_F(EncryptionOperationsTest, AesDecryptTooShort) {
     // Try decrypting garbage ciphertext that is too short to be valid (< nonce + tag).
     GenerateSymmetricKey(KM_ALGORITHM_AES, 128, KM_MODE_OCB, 4096);
     string ciphertext(12 + 15, 'a');
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob()));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.c_str(), ciphertext.length(),
-                                           &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.c_str(), ciphertext.length(), &result, &input_consumed));
     EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
@@ -1198,15 +1172,14 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptyCorrupted) {
 
     ciphertext[ciphertext.size() / 2]++;
 
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, key_blob()));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.c_str(), ciphertext.length(),
-                                           &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(ciphertext.c_str(), ciphertext.length(), &result, &input_consumed));
     EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(op_handle, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbFullChunk) {
@@ -1240,15 +1213,13 @@ TEST_F(EncryptionOperationsTest, AesOcbAbort) {
     GenerateSymmetricKey(KM_ALGORITHM_AES, 128, KM_MODE_OCB, 4096);
     const char message[] = "Hello";
 
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob()));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK,
-              UpdateOperation(op_handle, message, strlen(message), &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, strlen(message), &result, &input_consumed));
     EXPECT_EQ(strlen(message), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, device()->abort(device(), op_handle));
+    EXPECT_EQ(KM_ERROR_OK, device()->abort(device(), op_handle_));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
@@ -1261,9 +1232,7 @@ TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
     params_.push_back(Authorization(TAG_PADDING, KM_PAD_NONE));
 
     GenerateKey(&params_);
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT,
-              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob()));
 }
 
 TEST_F(EncryptionOperationsTest, AesEcbUnsupported) {
@@ -1276,9 +1245,7 @@ TEST_F(EncryptionOperationsTest, AesEcbUnsupported) {
     params_.push_back(Authorization(TAG_PADDING, KM_PAD_NONE));
 
     GenerateKey(&params_);
-    uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
-              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob()));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
@@ -1293,8 +1260,7 @@ TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
 
     GenerateKey(&params_);
     uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE,
-              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob()));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
@@ -1308,8 +1274,7 @@ TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
 
     GenerateKey(&params_);
     uint64_t op_handle;
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              BeginOperation(KM_PURPOSE_ENCRYPT, key_blob(), &op_handle));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT, key_blob()));
 }
 
 }  // namespace test
