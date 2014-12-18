@@ -491,6 +491,12 @@ TEST_F(CheckSupported, SupportedDigests) {
                                   KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1},
                                  digests, len));
     free(digests);
+
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
+                                                           KM_PURPOSE_SIGN, &digests, &len));
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
+                    KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1}, digests, len));
+    free(digests);
 }
 
 TEST_F(CheckSupported, SupportedImportFormats) {
@@ -693,6 +699,14 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
 }
 
+TEST_F(SigningOperationsTest, HmacSha1Success) {
+    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA1, 20));
+    string message = "12345678901234567890123456789012";
+    string signature;
+    SignMessage(message, &signature);
+    ASSERT_EQ(20, signature.size());
+}
+
 TEST_F(SigningOperationsTest, HmacSha224Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 28)));
     string message = "12345678901234567890123456789012";
@@ -776,8 +790,40 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     VerifyMessage(message, signature);
 }
 
+TEST_F(VerificationOperationsTest, HmacSha1Success) {
+    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA1, 16));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, HmacSha224Success) {
+    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 16));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
 TEST_F(VerificationOperationsTest, HmacSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16)));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, HmacSha384Success) {
+    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_384, 16));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, HmacSha512Success) {
+    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_512, 16));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
