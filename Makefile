@@ -50,6 +50,7 @@ CPPSRCS=\
 	key_blob.cpp \
 	key_blob_test.cpp \
 	logger.cpp \
+	openssl_err.cpp \
 	operation.cpp \
 	openssl_err.cpp \
 	rsa_key.cpp \

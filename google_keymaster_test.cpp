@@ -469,7 +469,7 @@ TEST_F(CheckSupported, SupportedDigests) {
     keymaster_digest_t* digests;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE}, digests, len));
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE, KM_DIGEST_SHA_2_256}, digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
@@ -662,6 +662,15 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
     SignMessage(message, &signature);
 }
 
+TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
+    // Note that without padding, key size must exactly match digest size.
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+}
+
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(224)));
     string message = "123456789012345678901234567890123456789012345678";
@@ -773,6 +782,8 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     EXPECT_EQ(0U, signature.length());
 }
 
+// TODO(swillden): Add more verification failure tests.
+
 typedef KeymasterTest VerificationOperationsTest;
 TEST_F(VerificationOperationsTest, RsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
@@ -780,6 +791,52 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
     string signature;
     SignMessage(message, &signature);
     VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
+    // Note that without padding, key size must exactly match digest size.
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptSignature) {
+    // Note that without padding, key size must exactly match digest size.
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    ++signature[signature.size() / 2];
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+}
+
+TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptInput) {
+    // Note that without padding, key size must exactly match digest size.
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    ++message[message.size() / 2];
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
