@@ -169,7 +169,7 @@ class KeymasterTest : public testing::Test {
 
     keymaster_device* device() { return reinterpret_cast<keymaster_device*>(device_.hw_device()); }
 
-    keymaster_error_t AttemptToGenerateKey(const ParamBuilder& builder) {
+    keymaster_error_t GenerateKey(const ParamBuilder& builder) {
         AuthorizationSet params(builder.build());
         params.push_back(UserAuthParams());
         params.push_back(ClientParams());
@@ -180,12 +180,8 @@ class KeymasterTest : public testing::Test {
                                       &characteristics_);
     }
 
-    void GenerateKey(const ParamBuilder& builder) {
-        ASSERT_EQ(KM_ERROR_OK, AttemptToGenerateKey(builder));
-    }
-
-    keymaster_error_t AttemptImportKey(const ParamBuilder& builder, keymaster_key_format_t format,
-                                       const string& key_material) {
+    keymaster_error_t ImportKey(const ParamBuilder& builder, keymaster_key_format_t format,
+                                const string& key_material) {
         AuthorizationSet params(builder.build());
         params.push_back(UserAuthParams());
         params.push_back(ClientParams());
@@ -195,11 +191,6 @@ class KeymasterTest : public testing::Test {
         return device()->import_key(device(), params.data(), params.size(), format,
                                     reinterpret_cast<const uint8_t*>(key_material.c_str()),
                                     key_material.length(), &blob_, &characteristics_);
-    }
-
-    void ImportKey(const ParamBuilder& builder, keymaster_key_format_t format,
-                   const string& key_material) {
-        ASSERT_EQ(KM_ERROR_OK, AttemptImportKey(builder, format, key_material));
     }
 
     AuthorizationSet UserAuthParams() {
@@ -254,7 +245,8 @@ class KeymasterTest : public testing::Test {
 
     template <typename T>
     bool ResponseContains(const vector<T>& expected, const T* values, size_t len) {
-        return std::is_permutation(values, values + len, expected.begin());
+        return expected.size() == len &&
+               std::is_permutation(values, values + len, expected.begin());
     }
 
     template <typename T> bool ResponseContains(T expected, const T* values, size_t len) {
@@ -357,8 +349,6 @@ class KeymasterTest : public testing::Test {
         free(const_cast<uint8_t*>(blob_.key_material));
         blob_.key_material = NULL;
     }
-
-    const keymaster_key_blob_t& key_blob() { return blob_; }
 
     void corrupt_key_blob() {
         assert(blob_.key_material);
@@ -586,7 +576,8 @@ class NewKeyGeneration : public KeymasterTest {
 };
 
 TEST_F(NewKeyGeneration, Rsa) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_NONE, KM_PAD_NONE, 3));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_NONE, KM_PAD_NONE, 3)));
     CheckBaseParams();
 
     // Check specified tags are all present in auths
@@ -598,7 +589,7 @@ TEST_F(NewKeyGeneration, Rsa) {
 
 TEST_F(NewKeyGeneration, RsaDefaultSize) {
     // TODO(swillden): Remove support for defaulting RSA parameter size and pub exponent.
-    GenerateKey(ParamBuilder().RsaSigningKey());
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey()));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -610,7 +601,7 @@ TEST_F(NewKeyGeneration, RsaDefaultSize) {
 }
 
 TEST_F(NewKeyGeneration, Ecdsa) {
-    GenerateKey(ParamBuilder().EcdsaSigningKey(224));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(224)));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -619,7 +610,7 @@ TEST_F(NewKeyGeneration, Ecdsa) {
 }
 
 TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
-    GenerateKey(ParamBuilder().EcdsaSigningKey());
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey()));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -630,42 +621,41 @@ TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
 }
 
 TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              AttemptToGenerateKey(ParamBuilder().EcdsaSigningKey(190)));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE, GenerateKey(ParamBuilder().EcdsaSigningKey(190)));
 }
 
 TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
     size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
-        EXPECT_EQ(KM_ERROR_OK, AttemptToGenerateKey(ParamBuilder().EcdsaSigningKey(size)))
+        EXPECT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(size)))
             << "Failed to generate size: " << size;
     }
 }
 
 TEST_F(NewKeyGeneration, AesOcb) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
 }
 
 TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(136).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(136).OcbMode(4096, 16)));
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
     size_t valid_sizes[] = {128, 192, 256};
     for (size_t size : valid_sizes) {
-        EXPECT_EQ(KM_ERROR_OK, AttemptToGenerateKey(ParamBuilder().AesEncryptionKey(size)))
+        EXPECT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(size)))
             << "Failed to generate size: " << size;
     }
 }
 
 TEST_F(NewKeyGeneration, HmacSha256) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16)));
 }
 
 typedef KeymasterTest GetKeyCharacteristics;
 TEST_F(GetKeyCharacteristics, SimpleRsa) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     AuthorizationSet original(sw_enforced());
 
     ASSERT_EQ(KM_ERROR_OK, GetCharacteristics());
@@ -674,21 +664,21 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
 
 typedef KeymasterTest SigningOperationsTest;
 TEST_F(SigningOperationsTest, RsaSuccess) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
 }
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
-    GenerateKey(ParamBuilder().EcdsaSigningKey(224));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(224)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
 }
 
 TEST_F(SigningOperationsTest, RsaAbort) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
     EXPECT_EQ(KM_ERROR_OK, AbortOperation());
     // Another abort should fail
@@ -706,17 +696,19 @@ TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
 }
 
 TEST_F(SigningOperationsTest, RsaNoDigest) {
-    GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(TAG_PADDING, KM_PAD_NONE));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(
+                               TAG_PADDING, KM_PAD_NONE)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaNoPadding) {
-    GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(TAG_DIGEST, KM_DIGEST_NONE));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(
+                               TAG_DIGEST, KM_DIGEST_NONE)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, HmacSha224Success) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 28));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 28)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -724,7 +716,7 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha256Success) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 32));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 32)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -732,7 +724,7 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha384Success) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_384, 48));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_384, 48)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -740,7 +732,7 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha512Success) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_512, 64));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_512, 64)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -752,21 +744,21 @@ TEST_F(SigningOperationsTest, HmacSha512Success) {
 //                 generate them randomly.
 
 TEST_F(SigningOperationsTest, HmacSha256NoMacLength) {
-    GenerateKey(ParamBuilder()
-                    .Option(TAG_ALGORITHM, KM_ALGORITHM_HMAC)
-                    .Option(TAG_KEY_SIZE, 128)
-                    .SigningKey()
-                    .Option(TAG_DIGEST, KM_DIGEST_SHA_2_256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder()
+                                           .Option(TAG_ALGORITHM, KM_ALGORITHM_HMAC)
+                                           .Option(TAG_KEY_SIZE, 128)
+                                           .SigningKey()
+                                           .Option(TAG_DIGEST, KM_DIGEST_SHA_2_256)));
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 33));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 33)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
 
     string message = "1234567890123456789012345678901";
@@ -783,7 +775,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
 
 typedef KeymasterTest VerificationOperationsTest;
 TEST_F(VerificationOperationsTest, RsaSuccess) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -791,7 +783,7 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
-    GenerateKey(ParamBuilder().EcdsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(256)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -799,7 +791,7 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha256Success) {
-    GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -808,7 +800,7 @@ TEST_F(VerificationOperationsTest, HmacSha256Success) {
 
 typedef VerificationOperationsTest ExportKeyTest;
 TEST_F(ExportKeyTest, RsaSuccess) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
     EXPECT_GT(export_data.length(), 0);
@@ -817,7 +809,7 @@ TEST_F(ExportKeyTest, RsaSuccess) {
 }
 
 TEST_F(ExportKeyTest, EcdsaSuccess) {
-    GenerateKey(ParamBuilder().EcdsaSigningKey(224));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().EcdsaSigningKey(224)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
     EXPECT_GT(export_data.length(), 0);
@@ -826,13 +818,13 @@ TEST_F(ExportKeyTest, EcdsaSuccess) {
 }
 
 TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     string export_data;
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_PKCS8, &export_data));
 }
 
 TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256)));
     corrupt_key_blob();
     string export_data;
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, ExportKey(KM_KEY_FORMAT_X509, &export_data));
@@ -850,7 +842,8 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
 
-    ImportKey(ParamBuilder().SigningKey().NoDigestOrPadding(), KM_KEY_FORMAT_PKCS8, pk8_key);
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey().NoDigestOrPadding(),
+                                     KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_RSA));
@@ -871,29 +864,29 @@ TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              AttemptImportKey(ParamBuilder()
-                                   .SigningKey()
-                                   .Option(TAG_KEY_SIZE, 2048)  // Doesn't match key
-                                   .NoDigestOrPadding(),
-                               KM_KEY_FORMAT_PKCS8, pk8_key));
+              ImportKey(ParamBuilder()
+                            .SigningKey()
+                            .Option(TAG_KEY_SIZE, 2048)  // Doesn't match key
+                            .NoDigestOrPadding(),
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
 TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              AttemptImportKey(ParamBuilder()
-                                   .SigningKey()
-                                   .Option(TAG_RSA_PUBLIC_EXPONENT, 3)  // Doesn't match key
-                                   .NoDigestOrPadding(),
-                               KM_KEY_FORMAT_PKCS8, pk8_key));
+              ImportKey(ParamBuilder()
+                            .SigningKey()
+                            .Option(TAG_RSA_PUBLIC_EXPONENT, 3)  // Doesn't match key
+                            .NoDigestOrPadding(),
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
 TEST_F(ImportKeyTest, EcdsaSuccess) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ImportKey(ParamBuilder().SigningKey(), KM_KEY_FORMAT_PKCS8, pk8_key);
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey(), KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
@@ -913,7 +906,8 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 256), KM_KEY_FORMAT_PKCS8, pk8_key);
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 256),
+                                     KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
@@ -933,8 +927,8 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              AttemptImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 224),
-                               KM_KEY_FORMAT_PKCS8, pk8_key));
+              ImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 224), KM_KEY_FORMAT_PKCS8,
+                        pk8_key));
 }
 
 typedef KeymasterTest VersionTest;
@@ -948,7 +942,7 @@ TEST_F(VersionTest, GetVersion) {
 
 typedef KeymasterTest EncryptionOperationsTest;
 TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP)));
 
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
@@ -962,7 +956,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512 / 8, ciphertext.size());
@@ -972,7 +966,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP)));
     string message = "12345678901234567890123";
     string result;
     size_t input_consumed;
@@ -984,7 +978,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512 / 8, ciphertext.size());
@@ -1001,7 +995,8 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
     EXPECT_EQ(512 / 8, ciphertext1.size());
@@ -1014,7 +1009,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512 / 8, ciphertext.size());
@@ -1024,7 +1020,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "12345678901234567890123456789012345678901234567890123";
     string result;
     size_t input_consumed;
@@ -1036,7 +1033,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
-    GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaEncryptionKey(512, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512 / 8, ciphertext.size());
@@ -1053,7 +1051,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
     EXPECT_EQ(12 /* nonce */ + message.size() + 16 /* tag */, ciphertext1.size());
@@ -1066,7 +1064,7 @@ TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripSuccess) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(message);
     EXPECT_EQ(12 /* nonce */ + message.length() + 16 /* tag */, ciphertext.size());
@@ -1076,7 +1074,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripSuccess) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripCorrupted) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(12 /* nonce */ + message.size() + 16 /* tag */, ciphertext.size());
@@ -1093,7 +1091,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripCorrupted) {
 }
 
 TEST_F(EncryptionOperationsTest, AesDecryptGarbage) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string ciphertext(128, 'a');
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
 
@@ -1105,7 +1103,7 @@ TEST_F(EncryptionOperationsTest, AesDecryptGarbage) {
 }
 
 TEST_F(EncryptionOperationsTest, AesDecryptTooShort) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
 
     // Try decrypting garbage ciphertext that is too short to be valid (< nonce + tag).
     string ciphertext(12 + 15, 'a');
@@ -1119,7 +1117,7 @@ TEST_F(EncryptionOperationsTest, AesDecryptTooShort) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(12 /* nonce */ + message.size() + 16 /* tag */, ciphertext.size());
@@ -1129,7 +1127,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptyCorrupted) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(12 /* nonce */ + message.size() + 16 /* tag */, ciphertext.size());
@@ -1146,7 +1144,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptyCorrupted) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbFullChunk) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message(4096, 'a');
     string ciphertext = EncryptMessage(message);
     EXPECT_EQ(12 /* nonce */ + message.length() + 16 /* tag */, ciphertext.size());
@@ -1157,7 +1155,8 @@ TEST_F(EncryptionOperationsTest, AesOcbFullChunk) {
 
 TEST_F(EncryptionOperationsTest, AesOcbVariousChunkLengths) {
     for (unsigned chunk_length = 1; chunk_length <= 128; ++chunk_length) {
-        GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(chunk_length, 16));
+        ASSERT_EQ(KM_ERROR_OK,
+                  GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(chunk_length, 16)));
         string message(128, 'a');
         string ciphertext = EncryptMessage(message);
         int expected_tag_count = (message.length() + chunk_length - 1) / chunk_length;
@@ -1173,7 +1172,7 @@ TEST_F(EncryptionOperationsTest, AesOcbVariousChunkLengths) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbAbort) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
     string message = "Hello";
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
@@ -1186,10 +1185,10 @@ TEST_F(EncryptionOperationsTest, AesOcbAbort) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
-    GenerateKey(ParamBuilder()
-                    .AesEncryptionKey(128)
-                    .Option(TAG_BLOCK_MODE, KM_MODE_OCB)
-                    .Option(TAG_MAC_LENGTH, 16));
+    EXPECT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Option(TAG_BLOCK_MODE, KM_MODE_OCB)
+                                           .Option(TAG_MAC_LENGTH, 16)));
     EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
