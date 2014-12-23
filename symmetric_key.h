@@ -21,19 +21,38 @@
 
 namespace keymaster {
 
+class SymmetricKey;
+
+class SymmetricKeyFactory : public KeyFactory {
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                             keymaster_error_t* error);
+    virtual Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
+                           const Logger&, keymaster_error_t* error) {
+        *error = KM_ERROR_UNIMPLEMENTED;
+        return NULL;
+    }
+
+    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) {
+        return NoFormats(format_count);
+    }
+    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) {
+        return NoFormats(format_count);
+    };
+
+  private:
+    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths, const Logger& logger) = 0;
+    const keymaster_key_format_t* NoFormats(size_t* format_count) {
+        *format_count = 0;
+        return NULL;
+    }
+};
+
 class SymmetricKey : public Key {
   public:
     static const int MAX_KEY_SIZE = 32;
     static const int MAX_MAC_LENGTH = 32;
     static const uint32_t MAX_CHUNK_LENGTH = 64 * 1024;
 
-    static SymmetricKey* GenerateKey(keymaster_algorithm_t algorithm,
-                                     const AuthorizationSet& key_description, const Logger& logger,
-                                     keymaster_error_t* error);
-    static SymmetricKey* CreateKey(keymaster_algorithm_t algorithm, const UnencryptedKeyBlob& blob,
-                                   const Logger& logger, keymaster_error_t* error);
-
-    SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     ~SymmetricKey();
 
     virtual keymaster_error_t key_material(UniquePtr<uint8_t[]>* key_material, size_t* size) const;
@@ -45,12 +64,16 @@ class SymmetricKey : public Key {
   protected:
     keymaster_error_t error_;
 
+    SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+
     const uint8_t* key_data() const { return key_data_; }
     size_t key_data_size() const { return key_data_size_; }
 
     SymmetricKey(const AuthorizationSet& auths, const Logger& logger) : Key(auths, logger) {}
 
   private:
+    friend SymmetricKeyFactory;
+
     keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
 
     size_t key_data_size_;

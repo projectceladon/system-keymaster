@@ -30,9 +30,23 @@ namespace keymaster {
 const uint32_t RSA_DEFAULT_KEY_SIZE = 2048;
 const uint64_t RSA_DEFAULT_EXPONENT = 65537;
 
-/* static */
-RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                            keymaster_error_t* error) {
+class RsaKeyFactory : public AsymmetricKeyFactory {
+  public:
+    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_RSA; }
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                             keymaster_error_t* error);
+    virtual Key* ImportKey(const AuthorizationSet& key_description,
+                           keymaster_key_format_t key_format, const uint8_t* key_data,
+                           size_t key_data_length, const Logger& logger, keymaster_error_t* error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                         keymaster_error_t* error) {
+        return new RsaKey(blob, logger, error);
+    }
+};
+static KeyFactoryRegistry::Registration<RsaKeyFactory> registration;
+
+Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                                keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -47,7 +61,7 @@ RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         authorizations.push_back(Authorization(TAG_KEY_SIZE, key_size));
 
     UniquePtr<BIGNUM, BIGNUM_Delete> exponent(BN_new());
-    UniquePtr<RSA, RSA_Delete> rsa_key(RSA_new());
+    UniquePtr<RSA, RsaKey::RSA_Delete> rsa_key(RSA_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (rsa_key.get() == NULL || pkey.get() == NULL) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -65,16 +79,24 @@ RsaKey* RsaKey::GenerateKey(const AuthorizationSet& key_description, const Logge
     return new_key;
 }
 
-/* static */
-RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                          const Logger& logger, keymaster_error_t* error) {
+Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
+                              keymaster_key_format_t key_format, const uint8_t* key_data,
+                              size_t key_data_length, const Logger& logger,
+                              keymaster_error_t* error) {
     if (!error)
         return NULL;
-    *error = KM_ERROR_UNKNOWN_ERROR;
 
-    UniquePtr<RSA, RSA_Delete> rsa_key(EVP_PKEY_get1_RSA(pkey));
-    if (!rsa_key.get())
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(
+        ExtractEvpKey(key_format, KM_ALGORITHM_RSA, key_data, key_data_length, error));
+    if (*error != KM_ERROR_OK)
         return NULL;
+    assert(pkey.get());
+
+    UniquePtr<RSA, RsaKey::RSA_Delete> rsa_key(EVP_PKEY_get1_RSA(pkey.get()));
+    if (!rsa_key.get()) {
+        *error = KM_ERROR_UNKNOWN_ERROR;
+        return NULL;
+    }
 
     AuthorizationSet authorizations(key_description);
 
