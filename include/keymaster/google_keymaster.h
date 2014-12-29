@@ -91,7 +91,7 @@ class GoogleKeymaster {
                                    keymaster_key_blob_t* keymaster_blob, AuthorizationSet* enforced,
                                    AuthorizationSet* unenforced);
     Key* LoadKey(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
-                 keymaster_error_t* error);
+                 keymaster_algorithm_t* algorithm, keymaster_error_t* error);
     UnencryptedKeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key,
                                     const AuthorizationSet& client_params,
                                     keymaster_error_t* error);

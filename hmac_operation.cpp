@@ -19,6 +19,8 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
+#include "symmetric_key.h"
+
 #if defined(OPENSSL_IS_BORINGSSL)
 typedef size_t openssl_size_t;
 #else
@@ -26,6 +28,74 @@ typedef int openssl_size_t;
 #endif
 
 namespace keymaster {
+
+/**
+ * Abstract base for HMAC operation factories.  This class does all of the work to create
+ * HMAC operations.
+ */
+class HmacOperationFactory : public OperationFactory {
+  public:
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_HMAC, purpose()); }
+
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error);
+
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const;
+
+    virtual keymaster_purpose_t purpose() const = 0;
+};
+
+Operation* HmacOperationFactory::CreateOperation(const Key& key, const Logger& logger,
+                                                 keymaster_error_t* error) {
+    *error = KM_ERROR_OK;
+
+    uint32_t tag_length;
+    if (!key.authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length))
+        *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+
+    keymaster_digest_t digest;
+    if (!key.authorizations().GetTagValue(TAG_DIGEST, &digest))
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
+    if (!symmetric_key) {
+        *error = KM_ERROR_UNKNOWN_ERROR;
+        return NULL;
+    }
+
+    Operation* op = new HmacOperation(purpose(), logger, symmetric_key->key_data(),
+                                      symmetric_key->key_data_size(), digest, tag_length);
+    if (!op)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return op;
+}
+
+static keymaster_digest_t supported_digests[] = {KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
+                                                 KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
+                                                 KM_DIGEST_SHA_2_512};
+const keymaster_digest_t* HmacOperationFactory::SupportedDigests(size_t* digest_count) const {
+    *digest_count = array_length(supported_digests);
+    return supported_digests;
+}
+
+/**
+ * Concrete factory for creating HMAC signing operations.
+ */
+class HmacSignOperationFactory : public HmacOperationFactory {
+    keymaster_purpose_t purpose() const { return KM_PURPOSE_SIGN; }
+};
+static OperationFactoryRegistry::Registration<HmacSignOperationFactory> sign_registration;
+
+/**
+ * Concrete factory for creating HMAC verification operations.
+ */
+class HmacVerifyOperationFactory : public HmacOperationFactory {
+    keymaster_purpose_t purpose() const { return KM_PURPOSE_VERIFY; }
+};
+static OperationFactoryRegistry::Registration<HmacVerifyOperationFactory> verify_registration;
 
 HmacOperation::HmacOperation(keymaster_purpose_t purpose, const Logger& logger,
                              const uint8_t* key_data, size_t key_data_size,

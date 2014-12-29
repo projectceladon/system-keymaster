@@ -44,6 +44,18 @@ int main(int argc, char** argv) {
     return result;
 }
 
+template <typename T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
+    os << "{ ";
+    bool first = true;
+    for (T t : vec) {
+        os << (first ? "" : ", ") << t;
+        if (first)
+            first = false;
+    }
+    os << " }";
+    return os;
+}
+
 namespace keymaster {
 namespace test {
 
@@ -279,19 +291,23 @@ class KeymasterTest : public testing::Test {
     }
 
     void SignMessage(const string& message, string* signature) {
+        SCOPED_TRACE("SignMessage");
         *signature = ProcessMessage(KM_PURPOSE_SIGN, message);
         EXPECT_GT(signature->size(), 0);
     }
 
     void VerifyMessage(const string& message, const string& signature) {
+        SCOPED_TRACE("VerifyMessage");
         ProcessMessage(KM_PURPOSE_VERIFY, message, signature);
     }
 
     string EncryptMessage(const string& message) {
+        SCOPED_TRACE("EncryptMessage");
         return ProcessMessage(KM_PURPOSE_ENCRYPT, message);
     }
 
     string DecryptMessage(const string& ciphertext) {
+        SCOPED_TRACE("DecryptMessage");
         return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext);
     }
 
@@ -392,21 +408,23 @@ TEST_F(CheckSupported, SupportedBlockModes) {
 
     size_t len;
     keymaster_block_mode_t* modes;
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
-              device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT,
-                                                  &modes, &len));
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA,
+                                                               KM_PURPOSE_ENCRYPT, &modes, &len));
+    EXPECT_EQ(0, len);
+    free(modes);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
               device()->get_supported_block_modes(device(), KM_ALGORITHM_DSA, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
               device()->get_supported_block_modes(device(), KM_ALGORITHM_ECDSA, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
-              device()->get_supported_block_modes(device(), KM_ALGORITHM_AES, KM_PURPOSE_ENCRYPT,
-                                                  &modes, &len));
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
+                                                               KM_PURPOSE_ENCRYPT, &modes, &len));
+    EXPECT_TRUE(ResponseContains({KM_MODE_OCB}, modes, len));
+    free(modes);
 }
 
 TEST_F(CheckSupported, SupportedPaddingModes) {
@@ -418,7 +436,12 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     keymaster_padding_t* modes;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    EXPECT_TRUE(ResponseContains(KM_PAD_NONE, modes, len));
+    EXPECT_TRUE(ResponseContains({KM_PAD_NONE}, modes, len));
+    free(modes);
+
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
+                                                                 KM_PURPOSE_ENCRYPT, &modes, &len));
+    EXPECT_TRUE(ResponseContains({KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT}, modes, len));
     free(modes);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
@@ -427,13 +450,12 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_ECDSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    EXPECT_TRUE(ResponseContains(KM_PAD_NONE, modes, len));
-    free(modes);
-
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_AES,
-                                                                 KM_PURPOSE_SIGN, &modes, &len));
     EXPECT_EQ(0, len);
     free(modes);
+
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
+              device()->get_supported_padding_modes(device(), KM_ALGORITHM_AES, KM_PURPOSE_SIGN,
+                                                    &modes, &len));
 }
 
 TEST_F(CheckSupported, SupportedDigests) {
@@ -445,7 +467,7 @@ TEST_F(CheckSupported, SupportedDigests) {
     keymaster_digest_t* digests;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE}, digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
@@ -454,12 +476,18 @@ TEST_F(CheckSupported, SupportedDigests) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_ECDSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
+    EXPECT_EQ(0, len);
     free(digests);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_AES,
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
+              device()->get_supported_digests(device(), KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &digests,
+                                              &len));
+
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
+                                  KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1},
+                                 digests, len));
     free(digests);
 }
 
@@ -472,19 +500,6 @@ TEST_F(CheckSupported, SupportedImportFormats) {
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
-    free(formats);
-
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
-              device()->get_supported_import_formats(device(), KM_ALGORITHM_DSA, &formats, &len));
-
-    EXPECT_EQ(KM_ERROR_OK,
-              device()->get_supported_import_formats(device(), KM_ALGORITHM_ECDSA, &formats, &len));
-    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
-    free(formats);
-
-    EXPECT_EQ(KM_ERROR_OK,
-              device()->get_supported_import_formats(device(), KM_ALGORITHM_AES, &formats, &len));
-    EXPECT_EQ(0, len);
     free(formats);
 }
 
@@ -1212,8 +1227,8 @@ TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
-    GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 17));
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 17)));
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 }  // namespace test

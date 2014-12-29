@@ -148,6 +148,7 @@ google_keymaster_test: google_keymaster_test.o \
 	key.o \
 	key_blob.o \
 	ocb.o \
+	operation.o \
 	rsa_key.o \
 	rsa_operation.o \
 	serializable.o \

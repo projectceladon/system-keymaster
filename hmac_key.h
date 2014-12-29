@@ -26,8 +26,6 @@ class HmacKey : public SymmetricKey {
     HmacKey(const AuthorizationSet& auths, const Logger& logger) : SymmetricKey(auths, logger) {}
     HmacKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
         : SymmetricKey(blob, logger, error) {}
-
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
 };
 
 }  // namespace keymaster
