@@ -50,35 +50,21 @@ class RsaOperationFactory : public OperationFactory {
 bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
                                                 keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    if (!key.authorizations().GetTagValue(TAG_PADDING, padding))
+    if (!key.authorizations().GetTagValue(TAG_PADDING, padding) || !supported(*padding))
         return false;
 
-    size_t padding_count;
-    const keymaster_padding_t* supported_paddings = SupportedPaddingModes(&padding_count);
-    for (size_t i = 0; i < padding_count; ++i) {
-        if (*padding == supported_paddings[i]) {
-            *error = KM_ERROR_OK;
-            return true;
-        }
-    }
-    return false;
+    *error = KM_ERROR_OK;
+    return true;
 }
 
 bool RsaOperationFactory::GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
                                                keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_DIGEST;
-    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest))
+    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest) || !supported(*digest))
         return false;
 
-    size_t digest_count;
-    const keymaster_digest_t* supported_digests = SupportedDigests(&digest_count);
-    for (size_t i = 0; i < digest_count; ++i) {
-        if (*digest == supported_digests[i]) {
-            *error = KM_ERROR_OK;
-            return true;
-        }
-    }
-    return false;
+    *error = KM_ERROR_OK;
+    return true;
 }
 
 /* static */
