@@ -58,8 +58,7 @@ struct keystore_module soft_keymaster_device_module = {
 
 namespace keymaster {
 
-SoftKeymasterDevice::SoftKeymasterDevice(Logger* logger)
-    : impl_(new GoogleSoftKeymaster(16, logger)) {
+SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new GoogleSoftKeymaster(16)) {
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
     static_assert(std::is_standard_layout<SoftKeymasterDevice>::value,
                   "SoftKeymasterDevice must be standard layout");
@@ -71,8 +70,8 @@ SoftKeymasterDevice::SoftKeymasterDevice(Logger* logger)
     assert(reinterpret_cast<keymaster_device*>(this) == &device_);
     assert(reinterpret_cast<hw_device_t*>(this) == &(device_.common));
 #endif
-    logger->info("Creating device");
-    logger->debug("Device address: %p", this);
+    LOG_I("Creating device");
+    LOG_D("Device address: %p", this);
 
     memset(&device_, 0, sizeof(device_));
 
@@ -159,7 +158,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
                                           const keymaster_keypair_t key_type,
                                           const void* key_params, uint8_t** key_blob,
                                           size_t* key_blob_length) {
-    convert_device(dev)->impl_->logger().debug("Device received generate_keypair");
+    LOG_D("%s", "Device received generate_keypair");
 
     GenerateKeyRequest req;
     StoreDefaultNewKeyParams(&req.key_description);
@@ -169,9 +168,8 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
         req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
         const keymaster_rsa_keygen_params_t* rsa_params =
             static_cast<const keymaster_rsa_keygen_params_t*>(key_params);
-        convert_device(dev)->impl_->logger().debug(
-            "Generating RSA pair, modulus size: %u, public exponent: %lu", rsa_params->modulus_size,
-            rsa_params->public_exponent);
+        LOG_D("Generating RSA pair, modulus size: %u, public exponent: %lu",
+              rsa_params->modulus_size, rsa_params->public_exponent);
         req.key_description.push_back(TAG_KEY_SIZE, rsa_params->modulus_size);
         req.key_description.push_back(TAG_RSA_PUBLIC_EXPONENT, rsa_params->public_exponent);
         break;
@@ -181,35 +179,31 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
         req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_ECDSA);
         const keymaster_ec_keygen_params_t* ec_params =
             static_cast<const keymaster_ec_keygen_params_t*>(key_params);
-        convert_device(dev)->impl_->logger().debug("Generating ECDSA pair, key size: %u",
-                                                   ec_params->field_size);
+        LOG_D("Generating ECDSA pair, key size: %u", ec_params->field_size);
         req.key_description.push_back(TAG_KEY_SIZE, ec_params->field_size);
         break;
     }
 
     default:
-        convert_device(dev)->impl_->logger().debug("Received request for unsuported key type %d",
-                                                   key_type);
+        LOG_D("Received request for unsuported key type %d", key_type);
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
 
     GenerateKeyResponse rsp;
     convert_device(dev)->impl_->GenerateKey(req, &rsp);
     if (rsp.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("Key generation failed with error: %d",
-                                                   rsp.error);
+        LOG_E("Key generation failed with error: %d", rsp.error);
         return rsp.error;
     }
 
     *key_blob_length = rsp.key_blob.key_material_size;
     *key_blob = static_cast<uint8_t*>(malloc(*key_blob_length));
     if (!*key_blob) {
-        convert_device(dev)->impl_->logger().error("Failed to allocate %d bytes", *key_blob_length);
+        LOG_E("Failed to allocate %d bytes", *key_blob_length);
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }
     memcpy(*key_blob, rsp.key_blob.key_material, *key_blob_length);
-    convert_device(dev)->impl_->logger().debug("Returning %d bytes in key blob\n",
-                                               (int)*key_blob_length);
+    LOG_D("Returning %d bytes in key blob\n", (int)*key_blob_length);
 
     return KM_ERROR_OK;
 }
@@ -218,7 +212,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
 int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const uint8_t* key,
                                         const size_t key_length, uint8_t** key_blob,
                                         size_t* key_blob_length) {
-    convert_device(dev)->impl_->logger().debug("Device received import_keypair");
+    LOG_D("Device received import_keypair");
 
     ImportKeyRequest request;
     StoreDefaultNewKeyParams(&request.key_description);
@@ -228,20 +222,18 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
     ImportKeyResponse response;
     convert_device(dev)->impl_->ImportKey(request, &response);
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("Key import failed with error: %d",
-                                                   response.error);
+        LOG_E("Key import failed with error: %d", response.error);
         return response.error;
     }
 
     *key_blob_length = response.key_blob.key_material_size;
     *key_blob = static_cast<uint8_t*>(malloc(*key_blob_length));
     if (!*key_blob) {
-        convert_device(dev)->impl_->logger().error("Failed to allocate %d bytes", *key_blob_length);
+        LOG_E("Failed to allocate %d bytes", *key_blob_length);
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }
     memcpy(*key_blob, response.key_blob.key_material, *key_blob_length);
-    convert_device(dev)->impl_->logger().debug("Returning %d bytes in key blob\n",
-                                               (int)*key_blob_length);
+    LOG_D("Returning %d bytes in key blob\n", (int)*key_blob_length);
 
     return KM_ERROR_OK;
 }
@@ -250,7 +242,7 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
 int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
                                             const uint8_t* key_blob, const size_t key_blob_length,
                                             uint8_t** x509_data, size_t* x509_data_length) {
-    convert_device(dev)->impl_->logger().debug("Device received get_keypair_public");
+    LOG_D("Device received get_keypair_public");
 
     ExportKeyRequest req;
     req.SetKeyMaterial(key_blob, key_blob_length);
@@ -259,8 +251,7 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
     ExportKeyResponse rsp;
     convert_device(dev)->impl_->ExportKey(req, &rsp);
     if (rsp.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_keypair_public failed with error: %d",
-                                                   rsp.error);
+        LOG_E("get_keypair_public failed with error: %d", rsp.error);
         return rsp.error;
     }
 
@@ -269,8 +260,7 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
     if (!*x509_data)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memcpy(*x509_data, rsp.key_data, *x509_data_length);
-    convert_device(dev)->impl_->logger().debug("Returning %d bytes in x509 key\n",
-                                               (int)*x509_data_length);
+    LOG_D("Returning %d bytes in x509 key\n", (int)*x509_data_length);
 
     return KM_ERROR_OK;
 }
@@ -280,7 +270,7 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
                                    const uint8_t* key_blob, const size_t key_blob_length,
                                    const uint8_t* data, const size_t data_length,
                                    uint8_t** signed_data, size_t* signed_data_length) {
-    convert_device(dev)->impl_->logger().debug("Device received sign_data");
+    LOG_D("Device received sign_data");
 
     *signed_data_length = 0;
 
@@ -295,8 +285,7 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
     BeginOperationResponse begin_response;
     convert_device(dev)->impl_->BeginOperation(begin_request, &begin_response);
     if (begin_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "sign_data begin operation failed with error: %d", begin_response.error);
+        LOG_E("sign_data begin operation failed with error: %d", begin_response.error);
         return begin_response.error;
     }
 
@@ -306,8 +295,7 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
     UpdateOperationResponse update_response;
     convert_device(dev)->impl_->UpdateOperation(update_request, &update_response);
     if (update_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "sign_data update operation failed with error: %d", update_response.error);
+        LOG_E("sign_data update operation failed with error: %d", update_response.error);
         return update_response.error;
     }
 
@@ -316,8 +304,7 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
     FinishOperationResponse finish_response;
     convert_device(dev)->impl_->FinishOperation(finish_request, &finish_response);
     if (finish_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "sign_data finish operation failed with error: %d", finish_response.error);
+        LOG_E("sign_data finish operation failed with error: %d", finish_response.error);
         return finish_response.error;
     }
 
@@ -335,7 +322,7 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
                                      const uint8_t* key_blob, const size_t key_blob_length,
                                      const uint8_t* signed_data, const size_t signed_data_length,
                                      const uint8_t* signature, const size_t signature_length) {
-    convert_device(dev)->impl_->logger().debug("Device received verify_data");
+    LOG_D("Device received verify_data");
 
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_VERIFY;
@@ -350,8 +337,7 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
     BeginOperationResponse begin_response;
     convert_device(dev)->impl_->BeginOperation(begin_request, &begin_response);
     if (begin_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "verify_data begin operation failed with error: %d", begin_response.error);
+        LOG_E("verify_data begin operation failed with error: %d", begin_response.error);
         return begin_response.error;
     }
 
@@ -361,8 +347,7 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
     UpdateOperationResponse update_response;
     convert_device(dev)->impl_->UpdateOperation(update_request, &update_response);
     if (update_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "verify_data update operation failed with error: %d", update_response.error);
+        LOG_E("verify_data update operation failed with error: %d", update_response.error);
         return update_response.error;
     }
 
@@ -372,8 +357,7 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
     FinishOperationResponse finish_response;
     convert_device(dev)->impl_->FinishOperation(finish_request, &finish_response);
     if (finish_response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error(
-            "verify_data finish operation failed with error: %d", finish_response.error);
+        LOG_E("verify_data finish operation failed with error: %d", finish_response.error);
         return finish_response.error;
     }
     return KM_ERROR_OK;
@@ -389,8 +373,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const keymaster1
     SupportedResponse<keymaster_algorithm_t> response;
     convert_device(dev)->impl_->SupportedAlgorithms(&response);
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_algorithms failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_algorithms failed with %d", response.error);
 
         return response.error;
     }
@@ -417,8 +400,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const keymaster
     convert_device(dev)->impl_->SupportedBlockModes(algorithm, purpose, &response);
 
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_block_modes failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_block_modes failed with %d", response.error);
 
         return response.error;
     }
@@ -444,8 +426,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(const keymast
     convert_device(dev)->impl_->SupportedPaddingModes(algorithm, purpose, &response);
 
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_padding_modes failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_padding_modes failed with %d", response.error);
         return response.error;
     }
 
@@ -470,8 +451,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_digests(const keymaster1_de
     convert_device(dev)->impl_->SupportedDigests(algorithm, purpose, &response);
 
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_digests failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_digests failed with %d", response.error);
         return response.error;
     }
 
@@ -494,8 +474,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
     convert_device(dev)->impl_->SupportedImportFormats(algorithm, &response);
 
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_import_formats failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_import_formats failed with %d", response.error);
         return response.error;
     }
 
@@ -519,8 +498,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
     convert_device(dev)->impl_->SupportedExportFormats(algorithm, &response);
 
     if (response.error != KM_ERROR_OK) {
-        convert_device(dev)->impl_->logger().error("get_supported_export_formats failed with %d",
-                                                   response.error);
+        LOG_E("get_supported_export_formats failed with %d", response.error);
         return response.error;
     }
 

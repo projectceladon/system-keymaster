@@ -20,6 +20,9 @@
 
 #include <openssl/err.h>
 
+#include <keymaster/logger.h>
+
+#include "openssl_err.h"
 #include "openssl_utils.h"
 #include "rsa_key.h"
 
@@ -98,8 +101,7 @@ static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE};
  */
 class RsaDigestingOperationFactory : public RsaOperationFactory {
   public:
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
 
     virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
         *digest_count = array_length(supported_digests);
@@ -112,12 +114,11 @@ class RsaDigestingOperationFactory : public RsaOperationFactory {
     }
 
   private:
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
-                                            keymaster_padding_t padding, RSA* key) = 0;
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                            RSA* key) = 0;
 };
 
-Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key, const Logger& logger,
-                                                         keymaster_error_t* error) {
+Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
     keymaster_padding_t padding;
     keymaster_digest_t digest;
     RSA* rsa;
@@ -125,7 +126,7 @@ Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key, const L
         !GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
         return NULL;
 
-    Operation* op = InstantiateOperation(logger, digest, padding, rsa);
+    Operation* op = InstantiateOperation(digest, padding, rsa);
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return op;
@@ -140,8 +141,7 @@ static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_RSA_OAEP,
  */
 class RsaCryptingOperationFactory : public RsaOperationFactory {
   public:
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
 
     virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
         *padding_mode_count = array_length(supported_crypt_padding);
@@ -154,18 +154,16 @@ class RsaCryptingOperationFactory : public RsaOperationFactory {
     }
 
   private:
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
-                                            RSA* key) = 0;
+    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) = 0;
 };
 
-Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key, const Logger& logger,
-                                                        keymaster_error_t* error) {
+Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
     keymaster_padding_t padding;
     RSA* rsa;
     if (!GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
         return NULL;
 
-    Operation* op = InstantiateOperation(logger, padding, rsa);
+    Operation* op = InstantiateOperation(padding, rsa);
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return op;
@@ -177,9 +175,9 @@ Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key, const Lo
 class RsaSigningOperationFactory : public RsaDigestingOperationFactory {
   public:
     virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_SIGN; }
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
-                                            keymaster_padding_t padding, RSA* key) {
-        return new RsaSignOperation(logger, digest, padding, key);
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                            RSA* key) {
+        return new RsaSignOperation(digest, padding, key);
     }
 };
 static OperationFactoryRegistry::Registration<RsaSigningOperationFactory> sign_registration;
@@ -189,9 +187,9 @@ static OperationFactoryRegistry::Registration<RsaSigningOperationFactory> sign_r
  */
 class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
     virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_VERIFY; }
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
-                                            keymaster_padding_t padding, RSA* key) {
-        return new RsaVerifyOperation(logger, digest, padding, key);
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                            RSA* key) {
+        return new RsaVerifyOperation(digest, padding, key);
     }
 };
 static OperationFactoryRegistry::Registration<RsaVerificationOperationFactory> verify_registration;
@@ -201,9 +199,8 @@ static OperationFactoryRegistry::Registration<RsaVerificationOperationFactory> v
  */
 class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
     virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_ENCRYPT; }
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
-                                            RSA* key) {
-        return new RsaEncryptOperation(logger, padding, key);
+    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) {
+        return new RsaEncryptOperation(padding, key);
     }
 };
 static OperationFactoryRegistry::Registration<RsaEncryptionOperationFactory> encrypt_registration;
@@ -213,9 +210,8 @@ static OperationFactoryRegistry::Registration<RsaEncryptionOperationFactory> enc
  */
 class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
     virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_DECRYPT; }
-    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
-                                            RSA* key) {
-        return new RsaDecryptOperation(logger, padding, key);
+    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) {
+        return new RsaDecryptOperation(padding, key);
     }
 };
 
@@ -315,21 +311,21 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     case KM_PAD_RSA_OAEP:
         openssl_padding = RSA_PKCS1_OAEP_PADDING;
         if (message_size >= RSA_size(rsa_key_) - OAEP_PADDING_OVERHEAD) {
-            logger().error("Cannot encrypt %d bytes with %d-byte key and OAEP padding",
-                           data_.available_read(), RSA_size(rsa_key_));
+            LOG_E("Cannot encrypt %d bytes with %d-byte key and OAEP padding",
+                  data_.available_read(), RSA_size(rsa_key_));
             return KM_ERROR_INVALID_INPUT_LENGTH;
         }
         break;
     case KM_PAD_RSA_PKCS1_1_5_ENCRYPT:
         openssl_padding = RSA_PKCS1_PADDING;
         if (message_size >= RSA_size(rsa_key_) - PKCS1_PADDING_OVERHEAD) {
-            logger().error("Cannot encrypt %d bytes with %d-byte key and PKCS1 padding",
-                           data_.available_read(), RSA_size(rsa_key_));
+            LOG_E("Cannot encrypt %d bytes with %d-byte key and PKCS1 padding",
+                  data_.available_read(), RSA_size(rsa_key_));
             return KM_ERROR_INVALID_INPUT_LENGTH;
         }
         break;
     default:
-        logger().error("Padding mode %d not supported", padding_);
+        LOG_E("Padding mode %d not supported", padding_);
         return KM_ERROR_UNSUPPORTED_PADDING_MODE;
     }
 
@@ -338,7 +334,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
                                              output->peek_write(), rsa_key_, openssl_padding);
 
     if (bytes_encrypted < 0) {
-        logger().error("Error %d encrypting data with RSA", ERR_get_error());
+        LOG_E("Error %d encrypting data with RSA", ERR_get_error());
         return KM_ERROR_UNKNOWN_ERROR;
     }
     assert(bytes_encrypted == RSA_size(rsa_key_));
@@ -359,7 +355,7 @@ keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additio
         openssl_padding = RSA_PKCS1_PADDING;
         break;
     default:
-        logger().error("Padding mode %d not supported", padding_);
+        LOG_E("Padding mode %d not supported", padding_);
         return KM_ERROR_UNSUPPORTED_PADDING_MODE;
     }
 
@@ -368,7 +364,7 @@ keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additio
                                               output->peek_write(), rsa_key_, openssl_padding);
 
     if (bytes_decrypted < 0) {
-        logger().error("Error %d decrypting data with RSA", ERR_get_error());
+        LOG_E("Error %d decrypting data with RSA", ERR_get_error());
         return KM_ERROR_UNKNOWN_ERROR;
     }
     output->advance_write(bytes_decrypted);

@@ -25,9 +25,8 @@ namespace keymaster {
 
 class AesKey : public SymmetricKey {
   public:
-    AesKey(const AuthorizationSet& auths, const Logger& logger) : SymmetricKey(auths, logger) {}
-    AesKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
-        : SymmetricKey(blob, logger, error) {}
+    AesKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
+    AesKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
 };
 
 }  // namespace keymaster

@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-#include "openssl_utils.h"
 #include "rsa_key.h"
+
+#include "openssl_err.h"
+#include "openssl_utils.h"
 #include "rsa_operation.h"
 #include "unencrypted_key_blob.h"
 
@@ -33,20 +35,17 @@ const uint64_t RSA_DEFAULT_EXPONENT = 65537;
 class RsaKeyFactory : public AsymmetricKeyFactory {
   public:
     virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_RSA; }
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                             keymaster_error_t* error);
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
     virtual Key* ImportKey(const AuthorizationSet& key_description,
                            keymaster_key_format_t key_format, const uint8_t* key_data,
-                           size_t key_data_length, const Logger& logger, keymaster_error_t* error);
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
-                         keymaster_error_t* error) {
-        return new RsaKey(blob, logger, error);
+                           size_t key_data_length, keymaster_error_t* error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+        return new RsaKey(blob, error);
     }
 };
 static KeyFactoryRegistry::Registration<RsaKeyFactory> registration;
 
-Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                                keymaster_error_t* error) {
+Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -70,19 +69,18 @@ Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const L
 
     if (!BN_set_word(exponent.get(), public_exponent) ||
         !RSA_generate_key_ex(rsa_key.get(), key_size, exponent.get(), NULL /* callback */)) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
+        *error = TranslateLastOpenSslError();
         return NULL;
     }
 
-    RsaKey* new_key = new RsaKey(rsa_key.release(), authorizations, logger);
+    RsaKey* new_key = new RsaKey(rsa_key.release(), authorizations);
     *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return new_key;
 }
 
 Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
                               keymaster_key_format_t key_format, const uint8_t* key_data,
-                              size_t key_data_length, const Logger& logger,
-                              keymaster_error_t* error) {
+                              size_t key_data_length, keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -94,7 +92,7 @@ Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
 
     UniquePtr<RSA, RsaKey::RSA_Delete> rsa_key(EVP_PKEY_get1_RSA(pkey.get()));
     if (!rsa_key.get()) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
+        *error = TranslateLastOpenSslError();
         return NULL;
     }
 
@@ -146,11 +144,10 @@ Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
     // missing, the error will be diagnosed when the key is used (when auth checking is
     // implemented).
     *error = KM_ERROR_OK;
-    return new RsaKey(rsa_key.release(), authorizations, logger);
+    return new RsaKey(rsa_key.release(), authorizations);
 }
 
-RsaKey::RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
-    : AsymmetricKey(blob, logger) {
+RsaKey::RsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
     if (error)
         *error = LoadKey(blob);
 }

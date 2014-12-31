@@ -28,10 +28,10 @@ class AeadModeOperation : public Operation {
     static const size_t MAX_TAG_LENGTH = 16;
     static const size_t MAX_KEY_LENGTH = 32;
 
-    AeadModeOperation(keymaster_purpose_t purpose, const Logger& logger, const uint8_t* key,
-                      size_t key_size, size_t chunk_length, size_t tag_length, size_t nonce_length,
+    AeadModeOperation(keymaster_purpose_t purpose, const uint8_t* key, size_t key_size,
+                      size_t chunk_length, size_t tag_length, size_t nonce_length,
                       keymaster_blob_t additional_data)
-        : Operation(purpose, logger), key_size_(key_size), tag_length_(tag_length),
+        : Operation(purpose), key_size_(key_size), tag_length_(tag_length),
           nonce_length_(nonce_length),
           processing_unit_(purpose == KM_PURPOSE_DECRYPT ? chunk_length + tag_length
                                                          : chunk_length),

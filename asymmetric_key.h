@@ -39,7 +39,7 @@ class AsymmetricKeyFactory : public KeyFactory {
 class AsymmetricKey : public Key {
   public:
   protected:
-    AsymmetricKey(const KeyBlob& blob, const Logger& logger) : Key(blob, logger) {}
+    AsymmetricKey(const KeyBlob& blob) : Key(blob) {}
     keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
 
     /**
@@ -55,7 +55,7 @@ class AsymmetricKey : public Key {
                                                      size_t* size) const;
 
   protected:
-    AsymmetricKey(const AuthorizationSet& auths, const Logger& logger) : Key(auths, logger) {}
+    AsymmetricKey(const AuthorizationSet& auths) : Key(auths) {}
 
   private:
     virtual int evp_key_type() = 0;

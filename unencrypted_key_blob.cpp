@@ -24,6 +24,7 @@
 #include "ae.h"
 #include "unencrypted_key_blob.h"
 #include "ocb_utils.h"
+#include "openssl_err.h"
 
 namespace keymaster {
 
@@ -155,7 +156,7 @@ AeCtx* UnencryptedKeyBlob::InitializeKeyWrappingContext(const uint8_t* master_ke
     AES_KEY aes_key;
     Eraser aes_key_eraser(AES_KEY);
     if (AES_set_encrypt_key(master_key, master_key_length * 8, &aes_key) != 0) {
-        error_ = KM_ERROR_UNKNOWN_ERROR;
+        error_ = TranslateLastOpenSslError();
         return NULL;
     }
     AES_encrypt(hash_buf.get(), derived_key.get(), &aes_key);
