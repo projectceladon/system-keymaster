@@ -13,3 +13,4 @@
 /key_blob_test
 /trusty_keymaster_device_test
 /abstract_factory_registry_test
+/keymaster_enforcement_test
