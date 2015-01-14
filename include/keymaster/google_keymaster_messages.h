@@ -186,6 +186,7 @@ struct GenerateKeyResponse : public KeymasterResponse {
 struct GetKeyCharacteristicsRequest : public KeymasterMessage {
     GetKeyCharacteristicsRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
         key_blob.key_material = NULL;
+        key_blob.key_material_size = 0;
     }
     ~GetKeyCharacteristicsRequest();
 
@@ -215,6 +216,7 @@ struct GetKeyCharacteristicsResponse : public KeymasterResponse {
 struct BeginOperationRequest : public KeymasterMessage {
     BeginOperationRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
         key_blob.key_material = NULL;
+        key_blob.key_material_size = 0;
     }
     ~BeginOperationRequest() { delete[] key_blob.key_material; }
 
@@ -304,6 +306,9 @@ struct ImportKeyRequest : public KeymasterMessage {
     ~ImportKeyRequest() { delete[] key_data; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
 
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
@@ -318,6 +323,7 @@ struct ImportKeyRequest : public KeymasterMessage {
 struct ImportKeyResponse : public KeymasterResponse {
     ImportKeyResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {
         key_blob.key_material = NULL;
+        key_blob.key_material_size = 0;
     }
     ~ImportKeyResponse() { delete[] key_blob.key_material; }
 
@@ -338,6 +344,7 @@ struct ImportKeyResponse : public KeymasterResponse {
 struct ExportKeyRequest : public KeymasterMessage {
     ExportKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
         key_blob.key_material = NULL;
+        key_blob.key_material_size = 0;
     }
     ~ExportKeyRequest() { delete[] key_blob.key_material; }
 
@@ -360,6 +367,9 @@ struct ExportKeyResponse : public KeymasterResponse {
     ~ExportKeyResponse() { delete[] key_data; }
 
     void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
 
     size_t NonErrorSerializedSize() const;
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
