@@ -412,6 +412,13 @@ void AuthorizationSet::CopyIndirectData() {
     indirect_data_size_ = indirect_data_pos - indirect_data_;
 }
 
+size_t AuthorizationSet::GetTagCount(keymaster_tag_t tag) const {
+    size_t count = 0;
+    for (int pos = -1; (pos = find(tag, pos)) != -1;)
+        ++count;
+    return count;
+}
+
 bool AuthorizationSet::GetTagValueEnum(keymaster_tag_t tag, uint32_t* val) const {
     int pos = find(tag);
     if (pos == -1) {
