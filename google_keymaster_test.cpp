@@ -1135,5 +1135,16 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     EXPECT_EQ(0, result.size());
 }
 
+typedef KeymasterTest VersionTest;
+TEST_F(VersionTest, GetVersion) {
+    GetVersionRequest req;
+    GetVersionResponse rsp;
+    device.GetVersion(req, &rsp);
+    EXPECT_EQ(KM_ERROR_OK, rsp.error);
+    EXPECT_EQ(1, rsp.major_ver);
+    EXPECT_EQ(0, rsp.minor_ver);
+    EXPECT_EQ(0, rsp.subminor_ver);
+}
+
 }  // namespace test
 }  // namespace keymaster

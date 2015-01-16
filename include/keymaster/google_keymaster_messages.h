@@ -33,6 +33,7 @@ const uint32_t FINISH_OPERATION = 3;
 const uint32_t ABORT_OPERATION = 4;
 const uint32_t IMPORT_KEY = 5;
 const uint32_t EXPORT_KEY = 6;
+const uint32_t GET_VERSION = 7;
 
 /**
  * All responses include an error value, and if the error is not KM_ERROR_OK, return no additional
@@ -41,6 +42,8 @@ const uint32_t EXPORT_KEY = 6;
  * structure, but in this case it's the cleanest option.
  */
 struct KeymasterResponse : public Serializable {
+    KeymasterResponse() : error(KM_ERROR_UNKNOWN_ERROR) {}
+
     size_t SerializedSize() const;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
@@ -68,7 +71,7 @@ template <typename T> struct SupportedResponse : public KeymasterResponse {
     SupportedResponse() : results(NULL), results_length(0) {}
     ~SupportedResponse() { delete[] results; }
 
-    template <size_t N> void SetResults(const T (&arr)[N]) {
+    template <size_t N> void SetResults(const T(&arr)[N]) {
         delete[] results;
         results_length = 0;
         results = dup_array(arr);
@@ -290,6 +293,24 @@ struct ExportKeyResponse : public KeymasterResponse {
 
     uint8_t* key_data;
     size_t key_data_length;
+};
+
+struct GetVersionRequest : public Serializable {
+    size_t SerializedSize() const { return 0; }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t*) const { return buf; }
+    bool Deserialize(const uint8_t**, const uint8_t*) { return true; };
+};
+
+struct GetVersionResponse : public KeymasterResponse {
+    GetVersionResponse() : major_ver(0), minor_ver(0), subminor_ver(0) {}
+
+    size_t NonErrorSerializedSize() const;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    uint8_t major_ver;
+    uint8_t minor_ver;
+    uint8_t subminor_ver;
 };
 
 // The structs below are trivial because they're not implemented yet.
