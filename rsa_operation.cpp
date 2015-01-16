@@ -34,7 +34,9 @@ RsaOperation::~RsaOperation() {
         RSA_free(rsa_key_);
 }
 
-keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */) {
+keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */,
+                                       size_t* input_consumed) {
+    assert(input_consumed);
     switch (purpose()) {
     default:
         return KM_ERROR_UNIMPLEMENTED;
@@ -42,18 +44,21 @@ keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */
     case KM_PURPOSE_VERIFY:
     case KM_PURPOSE_ENCRYPT:
     case KM_PURPOSE_DECRYPT:
-        return StoreData(input);
+        return StoreData(input, input_consumed);
     }
 }
 
-keymaster_error_t RsaOperation::StoreData(const Buffer& input) {
+keymaster_error_t RsaOperation::StoreData(const Buffer& input, size_t* input_consumed) {
+    assert(input_consumed);
     if (!data_.reserve(data_.available_read() + input.available_read()) ||
         !data_.write(input.peek_read(), input.available_read()))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    *input_consumed = input.available_read();
     return KM_ERROR_OK;
 }
 
 keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+    assert(output);
     output->Reinitialize(RSA_size(rsa_key_));
     int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
                                               output->peek_write(), rsa_key_, RSA_NO_PADDING);
@@ -95,6 +100,7 @@ const int OAEP_PADDING_OVERHEAD = 41;
 const int PKCS1_PADDING_OVERHEAD = 11;
 
 keymaster_error_t RsaEncryptOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+    assert(output);
     int openssl_padding;
 
 #if defined(OPENSSL_IS_BORINGSSL)
@@ -142,6 +148,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const Buffer& /* signature */, Buf
 }
 
 keymaster_error_t RsaDecryptOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+    assert(output);
     int openssl_padding;
     switch (padding_) {
     case KM_PAD_RSA_OAEP:

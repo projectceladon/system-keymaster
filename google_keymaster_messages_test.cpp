@@ -215,7 +215,7 @@ TEST(RoundTrip, UpdateOperationResponse) {
     msg.error = KM_ERROR_OK;
     msg.output.Reinitialize("foo", 3);
 
-    UniquePtr<UpdateOperationResponse> deserialized(round_trip(msg, 11));
+    UniquePtr<UpdateOperationResponse> deserialized(round_trip(msg, 15));
     EXPECT_EQ(KM_ERROR_OK, deserialized->error);
     EXPECT_EQ(3U, deserialized->output.available_read());
     EXPECT_EQ(0, memcmp(deserialized->output.peek_read(), "foo", 3));
