@@ -23,22 +23,9 @@
 
 #include "ae.h"
 #include "unencrypted_key_blob.h"
+#include "ocb_utils.h"
 
 namespace keymaster {
-
-class UnencryptedKeyBlob::AeCtx {
-  public:
-    AeCtx() : ctx_(ae_allocate(NULL)) {}
-    ~AeCtx() {
-        ae_clear(ctx_);
-        ae_free(ctx_);
-    }
-
-    ae_ctx* get() { return ctx_; }
-
-  private:
-    ae_ctx* ctx_;
-};
 
 UnencryptedKeyBlob::UnencryptedKeyBlob(const AuthorizationSet& enforced,
                                        const AuthorizationSet& unenforced,
@@ -135,9 +122,8 @@ void UnencryptedKeyBlob::DecryptKey(const uint8_t* master_key, size_t master_key
     error_ = KM_ERROR_OK;
 }
 
-UnencryptedKeyBlob::AeCtx*
-UnencryptedKeyBlob::InitializeKeyWrappingContext(const uint8_t* master_key,
-                                                 size_t master_key_length) {
+AeCtx* UnencryptedKeyBlob::InitializeKeyWrappingContext(const uint8_t* master_key,
+                                                        size_t master_key_length) {
     size_t derivation_data_length;
     UniquePtr<const uint8_t[]> derivation_data(BuildDerivationData(&derivation_data_length));
     if (derivation_data.get() == NULL) {
