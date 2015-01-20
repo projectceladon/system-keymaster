@@ -249,8 +249,7 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
         return;
     }
 
-    response->error =
-        entry->operation->Update(request.input, &response->output, &response->input_consumed);
+    response->error = entry->operation->Update(request.input, &response->output);
     if (response->error != KM_ERROR_OK) {
         // Any error invalidates the operation.
         DeleteOperation(entry);

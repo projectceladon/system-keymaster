@@ -188,16 +188,15 @@ bool UpdateOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t*
 }
 
 size_t UpdateOperationResponse::NonErrorSerializedSize() const {
-    return output.SerializedSize() + sizeof(uint32_t);
+    return output.SerializedSize();
 }
 
 uint8_t* UpdateOperationResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    buf = output.Serialize(buf, end);
-    return append_uint32_to_buf(buf, end, input_consumed);
+    return output.Serialize(buf, end);
 }
 
 bool UpdateOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return output.Deserialize(buf_ptr, end) && copy_uint32_from_buf(buf_ptr, end, &input_consumed);
+    return output.Deserialize(buf_ptr, end);
 }
 
 size_t FinishOperationRequest::SerializedSize() const {
