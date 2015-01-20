@@ -345,8 +345,10 @@ bool AuthorizationSet::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) 
 }
 
 void AuthorizationSet::FreeData() {
-    memset_s(elems_, 0, elems_size_ * sizeof(keymaster_key_param_t));
-    memset_s(indirect_data_, 0, indirect_data_size_);
+    if (elems_ != NULL)
+        memset_s(elems_, 0, elems_size_ * sizeof(keymaster_key_param_t));
+    if (indirect_data_ != NULL)
+        memset_s(indirect_data_, 0, indirect_data_size_);
 
     delete[] elems_;
     delete[] indirect_data_;

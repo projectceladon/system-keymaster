@@ -131,7 +131,8 @@ bool Buffer::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
 }
 
 void Buffer::Clear() {
-    memset_s(buffer_.get(), 0, buffer_size_);
+    if (buffer_.get())
+        memset_s(buffer_.get(), 0, buffer_size_);
     buffer_.reset();
     read_position_ = 0;
     write_position_ = 0;
