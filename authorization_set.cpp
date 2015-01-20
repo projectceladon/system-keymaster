@@ -344,22 +344,18 @@ bool AuthorizationSet::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) 
     return true;
 }
 
-void AuthorizationSet::Clear() {
+void AuthorizationSet::FreeData() {
     memset_s(elems_, 0, elems_size_ * sizeof(keymaster_key_param_t));
     memset_s(indirect_data_, 0, indirect_data_size_);
-    elems_size_ = 0;
-    indirect_data_size_ = 0;
-}
-
-void AuthorizationSet::FreeData() {
-    Clear();
 
     delete[] elems_;
     delete[] indirect_data_;
 
     elems_ = NULL;
     indirect_data_ = NULL;
+    elems_size_ = 0;
     elems_capacity_ = 0;
+    indirect_data_size_ = 0;
     indirect_data_capacity_ = 0;
     error_ = OK;
 }

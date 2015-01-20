@@ -396,8 +396,6 @@ keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key
                                                      keymaster_key_origin_t origin,
                                                      AuthorizationSet* enforced,
                                                      AuthorizationSet* unenforced) {
-    enforced->Clear();
-    unenforced->Clear();
     for (size_t i = 0; i < key_description.size(); ++i) {
         switch (key_description[i].tag) {
         // These cannot be specified by the client.
