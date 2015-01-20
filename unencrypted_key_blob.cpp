@@ -175,11 +175,11 @@ UnencryptedKeyBlob::InitializeKeyWrappingContext(const uint8_t* master_key,
     AES_encrypt(hash_buf.get(), derived_key.get(), &aes_key);
 
     // Set up AES OCB context using derived key.
-    if (ae_init(ctx->get(), derived_key.get(), AES_BLOCK_SIZE /* key length */, NONCE_LENGTH,
-                TAG_LENGTH) == AE_SUCCESS)
+    if (ae_init(ctx->get(), derived_key.get(), AES_BLOCK_SIZE, NONCE_LENGTH, TAG_LENGTH) ==
+        AE_SUCCESS)
         return ctx.release();
     else {
-        memset_s(ctx->get(), 0, ae_ctx_sizeof());
+        memset_s(ctx.get(), 0, ae_ctx_sizeof());
         return NULL;
     }
 }
