@@ -374,7 +374,6 @@ typedef enum {
     KM_ERROR_SECURE_HW_COMMUNICATION_FAILED = -49,
     KM_ERROR_UNSUPPORTED_EC_FIELD = -50,
     KM_ERROR_UNIMPLEMENTED = -100,
-    KM_ERROR_VERSION_MISMATCH = -101,
 
     /* Additional error codes may be added by implementations, but implementers should coordinate
      * with Google to avoid code collision. */

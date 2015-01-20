@@ -76,7 +76,6 @@ class GoogleKeymaster {
     void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
     keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
-    void GetVersion(const GetVersionRequest& request, GetVersionResponse* response);
 
     const Logger& logger() const { return *logger_; }
 
