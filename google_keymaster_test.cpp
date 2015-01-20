@@ -319,7 +319,7 @@ TEST_F(NewKeyGeneration, AesOcb) {
         Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
         Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
         Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_PADDING, KM_PAD_NONE),
     };
     req_.key_description.Reinitialize(params, array_length(params));
     device.GenerateKey(req_, &rsp_);
@@ -332,7 +332,7 @@ TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
         Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
         Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 129),
         Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_PADDING, KM_PAD_NONE),
     };
     req_.key_description.Reinitialize(params, array_length(params));
     device.GenerateKey(req_, &rsp_);
@@ -343,8 +343,9 @@ TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
         Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_BLOCK_MODE, KM_MODE_OCB),
-        Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_CHUNK_LENGTH, 4096),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES),
+        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB),
+        Authorization(TAG_CHUNK_LENGTH, 4096),
         Authorization(TAG_PADDING, KM_PAD_NONE),
     };
 
@@ -367,7 +368,7 @@ TEST_F(NewKeyGeneration, AesOcbNoChunkLength) {
     };
     req_.key_description.Reinitialize(params, array_length(params));
     device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, rsp_.error);
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, rsp_.error);
 }
 
 TEST_F(NewKeyGeneration, AesEcbUnsupported) {
@@ -393,19 +394,6 @@ TEST_F(NewKeyGeneration, AesOcbPaddingUnsupported) {
     req_.key_description.Reinitialize(params, array_length(params));
     device.GenerateKey(req_, &rsp_);
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, rsp_.error);
-}
-
-TEST_F(NewKeyGeneration, AesOcbInvalidMacLength) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_MAC_LENGTH, 17), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, rsp_.error);
 }
 
 typedef KeymasterTest GetKeyCharacteristics;

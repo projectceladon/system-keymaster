@@ -51,28 +51,16 @@ AesKey* AesKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         if (!authorizations.GetTagValue(TAG_CHUNK_LENGTH, &chunk_length) ||
             !chunk_length_is_supported(chunk_length)) {
             // TODO(swillden): Add a better error code for this.
-            *error = KM_ERROR_INVALID_ARGUMENT;
+            *error = KM_ERROR_INVALID_INPUT_LENGTH;
             return NULL;
         }
     }
 
     // Padding is optional
     keymaster_padding_t padding;
-    if (authorizations.GetTagValue(TAG_PADDING, &padding) &&
-        !padding_is_supported(block_mode, padding)) {
+    if (authorizations.GetTagValue(TAG_PADDING, &padding) && !padding_is_supported(padding)) {
         *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
         return NULL;
-    }
-
-    // Check required for some modes.
-    uint32_t mac_length;
-    if (mac_length_required(block_mode)) {
-        if (!authorizations.GetTagValue(TAG_MAC_LENGTH, &mac_length) ||
-            !mac_length_is_supported(block_mode, mac_length)) {
-            // TODO(swillden): Add a better error code for this.
-            *error = KM_ERROR_INVALID_ARGUMENT;
-            return NULL;
-        }
     }
 
     // Verify purpose is compatible with block mode.

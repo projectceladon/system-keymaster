@@ -28,7 +28,6 @@ const uint32_t MAX_AES_CHUNK_LENGTH = 64 * 1024;
 class AesKey : public Key {
   public:
     static const int MAX_KEY_SIZE = 32;
-    static const int MAX_MAC_LENGTH = 16;
 
     AesKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     ~AesKey();
@@ -48,13 +47,7 @@ class AesKey : public Key {
         return (chunk_length <= MAX_AES_CHUNK_LENGTH);
     }
 
-    static bool mac_length_required(keymaster_block_mode_t) { return true; }
-
-    static bool mac_length_is_supported(keymaster_block_mode_t, uint32_t mac_length) {
-        return (mac_length <= MAX_MAC_LENGTH);
-    }
-
-    static bool padding_is_supported(keymaster_block_mode_t, keymaster_padding_t padding) {
+    static bool padding_is_supported(keymaster_padding_t padding) {
         return (padding == KM_PAD_NONE);
     }
 
