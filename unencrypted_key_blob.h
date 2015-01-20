@@ -21,8 +21,6 @@
 
 namespace keymaster {
 
-class AeCtx;
-
 /**
  * Extends KeyBlob to provide access the the unencrypted key material as well as the encrypted form.
  */
@@ -68,6 +66,7 @@ class UnencryptedKeyBlob : public KeyBlob {
      * Create an AES_OCB context initialized with a key derived using \p master_key and the
      * authorizations.
      */
+    class AeCtx;
     AeCtx* InitializeKeyWrappingContext(const uint8_t* master_key, size_t master_key_length);
 
     const uint8_t* BuildDerivationData(size_t* derivation_data_len) const;

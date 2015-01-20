@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-#include <assert.h>
-
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
 #include "aes_key.h"
-#include "aes_operation.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
@@ -71,16 +67,20 @@ AesKey* AesKey::GenerateKey(const AuthorizationSet& key_description, const Logge
 
     // All required tags seem to be present and valid.  Generate the key bits.
     size_t key_data_size = key_size_bits / 8;
-    uint8_t key_data[MAX_KEY_SIZE];
-    Eraser erase_key_data(key_data, MAX_KEY_SIZE);
-    if (!RAND_bytes(key_data, key_data_size)) {
+    UniquePtr<uint8_t[]> key_data(new uint8_t[key_data_size]);
+    if (!key_data.get()) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return NULL;
+    }
+
+    if (!RAND_bytes(key_data.get(), key_data_size)) {
         logger.error("Error %ul generating %d bit AES key", ERR_get_error(), key_size_bits);
         *error = KM_ERROR_UNKNOWN_ERROR;
         return NULL;
     }
 
     *error = KM_ERROR_OK;
-    return new AesKey(key_data, key_data_size, authorizations, logger);
+    return new AesKey(key_data.release(), key_data_size, authorizations, logger);
 }
 
 bool AesKey::ModeAndPurposesAreCompatible(const AuthorizationSet& authorizations,
@@ -109,87 +109,15 @@ bool AesKey::ModeAndPurposesAreCompatible(const AuthorizationSet& authorizations
     return true;
 }
 
-AesKey::AesKey(const uint8_t(&key_data)[MAX_KEY_SIZE], size_t key_data_size,
-               AuthorizationSet& auths, const Logger& logger)
-    : Key(auths, logger), key_data_size_(key_data_size) {
-    memcpy(key_data_, key_data, key_data_size);
-}
-
-AesKey::AesKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
-    : Key(blob, logger), key_data_size_(blob.unencrypted_key_material_length()) {
-    if (error)
-        *error = LoadKey(blob);
-}
-
-AesKey::~AesKey() {
-    memset_s(key_data_, 0, MAX_KEY_SIZE);
-}
-
-keymaster_error_t AesKey::LoadKey(const UnencryptedKeyBlob& blob) {
-    assert(blob.unencrypted_key_material_length() == key_data_size_);
-    memcpy(key_data_, blob.unencrypted_key_material(), key_data_size_);
-
-    return KM_ERROR_OK;
-}
-
-Operation* AesKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    keymaster_block_mode_t block_mode;
-    if (!authorizations().GetTagValue(TAG_BLOCK_MODE, &block_mode)) {
-        *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return NULL;
-    }
-
-    switch (block_mode) {
-    case KM_MODE_OCB:
-        return CreateOcbOperation(purpose, error);
-    default:
-        *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return NULL;
-    }
-}
-
-Operation* AesKey::CreateOcbOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
-
-    uint32_t chunk_length;
-    if (!authorizations().GetTagValue(TAG_CHUNK_LENGTH, &chunk_length))
-        // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_INPUT_LENGTH;
-
-    uint32_t tag_length;
-    if (!authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length))
-        // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_INPUT_LENGTH;
-
-    if (*error != KM_ERROR_OK)
-        return NULL;
-
-    keymaster_blob_t additional_data = {0, 0};
-    authorizations().GetTagValue(TAG_ADDITIONAL_DATA, &additional_data);
-
-    Operation* op = NULL;
-    switch (purpose) {
-    case KM_PURPOSE_ENCRYPT:
-        op = new AesOcbEncryptOperation(logger_, key_data_, key_data_size_, chunk_length,
-                                        tag_length, additional_data);
-        break;
-    default:
-        *error = KM_ERROR_UNSUPPORTED_PURPOSE;
-        return NULL;
-    }
-
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    return op;
+AesKey::AesKey(uint8_t* key_data, size_t key_data_size, AuthorizationSet& auths,
+               const Logger& logger)
+    : Key(auths, logger), key_data_(key_data), key_data_size_(key_data_size) {
 }
 
 keymaster_error_t AesKey::key_material(UniquePtr<uint8_t[]>* key_material, size_t* size) const {
     *size = key_data_size_;
     key_material->reset(new uint8_t[*size]);
-    if (!key_material->get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(key_material->get(), key_data_, *size);
+    memcpy(key_material->get(), key_data_.get(), *size);
     return KM_ERROR_OK;
 }
 
