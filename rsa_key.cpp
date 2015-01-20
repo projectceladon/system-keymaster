@@ -128,44 +128,30 @@ RsaKey::RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_e
 }
 
 Operation* RsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
-
-    keymaster_padding_t padding = static_cast<keymaster_padding_t>(-1);
-    authorizations().GetTagValue(TAG_PADDING, &padding);
-    if (!SupportedMode(purpose, padding)) {
+    keymaster_digest_t digest = KM_DIGEST_NONE;
+    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_NONE) {
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+        return NULL;
+    }
+    keymaster_padding_t padding = KM_PAD_NONE;
+    if (!authorizations().GetTagValue(TAG_PADDING, &padding) || padding != KM_PAD_NONE) {
         *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
         return NULL;
     }
 
-    keymaster_digest_t digest = static_cast<keymaster_digest_t>(-1);
-    authorizations().GetTagValue(TAG_DIGEST, &digest);
-    if (!SupportedMode(purpose, digest)) {
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
-        return NULL;
-    }
-
-    Operation* op = NULL;
+    Operation* op;
     switch (purpose) {
     case KM_PURPOSE_SIGN:
-        op = new RsaSignOperation(logger_, digest, padding, rsa_key_.release());
+        op = new RsaSignOperation(purpose, logger_, digest, padding, rsa_key_.release());
         break;
     case KM_PURPOSE_VERIFY:
-        op = new RsaVerifyOperation(logger_, digest, padding, rsa_key_.release());
-        break;
-    case KM_PURPOSE_ENCRYPT:
-        op = new RsaEncryptOperation(logger_, padding, rsa_key_.release());
-        break;
-    case KM_PURPOSE_DECRYPT:
-        op = new RsaDecryptOperation(logger_, padding, rsa_key_.release());
+        op = new RsaVerifyOperation(purpose, logger_, digest, padding, rsa_key_.release());
         break;
     default:
-        *error = KM_ERROR_UNSUPPORTED_PURPOSE;
+        *error = KM_ERROR_UNIMPLEMENTED;
         return NULL;
     }
-
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
+    *error = op ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return op;
 }
 
@@ -176,34 +162,6 @@ bool RsaKey::EvpToInternal(const EVP_PKEY* pkey) {
 
 bool RsaKey::InternalToEvp(EVP_PKEY* pkey) const {
     return EVP_PKEY_set1_RSA(pkey, rsa_key_.get()) == 1;
-}
-
-bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_padding_t padding) {
-    switch (purpose) {
-    case KM_PURPOSE_SIGN:
-    case KM_PURPOSE_VERIFY:
-        return padding == KM_PAD_NONE;
-        break;
-    case KM_PURPOSE_ENCRYPT:
-    case KM_PURPOSE_DECRYPT:
-        return padding == KM_PAD_RSA_OAEP || padding == KM_PAD_RSA_PKCS1_1_5_ENCRYPT;
-        break;
-    };
-    return false;
-}
-
-bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_digest_t digest) {
-    switch (purpose) {
-    case KM_PURPOSE_SIGN:
-    case KM_PURPOSE_VERIFY:
-        return digest == KM_DIGEST_NONE;
-        break;
-    case KM_PURPOSE_ENCRYPT:
-    case KM_PURPOSE_DECRYPT:
-        /* Don't care */
-        break;
-    };
-    return true;
 }
 
 }  // namespace keymaster

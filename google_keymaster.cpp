@@ -79,12 +79,10 @@ void GoogleKeymaster::SupportedBlockModes(
     response->error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
 }
 
-keymaster_padding_t supported_rsa_crypt_padding[] = {KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
-keymaster_padding_t supported_rsa_sign_padding[] = {KM_PAD_NONE};
 keymaster_padding_t supported_padding[] = {KM_PAD_NONE};
 
 void GoogleKeymaster::SupportedPaddingModes(
-    keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
+    keymaster_algorithm_t algorithm, keymaster_purpose_t /* purpose */,
     SupportedResponse<keymaster_padding_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
@@ -92,17 +90,6 @@ void GoogleKeymaster::SupportedPaddingModes(
     response->error = KM_ERROR_OK;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
-        switch (purpose) {
-        case KM_PURPOSE_ENCRYPT:
-        case KM_PURPOSE_DECRYPT:
-            response->SetResults(supported_rsa_crypt_padding);
-            break;
-        case KM_PURPOSE_SIGN:
-        case KM_PURPOSE_VERIFY:
-            response->SetResults(supported_rsa_sign_padding);
-            break;
-        }
-        break;
     case KM_ALGORITHM_DSA:
     case KM_ALGORITHM_ECDSA:
         response->SetResults(supported_padding);
