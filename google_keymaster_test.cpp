@@ -374,13 +374,12 @@ TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
 TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
     size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
-        GenerateKeyResponse rsp;
         req_.key_description.Reinitialize(key_generation_base_params,
                                           array_length(key_generation_base_params));
         req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
         req_.key_description.push_back(Authorization(TAG_KEY_SIZE, size));
-        device.GenerateKey(req_, &rsp);
-        EXPECT_EQ(KM_ERROR_OK, rsp.error) << "Failed to generate size: " << size;
+        device.GenerateKey(req_, &rsp_);
+        EXPECT_EQ(KM_ERROR_OK, rsp_.error) << "Failed to generate size: " << size;
     }
 }
 
