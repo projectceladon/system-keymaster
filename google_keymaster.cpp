@@ -51,14 +51,8 @@ struct AE_CTX_Delete {
 };
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
-// TODO(swillden): Unify support analysis.  Right now, we have per-keytype methods that determine if
-// specific modes, padding, etc. are supported for that key type, and GoogleKeymaster also has
-// methods that return the same information.  They'll get out of sync.  Best to put the knowledge in
-// the keytypes and provide some mechanism for GoogleKeymaster to query the keytypes for the
-// information.
-
 keymaster_algorithm_t supported_algorithms[] = {
-    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES,
+    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA,
 };
 
 template <typename T>

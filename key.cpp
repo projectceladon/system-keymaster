@@ -16,7 +16,6 @@
 
 #include <openssl/x509.h>
 
-#include "aes_key.h"
 #include "dsa_key.h"
 #include "ecdsa_key.h"
 #include "openssl_utils.h"
@@ -68,8 +67,6 @@ Key* Key::GenerateKey(const AuthorizationSet& key_description, const Logger& log
         return DsaKey::GenerateKey(key_description, logger, error);
     case KM_ALGORITHM_ECDSA:
         return EcdsaKey::GenerateKey(key_description, logger, error);
-    case KM_ALGORITHM_AES:
-        return AesKey::GenerateKey(key_description, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;

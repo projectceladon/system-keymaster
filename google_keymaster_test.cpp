@@ -97,11 +97,10 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     SupportedResponse<keymaster_algorithm_t> response;
     device.SupportedAlgorithms(&response);
     EXPECT_EQ(KM_ERROR_OK, response.error);
-    EXPECT_EQ(4U, response.results_length);
+    EXPECT_EQ(3U, response.results_length);
     EXPECT_EQ(KM_ALGORITHM_RSA, response.results[0]);
     EXPECT_EQ(KM_ALGORITHM_DSA, response.results[1]);
     EXPECT_EQ(KM_ALGORITHM_ECDSA, response.results[2]);
-    EXPECT_EQ(KM_ALGORITHM_AES, response.results[3]);
 }
 
 TEST_F(CheckSupported, SupportedBlockModes) {
@@ -119,7 +118,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, response.error);
 
     device.SupportedBlockModes(KM_ALGORITHM_AES, KM_PURPOSE_ENCRYPT, &response);
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, response.error);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedPaddingModes) {
@@ -137,7 +136,7 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     ExpectResponseContains(KM_PAD_NONE, response);
 
     device.SupportedPaddingModes(KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &response);
-    ExpectEmptyResponse(response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedDigests) {
@@ -155,7 +154,7 @@ TEST_F(CheckSupported, SupportedDigests) {
     ExpectResponseContains(KM_DIGEST_NONE, response);
 
     device.SupportedDigests(KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &response);
-    ExpectEmptyResponse(response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedImportFormats) {
@@ -173,7 +172,7 @@ TEST_F(CheckSupported, SupportedImportFormats) {
     ExpectResponseContains(KM_KEY_FORMAT_PKCS8, response);
 
     device.SupportedImportFormats(KM_ALGORITHM_AES, &response);
-    ExpectEmptyResponse(response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 TEST_F(CheckSupported, SupportedExportFormats) {
@@ -191,7 +190,7 @@ TEST_F(CheckSupported, SupportedExportFormats) {
     ExpectResponseContains(KM_KEY_FORMAT_X509, response);
 
     device.SupportedExportFormats(KM_ALGORITHM_AES, &response);
-    ExpectEmptyResponse(response);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM, response.error);
 }
 
 keymaster_key_param_t key_generation_base_params[] = {
@@ -383,89 +382,6 @@ TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
         device.GenerateKey(req_, &rsp);
         EXPECT_EQ(KM_ERROR_OK, rsp.error) << "Failed to generate size: " << size;
     }
-}
-
-TEST_F(NewKeyGeneration, AesOcb) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_OK, rsp_.error);
-}
-
-TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 129),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE, rsp_.error);
-}
-
-TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB),
-        Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-
-    size_t valid_sizes[] = {128, 192, 256};
-    for (size_t size : valid_sizes) {
-        GenerateKeyResponse rsp;
-        req_.key_description.Reinitialize(params, array_length(params));
-        req_.key_description.push_back(Authorization(TAG_KEY_SIZE, size));
-        device.GenerateKey(req_, &rsp);
-        EXPECT_EQ(KM_ERROR_OK, rsp.error) << "Failed to generate size: " << size;
-    }
-}
-
-TEST_F(NewKeyGeneration, AesOcbNoChunkLength) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, rsp_.error);
-}
-
-TEST_F(NewKeyGeneration, AesEcbUnsupported) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_ECB), Authorization(TAG_PADDING, KM_PAD_NONE),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE, rsp_.error);
-}
-
-TEST_F(NewKeyGeneration, AesOcbPaddingUnsupported) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 128),
-        Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
-        Authorization(TAG_PADDING, KM_PAD_ZERO),
-    };
-    req_.key_description.Reinitialize(params, array_length(params));
-    device.GenerateKey(req_, &rsp_);
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, rsp_.error);
 }
 
 typedef KeymasterTest GetKeyCharacteristics;
