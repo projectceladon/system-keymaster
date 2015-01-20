@@ -17,6 +17,7 @@
 #include <openssl/x509.h>
 
 #include "aes_key.h"
+#include "dsa_key.h"
 #include "ecdsa_key.h"
 #include "openssl_utils.h"
 #include "rsa_key.h"
@@ -41,6 +42,8 @@ Key* Key::CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
     switch (blob.algorithm()) {
     case KM_ALGORITHM_RSA:
         return new RsaKey(blob, logger, error);
+    case KM_ALGORITHM_DSA:
+        return new DsaKey(blob, logger, error);
     case KM_ALGORITHM_ECDSA:
         return new EcdsaKey(blob, logger, error);
     default:
@@ -61,6 +64,8 @@ Key* Key::GenerateKey(const AuthorizationSet& key_description, const Logger& log
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
         return RsaKey::GenerateKey(key_description, logger, error);
+    case KM_ALGORITHM_DSA:
+        return DsaKey::GenerateKey(key_description, logger, error);
     case KM_ALGORITHM_ECDSA:
         return EcdsaKey::GenerateKey(key_description, logger, error);
     case KM_ALGORITHM_AES:
@@ -104,6 +109,8 @@ Key* Key::ImportKey(const AuthorizationSet& key_description, keymaster_key_forma
     switch (EVP_PKEY_type(pkey->type)) {
     case EVP_PKEY_RSA:
         return RsaKey::ImportKey(key_description, pkey.get(), logger, error);
+    case EVP_PKEY_DSA:
+        return DsaKey::ImportKey(key_description, pkey.get(), logger, error);
     case EVP_PKEY_EC:
         return EcdsaKey::ImportKey(key_description, pkey.get(), logger, error);
     default:

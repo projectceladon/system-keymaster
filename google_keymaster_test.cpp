@@ -268,6 +268,78 @@ TEST_F(NewKeyGeneration, RsaDefaultSize) {
     EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 2048));
 }
 
+TEST_F(NewKeyGeneration, Dsa) {
+    req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 256));
+    device.GenerateKey(req_, &rsp_);
+
+    CheckBaseParams(rsp_);
+
+    // Check specified tags are all present in unenforced characteristics
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 256));
+
+    // Generator should have created DSA params.
+    keymaster_blob_t g, p, q;
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_GENERATOR, &g));
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_P, &p));
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_Q, &q));
+    EXPECT_TRUE(g.data_length >= 63 && g.data_length <= 64);
+    EXPECT_EQ(64U, p.data_length);
+    EXPECT_EQ(20U, q.data_length);
+}
+
+TEST_F(NewKeyGeneration, DsaDefaultSize) {
+    req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    device.GenerateKey(req_, &rsp_);
+
+    CheckBaseParams(rsp_);
+
+    // Check specified tags are all present in unenforced characteristics
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+
+    // Now check that unspecified, defaulted tags are correct.
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 2048));
+    keymaster_blob_t g, p, q;
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_GENERATOR, &g));
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_P, &p));
+    EXPECT_TRUE(rsp_.unenforced.GetTagValue(TAG_DSA_Q, &q));
+    EXPECT_TRUE(g.data_length >= 255 && g.data_length <= 256);
+    EXPECT_EQ(256U, p.data_length);
+    EXPECT_EQ(32U, q.data_length);
+}
+
+TEST_F(NewKeyGeneration, Dsa_ParamsSpecified) {
+    req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 256));
+    req_.key_description.push_back(Authorization(TAG_DSA_GENERATOR, dsa_g, array_size(dsa_g)));
+    req_.key_description.push_back(Authorization(TAG_DSA_P, dsa_p, array_size(dsa_p)));
+    req_.key_description.push_back(Authorization(TAG_DSA_Q, dsa_q, array_size(dsa_q)));
+    device.GenerateKey(req_, &rsp_);
+
+    CheckBaseParams(rsp_);
+
+    // Check specified tags are all present in unenforced characteristics
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_KEY_SIZE, 256));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_DSA_GENERATOR,
+                         std::string(reinterpret_cast<const char*>(dsa_g), array_size(dsa_g))));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_DSA_P,
+                         std::string(reinterpret_cast<const char*>(dsa_p), array_size(dsa_p))));
+    EXPECT_TRUE(contains(rsp_.unenforced, TAG_DSA_Q,
+                         std::string(reinterpret_cast<const char*>(dsa_q), array_size(dsa_q))));
+}
+
+TEST_F(NewKeyGeneration, Dsa_SomeParamsSpecified) {
+    req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 256));
+    req_.key_description.push_back(Authorization(TAG_DSA_P, dsa_p, array_size(dsa_p)));
+    req_.key_description.push_back(Authorization(TAG_DSA_Q, dsa_q, array_size(dsa_q)));
+    device.GenerateKey(req_, &rsp_);
+
+    ASSERT_EQ(KM_ERROR_INVALID_DSA_PARAMS, rsp_.error);
+}
+
 TEST_F(NewKeyGeneration, Ecdsa) {
     req_.key_description.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
     req_.key_description.push_back(Authorization(TAG_KEY_SIZE, 224));
@@ -505,6 +577,12 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
     SignMessage(message, array_size(message) - 1);
 }
 
+TEST_F(SigningOperationsTest, DsaSuccess) {
+    GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+    const char message[] = "123456789012345678901234567890123456789012345678";
+    SignMessage(message, array_size(message) - 1);
+}
+
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
@@ -672,6 +750,13 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
     VerifyMessage(message, array_size(message) - 1);
 }
 
+TEST_F(VerificationOperationsTest, DsaSuccess) {
+    GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+    const char message[] = "123456789012345678901234567890123456789012345678";
+    SignMessage(message, array_size(message) - 1);
+    VerifyMessage(message, array_size(message) - 1);
+}
+
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     GenerateKey(KM_ALGORITHM_ECDSA, KM_DIGEST_NONE, KM_PAD_NONE, 224 /* key size */);
     const char message[] = "123456789012345678901234567890123456789012345678";
@@ -682,6 +767,22 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
 typedef SigningOperationsTest ExportKeyTest;
 TEST_F(ExportKeyTest, RsaSuccess) {
     GenerateKey(KM_ALGORITHM_RSA, KM_DIGEST_NONE, KM_PAD_NONE, 256 /* key size */);
+
+    ExportKeyRequest request;
+    ExportKeyResponse response;
+    AddClientParams(&request.additional_params);
+    request.key_format = KM_KEY_FORMAT_X509;
+    request.SetKeyMaterial(key_blob());
+
+    device.ExportKey(request, &response);
+    ASSERT_EQ(KM_ERROR_OK, response.error);
+    EXPECT_TRUE(response.key_data != NULL);
+
+    // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
+}
+
+TEST_F(ExportKeyTest, DsaSuccess) {
+    GenerateKey(KM_ALGORITHM_DSA, KM_DIGEST_NONE, KM_PAD_NONE, 1024 /* key size */);
 
     ExportKeyRequest request;
     ExportKeyResponse response;
@@ -822,6 +923,136 @@ TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
 
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
+
+    ImportKeyRequest import_request;
+    import_request.key_description.Reinitialize(params, array_length(params));
+    import_request.key_format = KM_KEY_FORMAT_PKCS8;
+    import_request.SetKeyMaterial(pk8_key.data(), pk8_key.size());
+
+    ImportKeyResponse import_response;
+    device.ImportKey(import_request, &import_response);
+    ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH, import_response.error);
+}
+
+TEST_F(ImportKeyTest, DsaSuccess) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
+    };
+
+    string pk8_key = read_file("dsa_privkey_pk8.der");
+    ASSERT_EQ(335U, pk8_key.size());
+
+    ImportKeyRequest import_request;
+    import_request.key_description.Reinitialize(params, array_length(params));
+    import_request.key_format = KM_KEY_FORMAT_PKCS8;
+    import_request.SetKeyMaterial(pk8_key.data(), pk8_key.size());
+
+    ImportKeyResponse import_response;
+    device.ImportKey(import_request, &import_response);
+    ASSERT_EQ(KM_ERROR_OK, import_response.error);
+    EXPECT_EQ(0U, import_response.enforced.size());
+    EXPECT_GT(import_response.unenforced.size(), 0U);
+
+    // Check values derived from the key.
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_KEY_SIZE, 1024));
+
+    // And values provided by GoogleKeymaster
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(import_response.unenforced, KM_TAG_CREATION_DATETIME));
+
+    size_t message_len = 48;
+    UniquePtr<uint8_t[]> message(new uint8_t[message_len]);
+    std::fill(message.get(), message.get() + message_len, 'a');
+    SignMessage(import_response.key_blob, message.get(), message_len);
+    ASSERT_TRUE(signature() != NULL);
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
+}
+
+TEST_F(ImportKeyTest, DsaParametersMatch) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_KEY_SIZE, 1024),
+        Authorization(TAG_DSA_GENERATOR, dsa_g, array_size(dsa_g)),
+        Authorization(TAG_DSA_P, dsa_p, array_size(dsa_p)),
+        Authorization(TAG_DSA_Q, dsa_q, array_size(dsa_q)),
+    };
+
+    string pk8_key = read_file("dsa_privkey_pk8.der");
+    ASSERT_EQ(335U, pk8_key.size());
+
+    ImportKeyRequest import_request;
+    import_request.key_description.Reinitialize(params, array_length(params));
+    import_request.key_format = KM_KEY_FORMAT_PKCS8;
+    import_request.SetKeyMaterial(pk8_key.data(), pk8_key.size());
+
+    ImportKeyResponse import_response;
+    device.ImportKey(import_request, &import_response);
+    ASSERT_EQ(KM_ERROR_OK, import_response.error);
+    EXPECT_EQ(0U, import_response.enforced.size());
+    EXPECT_GT(import_response.unenforced.size(), 0U);
+
+    // Check values derived from the key.
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ALGORITHM, KM_ALGORITHM_DSA));
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_KEY_SIZE, 1024));
+
+    // And values provided by GoogleKeymaster
+    EXPECT_TRUE(contains(import_response.unenforced, TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(import_response.unenforced, KM_TAG_CREATION_DATETIME));
+
+    size_t message_len = 48;
+    UniquePtr<uint8_t[]> message(new uint8_t[message_len]);
+    std::fill(message.get(), message.get() + message_len, 'a');
+    SignMessage(import_response.key_blob, message.get(), message_len);
+    ASSERT_TRUE(signature() != NULL);
+    VerifyMessage(import_response.key_blob, message.get(), message_len);
+}
+
+uint8_t dsa_wrong_q[] = {
+    0xC0, 0x66, 0x64, 0xF9, 0x05, 0x38, 0x64, 0x38, 0x4A, 0x17,
+    0x66, 0x79, 0xDD, 0x7F, 0x6E, 0x55, 0x22, 0x2A, 0xDF, 0xC5,
+};
+
+TEST_F(ImportKeyTest, DsaParameterMismatch) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_KEY_SIZE, 1024),
+        Authorization(TAG_DSA_Q, dsa_wrong_q, array_size(dsa_wrong_q)),
+    };
+
+    string pk8_key = read_file("dsa_privkey_pk8.der");
+    ASSERT_EQ(335U, pk8_key.size());
+
+    ImportKeyRequest import_request;
+    import_request.key_description.Reinitialize(params, array_length(params));
+    import_request.key_format = KM_KEY_FORMAT_PKCS8;
+    import_request.SetKeyMaterial(pk8_key.data(), pk8_key.size());
+
+    ImportKeyResponse import_response;
+    device.ImportKey(import_request, &import_response);
+    ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH, import_response.error);
+}
+
+TEST_F(ImportKeyTest, DsaKeySizeMismatch) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_DIGEST, KM_DIGEST_NONE), Authorization(TAG_PADDING, KM_PAD_NONE),
+        Authorization(TAG_USER_ID, 7), Authorization(TAG_USER_AUTH_ID, 8),
+        Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_KEY_SIZE, 2048),
+    };
+
+    string pk8_key = read_file("dsa_privkey_pk8.der");
+    ASSERT_EQ(335U, pk8_key.size());
 
     ImportKeyRequest import_request;
     import_request.key_description.Reinitialize(params, array_length(params));
