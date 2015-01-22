@@ -229,6 +229,7 @@ struct BeginOperationResponse : public KeymasterResponse {
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     keymaster_operation_handle_t op_handle;
+    AuthorizationSet output_params;
 };
 
 struct UpdateOperationRequest : public KeymasterMessage {

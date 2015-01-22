@@ -209,10 +209,33 @@ TEST(RoundTrip, BeginOperationResponse) {
         BeginOperationResponse msg(ver);
         msg.error = KM_ERROR_OK;
         msg.op_handle = 0xDEADBEEF;
+        msg.output_params.push_back(Authorization(TAG_NONCE, "foo", 3));
 
-        UniquePtr<BeginOperationResponse> deserialized(round_trip(ver, msg, 12));
+        UniquePtr<BeginOperationResponse> deserialized;
+        switch (ver) {
+        case 0:
+            deserialized.reset(round_trip(ver, msg, 12));
+            break;
+        case 1:
+            deserialized.reset(round_trip(ver, msg, 39));
+            break;
+        default:
+            FAIL();
+        }
+
         EXPECT_EQ(KM_ERROR_OK, deserialized->error);
         EXPECT_EQ(0xDEADBEEF, deserialized->op_handle);
+
+        switch (ver) {
+        case 0:
+            EXPECT_EQ(0, deserialized->output_params.size());
+            break;
+        case 1:
+            EXPECT_EQ(msg.output_params, deserialized->output_params);
+            break;
+        default:
+            FAIL();
+        }
     }
 }
 
