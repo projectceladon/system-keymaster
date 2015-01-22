@@ -229,7 +229,6 @@ class NewKeyGeneration : public KeymasterTest {
         EXPECT_FALSE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
         EXPECT_FALSE(contains(rsp.unenforced, TAG_PURPOSE, KM_PURPOSE_DECRYPT));
         EXPECT_FALSE(contains(rsp.unenforced, TAG_AUTH_TIMEOUT, 301));
-        EXPECT_FALSE(contains(rsp.unenforced, TAG_RESCOPE_AUTH_TIMEOUT));
 
         // Now check that unspecified, defaulted tags are correct.
         EXPECT_TRUE(contains(rsp.unenforced, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
