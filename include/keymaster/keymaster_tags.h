@@ -58,7 +58,7 @@
  * compilation units and not others.
  */
 
-#include <keymaster/keymaster_defs.h>
+#include <hardware/keymaster_defs.h>
 
 namespace keymaster {
 

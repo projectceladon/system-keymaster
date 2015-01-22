@@ -22,7 +22,7 @@
 #include <stdlib.h>
 
 #include <keymaster/google_keymaster_utils.h>
-#include <keymaster/keymaster_defs.h>
+#include <hardware/keymaster_defs.h>
 #include <keymaster/logger.h>
 
 namespace keymaster {

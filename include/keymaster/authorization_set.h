@@ -19,7 +19,7 @@
 
 #include <UniquePtr.h>
 
-#include <keymaster/keymaster_defs.h>
+#include <hardware/keymaster_defs.h>
 #include <keymaster/keymaster_tags.h>
 #include <keymaster/serializable.h>
 
