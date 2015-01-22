@@ -53,6 +53,10 @@ class AuthorizationSet : public Serializable {
         Reinitialize(elems, count);
     }
 
+    AuthorizationSet(const keymaster_key_param_set_t& set) : elems_(NULL), indirect_data_(NULL) {
+        Reinitialize(set.params, set.length);
+    }
+
     AuthorizationSet(const uint8_t* serialized_set, size_t serialized_size)
         : elems_(NULL), indirect_data_(NULL) {
         Deserialize(&serialized_set, serialized_set + serialized_size);
@@ -101,7 +105,14 @@ class AuthorizationSet : public Serializable {
     /**
      * Returns the data in the set, directly. Be careful with this.
      */
-    const keymaster_key_param_t* data() const;
+    const keymaster_key_param_t* data() { return elems_; }
+
+    /**
+     * Returns the data in a keymaster_key_param_set_t, suitable for returning to C code.  For C
+     * compatibility, the allocated struct and its contents are malloced, not new'ed, and so must be
+     * freed with free(), not delete.  The caller takes ownership.
+     */
+    void CopyToParamSet(keymaster_key_param_set_t* set) const;
 
     /**
      * Returns the offset of the next entry that matches \p tag, starting from the element after \p
@@ -214,20 +225,43 @@ class AuthorizationSet : public Serializable {
 
     bool push_back(const AuthorizationSet& set);
 
+    /**
+     * Append the tag and enumerated value to the set.
+     */
     template <keymaster_tag_t Tag, keymaster_tag_type_t Type, typename KeymasterEnum>
     bool push_back(TypedEnumTag<Type, Tag, KeymasterEnum> tag, KeymasterEnum val) {
         return push_back(Authorization(tag, val));
     }
 
+    /**
+     * Append the boolean tag (value "true") to the set.
+     */
     template <keymaster_tag_t Tag> bool push_back(TypedTag<KM_BOOL, Tag> tag) {
         return push_back(Authorization(tag));
     }
 
+    /**
+     * Append the tag and byte array to the set.  Copies the array into internal storage; does not
+     * take ownership of the passed-in array.
+     */
     template <keymaster_tag_t Tag>
     bool push_back(TypedTag<KM_BYTES, Tag> tag, const void* bytes, size_t bytes_len) {
         return push_back(keymaster_param_blob(tag, static_cast<const uint8_t*>(bytes), bytes_len));
     }
 
+    /**
+     * Append the tag and blob to the set.  Copies the blob contents into internal storage; does not
+     * take ownership of the blob's data.
+     */
+    template <keymaster_tag_t Tag>
+    bool push_back(TypedTag<KM_BYTES, Tag> tag, const keymaster_blob_t& blob) {
+        return push_back(tag, blob.data, blob.data_length);
+    }
+
+    /**
+     * Append the tag and bignum array to the set.  Copies the array into internal storage; does not
+     * take ownership of the passed-in array.
+     */
     template <keymaster_tag_t Tag>
     bool push_back(TypedTag<KM_BIGNUM, Tag> tag, const void* bytes, size_t bytes_len) {
         return push_back(keymaster_param_blob(tag, static_cast<const uint8_t*>(bytes), bytes_len));
