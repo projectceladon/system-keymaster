@@ -22,7 +22,7 @@
 
 #include <UniquePtr.h>
 
-#include <keymaster/keymaster_defs.h>
+#include <hardware/keymaster_defs.h>
 
 struct EVP_PKEY_Delete {
     void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }

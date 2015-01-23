@@ -17,8 +17,8 @@
 #ifndef SYSTEM_KEYMASTER_KEY_H_
 #define SYSTEM_KEYMASTER_KEY_H_
 
+#include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
-#include <keymaster/keymaster_defs.h>
 #include <keymaster/logger.h>
 
 namespace keymaster {

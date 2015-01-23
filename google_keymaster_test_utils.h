@@ -25,8 +25,8 @@
 
 #include <ostream>
 
+#include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
-#include <keymaster/keymaster_defs.h>
 #include <keymaster/logger.h>
 
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param);

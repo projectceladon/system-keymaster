@@ -16,7 +16,7 @@
 
 #include <openssl/x509.h>
 
-#include <keymaster/keymaster_defs.h>
+#include <hardware/keymaster_defs.h>
 
 #include "asymmetric_key.h"
 #include "openssl_utils.h"
