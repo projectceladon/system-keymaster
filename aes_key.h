@@ -27,6 +27,11 @@ const uint32_t MAX_AES_CHUNK_LENGTH = 64 * 1024;
 
 class AesKey : public Key {
   public:
+    static const int MAX_KEY_SIZE = 32;
+
+    AesKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
+    ~AesKey();
+
     static AesKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
                                keymaster_error_t* error);
 
@@ -46,27 +51,25 @@ class AesKey : public Key {
         return (padding == KM_PAD_NONE);
     }
 
-    virtual Operation* CreateOperation(keymaster_purpose_t, keymaster_error_t* error) {
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return NULL;
-    }
-
+    virtual Operation* CreateOperation(keymaster_purpose_t, keymaster_error_t* error);
     virtual keymaster_error_t key_material(UniquePtr<uint8_t[]>* key_material, size_t* size) const;
-
     virtual keymaster_error_t formatted_key_material(keymaster_key_format_t, UniquePtr<uint8_t[]>*,
                                                      size_t*) const {
         return KM_ERROR_UNIMPLEMENTED;
     }
 
   private:
-    AesKey(uint8_t* key_data, size_t key_data_size, AuthorizationSet& auths, const Logger& logger);
+    AesKey(const uint8_t(&key_data)[MAX_KEY_SIZE], size_t key_data_size, AuthorizationSet& auths,
+           const Logger& logger);
 
+    keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
     static bool ModeAndPurposesAreCompatible(const AuthorizationSet& auths,
                                              keymaster_block_mode_t block_mode,
                                              const Logger& logger);
+    Operation* CreateOcbOperation(keymaster_purpose_t, keymaster_error_t* error);
 
-    UniquePtr<const uint8_t[]> key_data_;
     const size_t key_data_size_;
+    uint8_t key_data_[MAX_KEY_SIZE];
 };
 
 }  // namespace keymaster

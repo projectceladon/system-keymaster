@@ -968,6 +968,23 @@ class EncryptionOperationsTest : public KeymasterTest {
         EXPECT_EQ(KM_ERROR_OK, generate_response_.error);
     }
 
+    void GenerateSymmetricKey(keymaster_algorithm_t algorithm, uint32_t key_size,
+                              keymaster_block_mode_t block_mode, uint32_t chunk_length) {
+        keymaster_key_param_t params[] = {
+            Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
+            Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT), Authorization(TAG_ALGORITHM, algorithm),
+            Authorization(TAG_BLOCK_MODE, block_mode),
+            Authorization(TAG_CHUNK_LENGTH, chunk_length), Authorization(TAG_KEY_SIZE, key_size),
+            Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_USER_ID, 7),
+            Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "app_id", 6),
+            Authorization(TAG_AUTH_TIMEOUT, 300),
+        };
+        GenerateKeyRequest generate_request;
+        generate_request.key_description.Reinitialize(params, array_length(params));
+        device.GenerateKey(generate_request, &generate_response_);
+        EXPECT_EQ(KM_ERROR_OK, generate_response_.error);
+    }
+
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose,
                                      const keymaster_key_blob_t& key_blob, uint64_t* op_handle) {
         BeginOperationRequest begin_request;
@@ -1157,6 +1174,19 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
                                            &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(op_handle, &result));
     EXPECT_EQ(0, result.size());
+}
+
+TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
+    GenerateSymmetricKey(KM_ALGORITHM_AES, 128, KM_MODE_OCB, 4096);
+    const char message[] = "Hello World!";
+    string ciphertext1 = EncryptMessage(message, strlen(message));
+    EXPECT_EQ(12 /* nonce */ + strlen(message) + 16 /* tag */, ciphertext1.size());
+
+    string ciphertext2 = EncryptMessage(message, strlen(message));
+    EXPECT_EQ(12 /* nonce */ + strlen(message) + 16 /* tag */, ciphertext2.size());
+
+    // OCB uses a random nonce, so every output should be different
+    EXPECT_NE(ciphertext1, ciphertext2);
 }
 
 }  // namespace test
