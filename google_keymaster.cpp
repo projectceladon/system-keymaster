@@ -273,7 +273,10 @@ keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_hand
     OpTableEntry* entry = FindOperation(op_handle);
     if (entry == NULL)
         return KM_ERROR_INVALID_OPERATION_HANDLE;
+    keymaster_error_t error = entry->operation->Abort();
     DeleteOperation(entry);
+    if (error != KM_ERROR_OK)
+        return error;
     return KM_ERROR_OK;
 }
 
