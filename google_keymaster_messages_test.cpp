@@ -244,11 +244,33 @@ TEST(RoundTrip, UpdateOperationResponse) {
         UpdateOperationResponse msg(ver);
         msg.error = KM_ERROR_OK;
         msg.output.Reinitialize("foo", 3);
+        msg.input_consumed = 99;
 
-        UniquePtr<UpdateOperationResponse> deserialized(round_trip(ver, msg, 11));
+        UniquePtr<UpdateOperationResponse> deserialized;
+        switch (ver) {
+        case 0:
+            deserialized.reset(round_trip(ver, msg, 11));
+            break;
+        case 1:
+            deserialized.reset(round_trip(ver, msg, 15));
+            break;
+        default:
+            FAIL();
+        }
         EXPECT_EQ(KM_ERROR_OK, deserialized->error);
         EXPECT_EQ(3U, deserialized->output.available_read());
         EXPECT_EQ(0, memcmp(deserialized->output.peek_read(), "foo", 3));
+
+        switch (ver) {
+        case 0:
+            EXPECT_EQ(0, deserialized->input_consumed);
+            break;
+        case 1:
+            EXPECT_EQ(99, deserialized->input_consumed);
+            break;
+        default:
+            FAIL();
+        }
     }
 }
 

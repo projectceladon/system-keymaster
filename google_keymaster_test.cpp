@@ -471,6 +471,7 @@ class SigningOperationsTest : public KeymasterTest {
         device.UpdateOperation(update_request, &update_response);
         ASSERT_EQ(KM_ERROR_OK, update_response.error);
         EXPECT_EQ(0U, update_response.output.available_read());
+        EXPECT_EQ(size, update_response.input_consumed);
 
         FinishOperationRequest finish_request;
         finish_request.op_handle = begin_response.op_handle;
@@ -612,6 +613,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     device.UpdateOperation(update_request, &update_response);
     ASSERT_EQ(KM_ERROR_OK, update_response.error);
     EXPECT_EQ(0U, update_response.output.available_read());
+    EXPECT_EQ(31U, update_response.input_consumed);
 
     FinishOperationRequest finish_request;
     finish_request.op_handle = begin_response.op_handle;
@@ -651,6 +653,7 @@ class VerificationOperationsTest : public SigningOperationsTest {
         device.UpdateOperation(update_request, &update_response);
         ASSERT_EQ(KM_ERROR_OK, update_response.error);
         EXPECT_EQ(0U, update_response.output.available_read());
+        EXPECT_EQ(message_len, update_response.input_consumed);
 
         FinishOperationRequest finish_request;
         finish_request.op_handle = begin_response.op_handle;
@@ -979,7 +982,7 @@ class EncryptionOperationsTest : public KeymasterTest {
     }
 
     keymaster_error_t UpdateOperation(uint64_t op_handle, const void* message, size_t size,
-                                      string* output) {
+                                      string* output, size_t* input_consumed) {
         UpdateOperationRequest update_request;
         update_request.op_handle = op_handle;
         update_request.input.Reinitialize(message, size);
@@ -989,6 +992,7 @@ class EncryptionOperationsTest : public KeymasterTest {
         if (update_response.error == KM_ERROR_OK)
             output->append(reinterpret_cast<const char*>(update_response.output.peek_read()),
                            update_response.output.available_read());
+        *input_consumed = update_response.input_consumed;
         return update_response.error;
     }
 
@@ -1009,8 +1013,11 @@ class EncryptionOperationsTest : public KeymasterTest {
         EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, key_blob, &op_handle));
 
         string result;
-        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, message, size, &result));
+        size_t input_consumed;
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, message, size, &result, &input_consumed));
+        EXPECT_EQ(size, input_consumed);
         EXPECT_EQ(KM_ERROR_OK, FinishOperation(op_handle, &result));
+
         return result;
     }
 
@@ -1064,10 +1071,12 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
     const char message[] = "12345678901234567890123";
     uint64_t op_handle;
     string result;
+    size_t input_consumed;
 
     EXPECT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_ENCRYPT, generate_response_.key_blob, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, message, array_size(message), &result));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(op_handle, message, array_size(message), &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(op_handle, &result));
     EXPECT_EQ(0, result.size());
 }
@@ -1083,10 +1092,11 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
 
     uint64_t op_handle;
     string result;
+    size_t input_consumed;
     EXPECT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_DECRYPT, generate_response_.key_blob, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK,
-              UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result,
+                                           &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(op_handle, &result));
     EXPECT_EQ(0, result.size());
 }
@@ -1119,10 +1129,12 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     const char message[] = "1234567890123456789012345678901234567890123456789012";
     uint64_t op_handle;
     string result;
+    size_t input_consumed;
 
     EXPECT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_ENCRYPT, generate_response_.key_blob, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, message, array_size(message), &result));
+    EXPECT_EQ(KM_ERROR_OK,
+              UpdateOperation(op_handle, message, array_size(message), &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(op_handle, &result));
     EXPECT_EQ(0, result.size());
 }
@@ -1138,10 +1150,11 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
 
     uint64_t op_handle;
     string result;
+    size_t input_consumed;
     EXPECT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_DECRYPT, generate_response_.key_blob, &op_handle));
-    EXPECT_EQ(KM_ERROR_OK,
-              UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(op_handle, ciphertext.data(), ciphertext.size(), &result,
+                                           &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(op_handle, &result));
     EXPECT_EQ(0, result.size());
 }

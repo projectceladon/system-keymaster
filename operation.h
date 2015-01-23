@@ -41,7 +41,8 @@ class Operation {
     const Logger& logger() { return logger_; }
 
     virtual keymaster_error_t Begin() = 0;
-    virtual keymaster_error_t Update(const Buffer& input, Buffer* output) = 0;
+    virtual keymaster_error_t Update(const Buffer& input, Buffer* output,
+                                     size_t* input_consumed) = 0;
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output) = 0;
     virtual keymaster_error_t Abort() = 0;
 
