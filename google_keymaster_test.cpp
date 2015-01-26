@@ -2349,5 +2349,13 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
     }
 }
 
+typedef KeymasterTest AddEntropyTest;
+TEST_F(AddEntropyTest, AddEntropy) {
+    // There's no obvious way to test that entropy is actually added, but we can test that the API
+    // doesn't blow up or return an error.
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->add_rng_entropy(device(), reinterpret_cast<const uint8_t*>("foo"), 3));
+}
+
 }  // namespace test
 }  // namespace keymaster

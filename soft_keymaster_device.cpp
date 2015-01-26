@@ -512,10 +512,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* /* dev */,
-                                                       const uint8_t* /* data */,
-                                                       size_t /* data_length */) {
-    return KM_ERROR_UNIMPLEMENTED;
+keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* dev,
+                                                       const uint8_t* data, size_t data_length) {
+    AddEntropyRequest request;
+    request.random_data.Reinitialize(data, data_length);
+    return convert_device(dev)->impl_->AddRngEntropy(request);
 }
 
 /* static */
