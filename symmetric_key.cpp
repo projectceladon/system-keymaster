@@ -95,6 +95,21 @@ SymmetricKey* SymmetricKeyFactory::CreateKeyAndValidateSize(const AuthorizationS
     return key.release();
 }
 
+Key* SymmetricKeyFactory::RescopeKey(const UnencryptedKeyBlob& blob,
+                                     const AuthorizationSet& new_authorizations,
+                                     keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+
+    UniquePtr<SymmetricKey> key(CreateKey(new_authorizations));
+    key->key_data_size_ = blob.unencrypted_key_material_length();
+    key->key_data_.reset(new uint8_t[key->key_data_size_]);
+    memcpy(key->key_data_.get(), blob.unencrypted_key_material(), key->key_data_size_);
+
+    *error = KM_ERROR_OK;
+    return key.release();
+}
+
 SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error)
     : Key(blob), key_data_size_(blob.unencrypted_key_material_length()) {
     key_data_.reset(new uint8_t[key_data_size_]);

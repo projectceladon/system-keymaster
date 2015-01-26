@@ -35,6 +35,8 @@ class EcdsaKeyFactory : public AsymmetricKeyFactory {
     virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
         return new EcdsaKey(blob, error);
     }
+    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
+                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
 
   private:
     static EC_GROUP* choose_group(size_t key_size_bits);
@@ -139,6 +141,21 @@ Key* EcdsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
     // implemented).
     *error = KM_ERROR_OK;
     return new EcdsaKey(ecdsa_key.release(), authorizations);
+}
+
+Key* EcdsaKeyFactory::RescopeKey(const UnencryptedKeyBlob& blob,
+                                 const AuthorizationSet& new_authorizations,
+                                 keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+
+    EcdsaKey original_key(blob, error);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    EcdsaKey* new_key = new EcdsaKey(original_key.ecdsa_key_.release(), new_authorizations);
+    *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return new_key;
 }
 
 /* static */
