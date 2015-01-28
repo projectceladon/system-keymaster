@@ -163,15 +163,24 @@ bool BeginOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* 
 }
 
 size_t BeginOperationResponse::NonErrorSerializedSize() const {
-    return sizeof(op_handle);
+    if (message_version == 0)
+        return sizeof(op_handle);
+    else
+        return sizeof(op_handle) + output_params.SerializedSize();
 }
 
 uint8_t* BeginOperationResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    return append_uint64_to_buf(buf, end, op_handle);
+    buf = append_uint64_to_buf(buf, end, op_handle);
+    if (message_version > 0)
+        buf = output_params.Serialize(buf, end);
+    return buf;
 }
 
 bool BeginOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return copy_uint64_from_buf(buf_ptr, end, &op_handle);
+    bool retval = copy_uint64_from_buf(buf_ptr, end, &op_handle);
+    if (retval && message_version > 0)
+        retval = output_params.Deserialize(buf_ptr, end);
+    return retval;
 }
 
 size_t UpdateOperationRequest::SerializedSize() const {
