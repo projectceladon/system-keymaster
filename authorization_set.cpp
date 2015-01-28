@@ -103,6 +103,27 @@ void AuthorizationSet::set_invalid(Error error) {
     error_ = error;
 }
 
+void AuthorizationSet::CopyToParamSet(keymaster_key_param_set_t* set) const {
+    assert(set);
+
+    set->length = size();
+    set->params =
+        reinterpret_cast<keymaster_key_param_t*>(malloc(sizeof(keymaster_key_param_t) * size()));
+
+    for (size_t i = 0; i < size(); ++i) {
+        const keymaster_key_param_t src = (*this)[i];
+        keymaster_key_param_t& dst(set->params[i]);
+
+        dst = src;
+        keymaster_tag_type_t type = keymaster_tag_get_type(src.tag);
+        if (type == KM_BIGNUM || type == KM_BYTES) {
+            void* tmp = malloc(src.blob.data_length);
+            memcpy(tmp, src.blob.data, src.blob.data_length);
+            dst.blob.data = reinterpret_cast<uint8_t*>(tmp);
+        }
+    }
+}
+
 int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
     if (is_valid() != OK)
         return -1;
