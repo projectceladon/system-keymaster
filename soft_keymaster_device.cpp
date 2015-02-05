@@ -632,6 +632,9 @@ SoftKeymasterDevice::begin(const struct keymaster_device* dev, keymaster_purpose
     if (!operation_handle || !out_params || !out_params_count)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
+    *out_params = NULL;
+    *out_params_count = 0;
+
     BeginOperationRequest request;
     request.purpose = purpose;
     request.SetKeyMaterial(*key);

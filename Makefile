@@ -46,6 +46,7 @@ CPPSRCS=\
 	rsa_operation.cpp \
 	serializable.cpp \
 	soft_keymaster_device.cpp \
+	symmetric_key.cpp \
 	unencrypted_key_blob.cpp
 CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
@@ -145,6 +146,7 @@ google_keymaster_test: google_keymaster_test.o \
 	rsa_operation.o \
 	serializable.o \
 	soft_keymaster_device.o \
+	symmetric_key.o \
 	unencrypted_key_blob.o \
 	$(GTEST)/src/gtest-all.o
 
