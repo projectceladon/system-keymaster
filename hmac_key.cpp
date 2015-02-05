@@ -31,7 +31,7 @@ Operation* HmacKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error
         *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
 
     keymaster_digest_t digest;
-    if (!authorizations().GetTagValue(TAG_DIGEST, &digest) || digest != KM_DIGEST_SHA_2_256)
+    if (!authorizations().GetTagValue(TAG_DIGEST, &digest))
         *error = KM_ERROR_UNSUPPORTED_DIGEST;
 
     if (*error != KM_ERROR_OK)
