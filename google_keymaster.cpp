@@ -62,7 +62,7 @@ typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 // information.
 
 keymaster_algorithm_t supported_algorithms[] = {
-    KM_ALGORITHM_RSA, KM_ALGORITHM_DSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES,
+    KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES,
 };
 
 template <typename T>

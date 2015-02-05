@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-#include <string>
+#include <algorithm>
 #include <fstream>
+#include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -27,9 +29,10 @@
 #include "google_keymaster_test_utils.h"
 #include "soft_keymaster_device.h"
 
-using std::string;
 using std::ifstream;
 using std::istreambuf_iterator;
+using std::string;
+using std::vector;
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
@@ -247,9 +250,13 @@ class KeymasterTest : public testing::Test {
         return error;
     }
 
-    template <typename T> void ExpectContains(T val, T* vals, size_t len) {
-        EXPECT_EQ(1U, len);
-        EXPECT_EQ(val, vals[0]);
+    template <typename T>
+    bool ResponseContains(const vector<T>& expected, const T* values, size_t len) {
+        return std::is_permutation(values, values + len, expected.begin());
+    }
+
+    template <typename T> bool ResponseContains(T expected, const T* values, size_t len) {
+        return (len == 1 && *values == expected);
     }
 
     keymaster_error_t AbortOperation() { return device()->abort(device(), op_handle_); }
@@ -380,12 +387,8 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     size_t len;
     keymaster_algorithm_t* algorithms;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_algorithms(device(), &algorithms, &len));
-    ASSERT_EQ(4U, len);
-    EXPECT_EQ(KM_ALGORITHM_RSA, algorithms[0]);
-    EXPECT_EQ(KM_ALGORITHM_DSA, algorithms[1]);
-    EXPECT_EQ(KM_ALGORITHM_ECDSA, algorithms[2]);
-    EXPECT_EQ(KM_ALGORITHM_AES, algorithms[3]);
-
+    EXPECT_TRUE(ResponseContains({KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES},
+                                 algorithms, len));
     free(algorithms);
 }
 
@@ -400,7 +403,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
               device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_BLOCK_MODE,
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
               device()->get_supported_block_modes(device(), KM_ALGORITHM_DSA, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
@@ -422,17 +425,16 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     keymaster_padding_t* modes;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    ExpectContains(KM_PAD_NONE, modes, len);
+    EXPECT_TRUE(ResponseContains(KM_PAD_NONE, modes, len));
     free(modes);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_DSA,
-                                                                 KM_PURPOSE_SIGN, &modes, &len));
-    ExpectContains(KM_PAD_NONE, modes, len);
-    free(modes);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
+              device()->get_supported_padding_modes(device(), KM_ALGORITHM_DSA, KM_PURPOSE_SIGN,
+                                                    &modes, &len));
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_ECDSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    ExpectContains(KM_PAD_NONE, modes, len);
+    EXPECT_TRUE(ResponseContains(KM_PAD_NONE, modes, len));
     free(modes);
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_AES,
@@ -450,17 +452,16 @@ TEST_F(CheckSupported, SupportedDigests) {
     keymaster_digest_t* digests;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    ExpectContains(KM_DIGEST_NONE, digests, len);
+    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
     free(digests);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_DSA,
-                                                           KM_PURPOSE_SIGN, &digests, &len));
-    ExpectContains(KM_DIGEST_NONE, digests, len);
-    free(digests);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
+              device()->get_supported_digests(device(), KM_ALGORITHM_DSA, KM_PURPOSE_SIGN, &digests,
+                                              &len));
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_ECDSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    ExpectContains(KM_DIGEST_NONE, digests, len);
+    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_AES,
@@ -477,17 +478,15 @@ TEST_F(CheckSupported, SupportedImportFormats) {
     keymaster_key_format_t* formats;
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_PKCS8, formats, len);
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_DSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_PKCS8, formats, len);
-    free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_ECDSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_PKCS8, formats, len);
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
     free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
@@ -504,17 +503,15 @@ TEST_F(CheckSupported, SupportedExportFormats) {
     keymaster_key_format_t* formats;
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_X509, formats, len);
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_DSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_X509, formats, len);
-    free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_ECDSA, &formats, &len));
-    ExpectContains(KM_KEY_FORMAT_X509, formats, len);
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
