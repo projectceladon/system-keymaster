@@ -44,6 +44,7 @@ Key* Key::CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
     case KM_ALGORITHM_ECDSA:
         return new EcdsaKey(blob, logger, error);
     case KM_ALGORITHM_AES:
+    case KM_ALGORITHM_HMAC:
         return SymmetricKey::CreateKey(blob.algorithm(), blob, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
@@ -66,6 +67,7 @@ Key* Key::GenerateKey(const AuthorizationSet& key_description, const Logger& log
     case KM_ALGORITHM_ECDSA:
         return EcdsaKey::GenerateKey(key_description, logger, error);
     case KM_ALGORITHM_AES:
+    case KM_ALGORITHM_HMAC:
         return SymmetricKey::GenerateKey(algorithm, key_description, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;

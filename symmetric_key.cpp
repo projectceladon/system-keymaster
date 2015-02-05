@@ -22,6 +22,7 @@
 #include <openssl/rand.h>
 
 #include "aes_key.h"
+#include "hmac_key.h"
 #include "unencrypted_key_blob.h"
 
 namespace keymaster {
@@ -39,6 +40,9 @@ SymmetricKey* SymmetricKey::GenerateKey(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_AES:
         key.reset(new AesKey(key_description, logger));
+        break;
+    case KM_ALGORITHM_HMAC:
+        key.reset(new HmacKey(key_description, logger));
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
@@ -74,6 +78,8 @@ SymmetricKey* SymmetricKey::CreateKey(keymaster_algorithm_t algorithm,
     switch (algorithm) {
     case KM_ALGORITHM_AES:
         return new AesKey(blob, logger, error);
+    case KM_ALGORITHM_HMAC:
+        return new HmacKey(blob, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;

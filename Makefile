@@ -39,6 +39,8 @@ CPPSRCS=\
 	google_keymaster_test.cpp \
 	google_keymaster_test_utils.cpp \
 	google_keymaster_utils.cpp \
+	hmac_key.cpp \
+	hmac_operation.cpp \
 	key.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
@@ -139,6 +141,8 @@ google_keymaster_test: google_keymaster_test.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \
 	google_keymaster_utils.o \
+	hmac_key.o \
+	hmac_operation.o \
 	key.o \
 	key_blob.o \
 	ocb.o \
