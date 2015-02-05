@@ -47,6 +47,7 @@ include $(CLEAR_VARS)
 LOCAL_CLANG := false
 LOCAL_MODULE:= libkeymaster
 LOCAL_SRC_FILES:= \
+		aead_mode_operation.cpp \
 		aes_key.cpp \
 		aes_operation.cpp \
 		asymmetric_key.cpp \
