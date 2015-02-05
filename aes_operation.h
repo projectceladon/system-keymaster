@@ -17,61 +17,44 @@
 #ifndef SYSTEM_KEYMASTER_AES_OPERATION_H_
 #define SYSTEM_KEYMASTER_AES_OPERATION_H_
 
-#include <keymaster/key_blob.h>
-
+#include "aead_mode_operation.h"
 #include "ocb_utils.h"
 #include "operation.h"
 
 namespace keymaster {
 
-class AesOcbEncryptOperation : public Operation {
+class AesOcbOperation : public AeadModeOperation {
   public:
     static const size_t NONCE_LENGTH = 12;
     static const size_t MAX_TAG_LENGTH = 16;
     static const size_t MAX_KEY_LENGTH = 32;
 
-    AesOcbEncryptOperation(const Logger& logger, uint8_t* key, size_t key_size, size_t chunk_length,
-                           size_t tag_length, keymaster_blob_t additional_data)
-        : Operation(KM_PURPOSE_ENCRYPT, logger), key_size_(key_size), chunk_length_(chunk_length),
-          chunk_offset_(0), tag_length_(tag_length), additional_data_(additional_data),
-          nonce_written_(false) {
-        assert(key_size <= MAX_KEY_LENGTH);
-        memcpy(key_, key, key_size);
-    }
-    ~AesOcbEncryptOperation() {
-        // Wipe sensitive buffers.
-        memset_s(chunk_.get(), 0, chunk_length_);
-        memset_s(const_cast<uint8_t*>(additional_data_.data), 0, additional_data_.data_length);
-        memset_s(key_, 0, MAX_KEY_LENGTH);
-        memset_s(tag_, 0, MAX_TAG_LENGTH);
-        delete[] additional_data_.data;
+    AesOcbOperation(keymaster_purpose_t purpose, const Logger& logger, uint8_t* key,
+                    size_t key_size, size_t chunk_length, size_t tag_length,
+                    keymaster_blob_t additional_data)
+        : AeadModeOperation(purpose, logger, key, key_size, chunk_length, tag_length, NONCE_LENGTH,
+                            additional_data) {}
+
+    virtual keymaster_error_t Abort() {
+        /* All cleanup is in the dtor */
+        return KM_ERROR_OK;
     }
 
-    virtual keymaster_error_t Begin();
-    virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
-    virtual keymaster_error_t Finish(const Buffer& /* signature */, Buffer* output);
-    virtual keymaster_error_t Abort() { return KM_ERROR_UNIMPLEMENTED; }
+  protected:
+    ae_ctx* ctx() { return ctx_.get(); }
 
   private:
-    ptrdiff_t chunk_unfilled_space() { return chunk_length_ - chunk_offset_; }
-
-    keymaster_error_t StartIncrementalEncryption();
-    keymaster_error_t DoIncrementalEncryption(const uint8_t* input, size_t input_size,
-                                              Buffer* output, size_t* input_consumed);
-    keymaster_error_t ProcessChunk(Buffer* output);
-    void IncrementNonce();
-
+    virtual keymaster_error_t Initialize(uint8_t* key, size_t key_size, size_t nonce_length,
+                                         size_t tag_length);
+    virtual keymaster_error_t EncryptChunk(const uint8_t* nonce, size_t nonce_length,
+                                           size_t tag_length,
+                                           const keymaster_blob_t additional_data, uint8_t* chunk,
+                                           size_t chunk_size, Buffer* output);
+    virtual keymaster_error_t DecryptChunk(const uint8_t* nonce, size_t nonce_length,
+                                           const uint8_t* tag, size_t tag_length,
+                                           const keymaster_blob_t additional_data, uint8_t* chunk,
+                                           size_t chunk_size, Buffer* output);
     AeCtx ctx_;
-    size_t key_size_;
-    size_t chunk_length_;
-    UniquePtr<uint8_t[]> chunk_;
-    size_t chunk_offset_;
-    size_t tag_length_;
-    keymaster_blob_t additional_data_;
-    uint8_t __attribute__((aligned(16))) key_[MAX_KEY_LENGTH];
-    uint8_t __attribute__((aligned(16))) nonce_[NONCE_LENGTH];
-    bool nonce_written_;
-    uint8_t __attribute__((aligned(16))) tag_[MAX_TAG_LENGTH];
 };
 
 }  // namespace keymaster

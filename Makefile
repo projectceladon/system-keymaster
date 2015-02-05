@@ -25,6 +25,7 @@ CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-paramete
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
+	aead_mode_operation.cpp \
 	aes_key.cpp \
 	aes_operation.cpp \
 	asymmetric_key.cpp \
@@ -126,6 +127,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 	$(GTEST)/src/gtest-all.o
 
 google_keymaster_test: google_keymaster_test.o \
+	aead_mode_operation.o \
 	aes_key.o \
 	aes_operation.o \
 	asymmetric_key.o \
