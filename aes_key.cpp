@@ -38,50 +38,6 @@ AesKey* AesKey::GenerateKey(const AuthorizationSet& key_description, const Logge
         return NULL;
     }
 
-    keymaster_block_mode_t block_mode;
-    if (!authorizations.GetTagValue(TAG_BLOCK_MODE, &block_mode) ||
-        !block_mode_is_supported(block_mode)) {
-        *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return NULL;
-    }
-
-    uint32_t chunk_length = 0;
-    if (block_mode >= KM_MODE_FIRST_AUTHENTICATED && block_mode < KM_MODE_FIRST_MAC) {
-        // Chunk length is required.
-        if (!authorizations.GetTagValue(TAG_CHUNK_LENGTH, &chunk_length) ||
-            !chunk_length_is_supported(chunk_length)) {
-            // TODO(swillden): Add a better error code for this.
-            *error = KM_ERROR_INVALID_ARGUMENT;
-            return NULL;
-        }
-    }
-
-    // Padding is optional
-    keymaster_padding_t padding;
-    if (authorizations.GetTagValue(TAG_PADDING, &padding) &&
-        !padding_is_supported(block_mode, padding)) {
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        return NULL;
-    }
-
-    // Mac required for some modes.
-    uint32_t mac_length;
-    if (mac_length_required(block_mode)) {
-        if (!authorizations.GetTagValue(TAG_MAC_LENGTH, &mac_length) ||
-            !mac_length_is_supported(block_mode, mac_length)) {
-            // TODO(swillden): Add a better error code for this.
-            *error = KM_ERROR_INVALID_ARGUMENT;
-            return NULL;
-        }
-    }
-
-    // Verify purpose is compatible with block mode.
-    if (!ModeAndPurposesAreCompatible(authorizations, block_mode, logger)) {
-        *error = KM_ERROR_INCOMPATIBLE_BLOCK_MODE;
-        return NULL;
-    }
-
-    // All required tags seem to be present and valid.  Generate the key bits.
     size_t key_data_size = key_size_bits / 8;
     uint8_t key_data[MAX_KEY_SIZE];
     Eraser erase_key_data(key_data, MAX_KEY_SIZE);
@@ -166,12 +122,17 @@ Operation* AesKey::CreateOcbOperation(keymaster_purpose_t purpose, keymaster_err
     uint32_t chunk_length;
     if (!authorizations().GetTagValue(TAG_CHUNK_LENGTH, &chunk_length))
         // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_INPUT_LENGTH;
+        *error = KM_ERROR_INVALID_ARGUMENT;
 
     uint32_t tag_length;
     if (!authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length))
         // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_INPUT_LENGTH;
+        *error = KM_ERROR_INVALID_ARGUMENT;
+
+    keymaster_padding_t padding;
+    if (authorizations().GetTagValue(TAG_PADDING, &padding) && padding != KM_PAD_NONE) {
+        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    }
 
     if (*error != KM_ERROR_OK)
         return NULL;

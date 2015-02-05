@@ -105,7 +105,7 @@ class AuthorizationSet : public Serializable {
     /**
      * Returns the data in the set, directly. Be careful with this.
      */
-    const keymaster_key_param_t* data() { return elems_; }
+    const keymaster_key_param_t* data() const { return elems_; }
 
     /**
      * Returns the data in a keymaster_key_param_set_t, suitable for returning to C code.  For C
