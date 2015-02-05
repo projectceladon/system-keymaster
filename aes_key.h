@@ -27,6 +27,12 @@ class AesKey : public SymmetricKey {
   public:
     AesKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
     AesKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
+
+  private:
+    virtual bool size_supported(size_t key_size) {
+        // AES keys only come in three sizes, 128, 192 and 256 bits.
+        return key_size == 128 / 8 || key_size == 192 / 8 || key_size == 256 / 8;
+    }
 };
 
 }  // namespace keymaster

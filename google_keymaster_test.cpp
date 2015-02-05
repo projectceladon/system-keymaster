@@ -506,6 +506,16 @@ TEST_F(CheckSupported, SupportedImportFormats) {
               device()->get_supported_import_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
     free(formats);
+
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_import_formats(device(), KM_ALGORITHM_AES, &formats, &len));
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_RAW, formats, len));
+    free(formats);
+
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_import_formats(device(), KM_ALGORITHM_HMAC, &formats, &len));
+    EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_RAW, formats, len));
+    free(formats);
 }
 
 TEST_F(CheckSupported, SupportedExportFormats) {
@@ -529,6 +539,16 @@ TEST_F(CheckSupported, SupportedExportFormats) {
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
+    EXPECT_EQ(0, len);
+    free(formats);
+
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
+    EXPECT_EQ(0, len);
+    free(formats);
+
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_export_formats(device(), KM_ALGORITHM_HMAC, &formats, &len));
     EXPECT_EQ(0, len);
     free(formats);
 }
@@ -626,8 +646,8 @@ TEST_F(NewKeyGeneration, AesOcb) {
 }
 
 TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(136).OcbMode(4096, 16)));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
+              GenerateKey(ParamBuilder().AesEncryptionKey(136).OcbMode(4096, 16)));
 }
 
 TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
@@ -1094,6 +1114,15 @@ TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
     corrupt_key_blob();
     string export_data;
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, ExportKey(KM_KEY_FORMAT_X509, &export_data));
+}
+
+TEST_F(ExportKeyTest, AesKeyExportFails) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128)));
+    string export_data;
+
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_X509, &export_data));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_PKCS8, &export_data));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_RAW, &export_data));
 }
 
 static string read_file(const string& file_name) {
