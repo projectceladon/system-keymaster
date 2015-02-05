@@ -69,22 +69,22 @@ Operation* AesKey::CreateOcbOperation(keymaster_purpose_t purpose, keymaster_err
     keymaster_blob_t additional_data = {0, 0};
     authorizations().GetTagValue(TAG_ADDITIONAL_DATA, &additional_data);
 
-    Operation* op = NULL;
+    UniquePtr<Operation> op;
     switch (purpose) {
     case KM_PURPOSE_ENCRYPT:
     case KM_PURPOSE_DECRYPT:
-        op = new AesOcbOperation(purpose, logger_, key_data(), key_data_size(), chunk_length,
-                                 tag_length, additional_data);
+        op.reset(new AesOcbOperation(purpose, logger_, key_data(), key_data_size(), chunk_length,
+                                     tag_length, additional_data));
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_PURPOSE;
         return NULL;
     }
 
-    if (!op)
+    if (!op.get())
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    return op;
+    return op.release();
 }
 
 }  // namespace keymaster
