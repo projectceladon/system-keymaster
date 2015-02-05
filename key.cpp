@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
+#include "key.h"
+
 #include <openssl/x509.h>
 
-#include "aes_key.h"
 #include "ecdsa_key.h"
 #include "openssl_utils.h"
 #include "rsa_key.h"
+#include "symmetric_key.h"
 #include "unencrypted_key_blob.h"
-
-#include "key.h"
 
 namespace keymaster {
 
@@ -44,7 +44,7 @@ Key* Key::CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
     case KM_ALGORITHM_ECDSA:
         return new EcdsaKey(blob, logger, error);
     case KM_ALGORITHM_AES:
-        return new AesKey(blob, logger, error);
+        return SymmetricKey::CreateKey(blob.algorithm(), blob, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;
@@ -66,7 +66,7 @@ Key* Key::GenerateKey(const AuthorizationSet& key_description, const Logger& log
     case KM_ALGORITHM_ECDSA:
         return EcdsaKey::GenerateKey(key_description, logger, error);
     case KM_ALGORITHM_AES:
-        return AesKey::GenerateKey(key_description, logger, error);
+        return SymmetricKey::GenerateKey(algorithm, key_description, logger, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return NULL;

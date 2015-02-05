@@ -437,14 +437,22 @@ TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT),
         Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 129),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES), Authorization(TAG_KEY_SIZE, 136),
         Authorization(TAG_BLOCK_MODE, KM_MODE_OCB), Authorization(TAG_CHUNK_LENGTH, 4096),
         Authorization(TAG_MAC_LENGTH, 16), Authorization(TAG_PADDING, KM_PAD_NONE),
     };
     params_.Reinitialize(params, array_length(params));
+    params_.Reinitialize(params, array_length(params));
+    EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params_.data(), params_.size(), &blob_,
+                                                  &characteristics_));
+
+    keymaster_key_param_t* out_params;
+    size_t out_params_count;
+    uint64_t op_handle;
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              device()->generate_key(device(), params_.data(), params_.size(), &blob_,
-                                     &characteristics_));
+              device()->begin(device(), KM_PURPOSE_ENCRYPT, &blob_, NULL, 0, &out_params,
+                              &out_params_count, &op_handle));
+    free(out_params);
 }
 
 TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
@@ -460,12 +468,20 @@ TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
     for (size_t size : valid_sizes) {
         params_.Reinitialize(params, array_length(params));
         params_.push_back(Authorization(TAG_KEY_SIZE, size));
+        FreeCharacteristics();
+        FreeKeyBlob();
+
         EXPECT_EQ(KM_ERROR_OK, device()->generate_key(device(), params_.data(), params_.size(),
                                                       &blob_, &characteristics_))
             << "Failed to generate size: " << size;
 
-        FreeCharacteristics();
-        FreeKeyBlob();
+        keymaster_key_param_t* out_params;
+        size_t out_params_count;
+        uint64_t op_handle;
+        EXPECT_EQ(KM_ERROR_OK, device()->begin(device(), KM_PURPOSE_ENCRYPT, &blob_, NULL, 0,
+                                               &out_params, &out_params_count, &op_handle))
+            << "Unsupported key size: " << size;
+        free(out_params);
     }
 }
 

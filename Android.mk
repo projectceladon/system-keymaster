@@ -63,6 +63,7 @@ LOCAL_SRC_FILES:= \
 		rsa_key.cpp \
 		rsa_operation.cpp \
 		serializable.cpp \
+		symmetric_key.cpp \
 		unencrypted_key_blob.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
