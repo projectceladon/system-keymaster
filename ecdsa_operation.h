@@ -33,7 +33,10 @@ class EcdsaOperation : public Operation {
         : Operation(purpose, logger), ecdsa_key_(key) {}
     ~EcdsaOperation();
 
-    virtual keymaster_error_t Begin() { return KM_ERROR_OK; }
+    virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
+                                    AuthorizationSet* /* output_params */) {
+        return KM_ERROR_OK;
+    }
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
 
