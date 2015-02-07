@@ -117,11 +117,10 @@ Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key,
     if (*error != KM_ERROR_OK)
         return NULL;
 
-    keymaster_blob_t additional_data = {0, 0};
-    key.authorizations().GetTagValue(TAG_ASSOCIATED_DATA, &additional_data);
+    bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);
 
     Operation* op = new AesOcbOperation(purpose(), key.key_data(), key.key_data_size(),
-                                        chunk_length, tag_length, additional_data);
+                                        chunk_length, tag_length, caller_nonce);
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return op;

@@ -680,6 +680,13 @@ keymaster_error_t SoftKeymasterDevice::begin(
     if (response.error != KM_ERROR_OK)
         return response.error;
 
+    if (response.output_params.size() > 0) {
+        keymaster_key_param_set_t out_params_set;
+        response.output_params.CopyToParamSet(&out_params_set);
+        *out_params = out_params_set.params;
+        *out_params_count = out_params_set.length;
+    }
+
     *operation_handle = response.op_handle;
     return KM_ERROR_OK;
 }

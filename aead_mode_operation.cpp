@@ -19,6 +19,7 @@
 #include <openssl/aes.h>
 #include <openssl/rand.h>
 
+#include <keymaster/authorization_set.h>
 #include <keymaster/logger.h>
 
 #include "aead_mode_operation.h"
@@ -26,16 +27,18 @@
 
 namespace keymaster {
 
-keymaster_error_t AeadModeOperation::Begin(const AuthorizationSet& /* input_params */,
-                                           AuthorizationSet* /* output_params */) {
+keymaster_error_t AeadModeOperation::Begin(const AuthorizationSet& input_params,
+                                           AuthorizationSet* output_params) {
     keymaster_error_t error = Initialize(key_, key_size_, nonce_length_, tag_length_);
-    if (error == KM_ERROR_OK) {
-        buffer_end_ = 0;
-        buffer_.reset(new uint8_t[processing_unit_]);
-        if (!buffer_.get())
-            error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    }
-    return error;
+    if (error != KM_ERROR_OK)
+        return error;
+
+    buffer_end_ = 0;
+    buffer_.reset(new uint8_t[processing_unit_]);
+    if (!buffer_.get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    return HandleNonce(input_params, output_params);
 }
 
 inline size_t min(size_t a, size_t b) {
@@ -44,7 +47,7 @@ inline size_t min(size_t a, size_t b) {
     return b;
 }
 
-keymaster_error_t AeadModeOperation::Update(const AuthorizationSet& /* additional_params */,
+keymaster_error_t AeadModeOperation::Update(const AuthorizationSet& additional_params,
                                             const Buffer& input, Buffer* output,
                                             size_t* input_consumed) {
     // Make an effort to reserve enough output space.  The output buffer will be extended if needed,
@@ -55,39 +58,32 @@ keymaster_error_t AeadModeOperation::Update(const AuthorizationSet& /* additiona
     keymaster_error_t error = KM_ERROR_OK;
     *input_consumed = 0;
 
+    keymaster_blob_t associated_data = {0, 0};
+    additional_params.GetTagValue(TAG_ASSOCIATED_DATA, &associated_data);
+
     const uint8_t* plaintext = input.peek_read();
     const uint8_t* plaintext_end = plaintext + input.available_read();
     while (plaintext < plaintext_end && error == KM_ERROR_OK) {
         if (buffered_data_length() == processing_unit_) {
-            assert(nonce_handled_);
-            if (!nonce_handled_)
-                return KM_ERROR_UNKNOWN_ERROR;
-            error = ProcessChunk(output);
+            error = ProcessChunk(associated_data, output);
             ClearBuffer();
             IncrementNonce();
         }
         plaintext = AppendToBuffer(plaintext, plaintext_end - plaintext);
         *input_consumed = plaintext - input.peek_read();
-        if (!nonce_handled_)
-            error = HandleNonce(output);
     }
     return error;
 }
 
-keymaster_error_t AeadModeOperation::Finish(const AuthorizationSet& /* additional_params */,
+keymaster_error_t AeadModeOperation::Finish(const AuthorizationSet& additional_params,
                                             const Buffer& /* signature */, Buffer* output) {
-    keymaster_error_t error = KM_ERROR_OK;
-    if (!nonce_handled_)
-        error = HandleNonce(output);
-    if (error != KM_ERROR_OK)
-        return error;
-    return ProcessChunk(output);
+    keymaster_blob_t associated_data = {0, 0};
+    additional_params.GetTagValue(TAG_ASSOCIATED_DATA, &associated_data);
+    return ProcessChunk(associated_data, output);
 }
 
-keymaster_error_t AeadModeOperation::ProcessChunk(Buffer* output) {
-    if (!nonce_handled_)
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
+keymaster_error_t AeadModeOperation::ProcessChunk(const keymaster_blob_t& additional_data,
+                                                  Buffer* output) {
     keymaster_error_t error = KM_ERROR_OK;
     if (purpose() == KM_PURPOSE_DECRYPT) {
         if (buffered_data_length() < tag_length_)
@@ -97,14 +93,14 @@ keymaster_error_t AeadModeOperation::ProcessChunk(Buffer* output) {
         if (!output->reserve(output->available_read() + buffered_data_length()))
             error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         else
-            error = DecryptChunk(nonce_, nonce_length_, tag_, tag_length_, additional_data_,
+            error = DecryptChunk(nonce_, nonce_length_, tag_, tag_length_, additional_data,
                                  buffer_.get(), buffered_data_length(), output);
     } else {
         if (!output->reserve(output->available_read() + buffered_data_length() + tag_length_))
             error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         else
-            error = EncryptChunk(nonce_, nonce_length_, tag_length_, additional_data_,
-                                 buffer_.get(), buffered_data_length(), output);
+            error = EncryptChunk(nonce_, nonce_length_, tag_length_, additional_data, buffer_.get(),
+                                 buffered_data_length(), output);
     }
     return error;
 }
@@ -129,30 +125,58 @@ size_t AeadModeOperation::EstimateOutputSize(const Buffer& input, Buffer* output
     }
 }
 
-keymaster_error_t AeadModeOperation::HandleNonce(Buffer* output) {
+keymaster_error_t AeadModeOperation::HandleNonce(const AuthorizationSet& input_params,
+                                                 AuthorizationSet* output_params) {
+    if (!output_params)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
     switch (purpose()) {
-    case KM_PURPOSE_ENCRYPT:
-        if (!RAND_bytes(nonce_, nonce_length_)) {
-            LOG_S("Failed to generate %d-byte nonce", nonce_length_);
-            return TranslateLastOpenSslError();
+    case KM_PURPOSE_ENCRYPT: {
+        keymaster_error_t error;
+        if (caller_nonce_)
+            error = ExtractNonce(input_params);
+        else {
+            if (input_params.find(TAG_NONCE) != -1)
+                /* TODO(swillden): Create and return a better error code */
+                return KM_ERROR_INVALID_ARGUMENT;
+            error = GenerateNonce();
         }
-        if (!output->reserve(nonce_length_))
+
+        if (error != KM_ERROR_OK)
+            return error;
+
+        output_params->push_back(TAG_NONCE, nonce_, nonce_length_);
+        if (output_params->is_valid() != AuthorizationSet::OK)
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        output->write(nonce_, nonce_length_);
-        nonce_handled_ = true;
         break;
+    }
     case KM_PURPOSE_DECRYPT:
-        if (buffered_data_length() >= nonce_length_) {
-            memcpy(nonce_, buffer_.get(), nonce_length_);
-            memmove(buffer_.get(), buffer_.get() + nonce_length_,
-                    buffered_data_length() - nonce_length_);
-            buffer_end_ -= nonce_length_;
-            nonce_handled_ = true;
-        }
-        break;
+        return ExtractNonce(input_params);
+
     default:
         return KM_ERROR_UNSUPPORTED_PURPOSE;
     }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t AeadModeOperation::GenerateNonce() {
+    if (RAND_bytes(nonce_, nonce_length_))
+        return KM_ERROR_OK;
+    LOG_S("Failed to generate %d-byte nonce", nonce_length_);
+    return TranslateLastOpenSslError();
+}
+
+keymaster_error_t AeadModeOperation::ExtractNonce(const AuthorizationSet& input_params) {
+    keymaster_blob_t nonce_blob;
+    if (!input_params.GetTagValue(TAG_NONCE, &nonce_blob))
+        /* TODO(swillden): Add a better error return code for this case. */
+        return KM_ERROR_INVALID_ARGUMENT;
+
+    if (nonce_blob.data_length != nonce_length_)
+        /* TODO(swillden): Add a better error return code for this case. */
+        return KM_ERROR_INVALID_ARGUMENT;
+
+    memcpy(nonce_, nonce_blob.data, nonce_length_);
     return KM_ERROR_OK;
 }
 
