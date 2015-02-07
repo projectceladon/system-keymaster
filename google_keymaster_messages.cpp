@@ -184,16 +184,25 @@ bool BeginOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const 
 }
 
 size_t UpdateOperationRequest::SerializedSize() const {
-    return sizeof(op_handle) + input.SerializedSize();
+    if (message_version == 0)
+        return sizeof(op_handle) + input.SerializedSize();
+    else
+        return sizeof(op_handle) + input.SerializedSize() + additional_params.SerializedSize();
 }
 
 uint8_t* UpdateOperationRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
     buf = append_uint64_to_buf(buf, end, op_handle);
-    return input.Serialize(buf, end);
+    buf = input.Serialize(buf, end);
+    if (message_version > 0)
+        buf = additional_params.Serialize(buf, end);
+    return buf;
 }
 
 bool UpdateOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return copy_uint64_from_buf(buf_ptr, end, &op_handle) && input.Deserialize(buf_ptr, end);
+    bool retval = copy_uint64_from_buf(buf_ptr, end, &op_handle) && input.Deserialize(buf_ptr, end);
+    if (retval && message_version > 0)
+        retval = additional_params.Deserialize(buf_ptr, end);
+    return retval;
 }
 
 size_t UpdateOperationResponse::NonErrorSerializedSize() const {
@@ -218,16 +227,26 @@ bool UpdateOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const
 }
 
 size_t FinishOperationRequest::SerializedSize() const {
-    return sizeof(op_handle) + signature.SerializedSize();
+    if (message_version == 0)
+        return sizeof(op_handle) + signature.SerializedSize();
+    else
+        return sizeof(op_handle) + signature.SerializedSize() + additional_params.SerializedSize();
 }
 
 uint8_t* FinishOperationRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
     buf = append_uint64_to_buf(buf, end, op_handle);
-    return signature.Serialize(buf, end);
+    buf = signature.Serialize(buf, end);
+    if (message_version > 0)
+        buf = additional_params.Serialize(buf, end);
+    return buf;
 }
 
 bool FinishOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return copy_uint64_from_buf(buf_ptr, end, &op_handle) && signature.Deserialize(buf_ptr, end);
+    bool retval =
+        copy_uint64_from_buf(buf_ptr, end, &op_handle) && signature.Deserialize(buf_ptr, end);
+    if (retval && message_version > 0)
+        retval = additional_params.Deserialize(buf_ptr, end);
+    return retval;
 }
 
 size_t FinishOperationResponse::NonErrorSerializedSize() const {
