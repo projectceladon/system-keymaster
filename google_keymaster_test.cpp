@@ -25,9 +25,9 @@
 
 #include <keymaster/google_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
+#include <keymaster/soft_keymaster_device.h>
 
 #include "google_keymaster_test_utils.h"
-#include "soft_keymaster_device.h"
 
 using std::ifstream;
 using std::istreambuf_iterator;
