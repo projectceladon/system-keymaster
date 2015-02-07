@@ -70,7 +70,8 @@ keymaster_error_t HmacOperation::Begin(const AuthorizationSet& /* input_params *
     return error_;
 }
 
-keymaster_error_t HmacOperation::Update(const Buffer& input, Buffer* /* output */,
+keymaster_error_t HmacOperation::Update(const AuthorizationSet& /* additional_params */,
+                                        const Buffer& input, Buffer* /* output */,
                                         size_t* input_consumed) {
     if (!HMAC_Update(&ctx_, input.peek_read(), input.available_read()))
         return KM_ERROR_UNKNOWN_ERROR;
@@ -82,7 +83,8 @@ keymaster_error_t HmacOperation::Abort() {
     return KM_ERROR_OK;
 }
 
-keymaster_error_t HmacOperation::Finish(const Buffer& signature, Buffer* output) {
+keymaster_error_t HmacOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                        const Buffer& signature, Buffer* output) {
     uint8_t digest[EVP_MAX_MD_SIZE];
     unsigned int digest_len;
     if (!HMAC_Final(&ctx_, digest, &digest_len))

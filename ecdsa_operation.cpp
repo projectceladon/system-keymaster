@@ -26,7 +26,8 @@ EcdsaOperation::~EcdsaOperation() {
         EC_KEY_free(ecdsa_key_);
 }
 
-keymaster_error_t EcdsaOperation::Update(const Buffer& input, Buffer* /* output */,
+keymaster_error_t EcdsaOperation::Update(const AuthorizationSet& /* additional_params */,
+                                         const Buffer& input, Buffer* /* output */,
                                          size_t* input_consumed) {
     assert(input_consumed);
     switch (purpose()) {
@@ -46,7 +47,8 @@ keymaster_error_t EcdsaOperation::StoreData(const Buffer& input, size_t* input_c
     return KM_ERROR_OK;
 }
 
-keymaster_error_t EcdsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+keymaster_error_t EcdsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                             const Buffer& /* signature */, Buffer* output) {
     assert(output);
     output->Reinitialize(ECDSA_size(ecdsa_key_));
     unsigned int siglen;
@@ -57,7 +59,8 @@ keymaster_error_t EcdsaSignOperation::Finish(const Buffer& /* signature */, Buff
     return KM_ERROR_OK;
 }
 
-keymaster_error_t EcdsaVerifyOperation::Finish(const Buffer& signature, Buffer* /* output */) {
+keymaster_error_t EcdsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                               const Buffer& signature, Buffer* /* output */) {
     int result = ECDSA_verify(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
                               signature.peek_read(), signature.available_read(), ecdsa_key_);
     if (result < 0)

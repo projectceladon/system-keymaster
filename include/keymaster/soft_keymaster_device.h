@@ -138,13 +138,13 @@ class SoftKeymasterDevice {
                                    const keymaster_key_param_t* params, size_t params_count,
                                    keymaster_key_param_t** out_params, size_t* out_params_count,
                                    keymaster_operation_handle_t* operation_handle);
-    static keymaster_error_t update(const struct keymaster_device* dev,
-                                    keymaster_operation_handle_t operation_handle,
-                                    const uint8_t* input, size_t input_length,
-                                    size_t* input_consumed, uint8_t** output,
-                                    size_t* output_length);
+    static keymaster_error_t
+    update(const struct keymaster_device* dev, keymaster_operation_handle_t operation_handle,
+           const keymaster_key_param_t* params, size_t params_count, const uint8_t* input,
+           size_t input_length, size_t* input_consumed, uint8_t** output, size_t* output_length);
     static keymaster_error_t finish(const struct keymaster_device* dev,
                                     keymaster_operation_handle_t operation_handle,
+                                    const keymaster_key_param_t* params, size_t params_count,
                                     const uint8_t* signature, size_t signature_length,
                                     uint8_t** output, size_t* output_length);
     static keymaster_error_t abort(const struct keymaster_device* dev,
