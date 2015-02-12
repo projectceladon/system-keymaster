@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "soft_keymaster_logger.h"
+#include <keymaster/soft_keymaster_logger.h>
 
 #include <stdarg.h>
 #include <syslog.h>
