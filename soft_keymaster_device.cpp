@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "soft_keymaster_device.h"
+#include <keymaster/soft_keymaster_device.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -34,9 +34,9 @@
 #include <keymaster/authorization_set.h>
 #include <keymaster/google_keymaster_messages.h>
 #include <keymaster/key_blob.h>
+#include <keymaster/soft_keymaster_logger.h>
 
 #include "google_softkeymaster.h"
-#include "soft_keymaster_logger.h"
 
 const uint32_t SEND_BUF_SIZE = 8192;
 const uint32_t RECV_BUF_SIZE = 8192;
