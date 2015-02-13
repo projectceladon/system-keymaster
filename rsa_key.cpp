@@ -19,6 +19,12 @@
 #include "rsa_operation.h"
 #include "unencrypted_key_blob.h"
 
+#if defined(OPENSSL_IS_BORINGSSL)
+typedef size_t openssl_size_t;
+#else
+typedef int openssl_size_t;
+#endif
+
 namespace keymaster {
 
 const uint32_t RSA_DEFAULT_KEY_SIZE = 2048;
@@ -95,7 +101,7 @@ RsaKey* RsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pke
     uint32_t key_size;
     if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
         // key_size specified, make sure it matches the key.
-        if (RSA_size(rsa_key.get()) != (int)key_size) {
+        if (RSA_size(rsa_key.get()) != (openssl_size_t)key_size) {
             *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
             return NULL;
         }
