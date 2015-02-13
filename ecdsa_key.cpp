@@ -49,8 +49,8 @@ EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const L
         return NULL;
     }
 
-    EC_GROUP_set_point_conversion_form(group.get(), POINT_CONVERSION_UNCOMPRESSED);
 #if !defined(OPENSSL_IS_BORINGSSL)
+    EC_GROUP_set_point_conversion_form(group.get(), POINT_CONVERSION_UNCOMPRESSED);
     EC_GROUP_set_asn1_flag(group.get(), OPENSSL_EC_NAMED_CURVE);
 #endif
 

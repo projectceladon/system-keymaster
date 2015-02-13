@@ -19,6 +19,12 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
+#if defined(OPENSSL_IS_BORINGSSL)
+typedef size_t openssl_size_t;
+#else
+typedef int openssl_size_t;
+#endif
+
 namespace keymaster {
 
 HmacOperation::HmacOperation(keymaster_purpose_t purpose, const Logger& logger,
@@ -47,7 +53,7 @@ HmacOperation::HmacOperation(keymaster_purpose_t purpose, const Logger& logger,
         return;
     }
 
-    if ((int)tag_length_ > EVP_MD_size(md)) {
+    if ((openssl_size_t)tag_length_ > EVP_MD_size(md)) {
         error_ = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
         return;
     }
