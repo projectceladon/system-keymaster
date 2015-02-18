@@ -67,7 +67,7 @@ Operation* AesKey::CreateOcbOperation(keymaster_purpose_t purpose, keymaster_err
         return NULL;
 
     keymaster_blob_t additional_data = {0, 0};
-    authorizations().GetTagValue(TAG_ADDITIONAL_DATA, &additional_data);
+    authorizations().GetTagValue(TAG_ASSOCIATED_DATA, &additional_data);
 
     UniquePtr<Operation> op;
     switch (purpose) {
