@@ -65,7 +65,8 @@ HmacOperation::~HmacOperation() {
     HMAC_CTX_cleanup(&ctx_);
 }
 
-keymaster_error_t HmacOperation::Begin() {
+keymaster_error_t HmacOperation::Begin(const AuthorizationSet& /* input_params */,
+                                       AuthorizationSet* /* output_params */) {
     return error_;
 }
 

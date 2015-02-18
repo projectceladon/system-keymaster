@@ -27,6 +27,8 @@
 
 namespace keymaster {
 
+class AuthorizationSet;
+
 /**
  * Abstract base for all cryptographic operations.
  */
@@ -40,7 +42,8 @@ class Operation {
 
     const Logger& logger() { return logger_; }
 
-    virtual keymaster_error_t Begin() = 0;
+    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
+                                    AuthorizationSet* output_params) = 0;
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output,
                                      size_t* input_consumed) = 0;
     virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output) = 0;

@@ -234,7 +234,8 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (operation.get() == NULL)
         return;
 
-    response->error = operation->Begin();
+    response->output_params.Clear();
+    response->error = operation->Begin(request.additional_params, &response->output_params);
     if (response->error != KM_ERROR_OK)
         return;
 
