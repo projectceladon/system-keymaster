@@ -23,9 +23,32 @@ namespace keymaster {
 
 const uint32_t ECDSA_DEFAULT_KEY_SIZE = 224;
 
-/* static */
-EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                                keymaster_error_t* error) {
+class EcdsaKeyFactory : public AsymmetricKeyFactory {
+  public:
+    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_ECDSA; }
+
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                             keymaster_error_t* error);
+    virtual Key* ImportKey(const AuthorizationSet& key_description,
+                           keymaster_key_format_t key_format, const uint8_t* key_data,
+                           size_t key_data_length, const Logger& logger, keymaster_error_t* error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                         keymaster_error_t* error) {
+        return new EcdsaKey(blob, logger, error);
+    }
+
+  private:
+    static EC_GROUP* choose_group(size_t key_size_bits);
+    static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
+
+    struct EC_GROUP_Delete {
+        void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
+    };
+};
+static KeyFactoryRegistry::Registration<EcdsaKeyFactory> registration;
+
+Key* EcdsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                                  keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -35,7 +58,7 @@ EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const L
     if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size))
         authorizations.push_back(Authorization(TAG_KEY_SIZE, key_size));
 
-    UniquePtr<EC_KEY, ECDSA_Delete> ecdsa_key(EC_KEY_new());
+    UniquePtr<EC_KEY, EcdsaKey::ECDSA_Delete> ecdsa_key(EC_KEY_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (ecdsa_key.get() == NULL || pkey.get() == NULL) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -65,23 +88,31 @@ EcdsaKey* EcdsaKey::GenerateKey(const AuthorizationSet& key_description, const L
     return new_key;
 }
 
-/* static */
-EcdsaKey* EcdsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                              const Logger& logger, keymaster_error_t* error) {
+Key* EcdsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
+                                keymaster_key_format_t key_format, const uint8_t* key_data,
+                                size_t key_data_length, const Logger& logger,
+                                keymaster_error_t* error) {
     if (!error)
         return NULL;
-    *error = KM_ERROR_UNKNOWN_ERROR;
 
-    UniquePtr<EC_KEY, ECDSA_Delete> ecdsa_key(EVP_PKEY_get1_EC_KEY(pkey));
-    if (!ecdsa_key.get())
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(
+        ExtractEvpKey(key_format, KM_ALGORITHM_ECDSA, key_data, key_data_length, error));
+    if (*error != KM_ERROR_OK)
         return NULL;
+    assert(pkey.get());
 
-    AuthorizationSet authorizations(key_description);
+    UniquePtr<EC_KEY, EcdsaKey::ECDSA_Delete> ecdsa_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
+    if (!ecdsa_key.get()) {
+        *error = KM_ERROR_UNKNOWN_ERROR;
+        return NULL;
+    }
 
     size_t extracted_key_size_bits;
     *error = get_group_size(*EC_KEY_get0_group(ecdsa_key.get()), &extracted_key_size_bits);
     if (*error != KM_ERROR_OK)
         return NULL;
+
+    AuthorizationSet authorizations(key_description);
 
     uint32_t key_size_bits;
     if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
@@ -113,7 +144,7 @@ EcdsaKey* EcdsaKey::ImportKey(const AuthorizationSet& key_description, EVP_PKEY*
 }
 
 /* static */
-EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
+EC_GROUP* EcdsaKeyFactory::choose_group(size_t key_size_bits) {
     switch (key_size_bits) {
     case 224:
         return EC_GROUP_new_by_curve_name(NID_secp224r1);
@@ -134,7 +165,7 @@ EC_GROUP* EcdsaKey::choose_group(size_t key_size_bits) {
 }
 
 /* static */
-keymaster_error_t EcdsaKey::get_group_size(const EC_GROUP& group, size_t* key_size_bits) {
+keymaster_error_t EcdsaKeyFactory::get_group_size(const EC_GROUP& group, size_t* key_size_bits) {
     switch (EC_GROUP_get_curve_name(&group)) {
     case NID_secp224r1:
         *key_size_bits = 224;

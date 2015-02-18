@@ -111,13 +111,17 @@ template <typename T> struct SupportedResponse : public KeymasterResponse {
     ~SupportedResponse() { delete[] results; }
 
     template <size_t N> void SetResults(const T(&arr)[N]) {
+        SetResults(arr, N);
+    }
+
+    void SetResults(const T* arr, size_t n) {
         delete[] results;
         results_length = 0;
-        results = dup_array(arr);
+        results = dup_array(arr, n);
         if (results == NULL) {
             error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         } else {
-            results_length = N;
+            results_length = n;
             error = KM_ERROR_OK;
         }
     }

@@ -21,7 +21,41 @@
 #include <keymaster/authorization_set.h>
 #include <keymaster/logger.h>
 
+#include "abstract_factory_registry.h"
+#include "unencrypted_key_blob.h"
+
 namespace keymaster {
+
+class Key;
+
+/**
+ * KeyFactory is a pure interface whose subclasses know how to construct a specific subclass of Key.
+ * There is a one to one correspondence between Key subclasses and KeyFactory subclasses.
+ */
+class KeyFactory {
+  public:
+    virtual ~KeyFactory() {}
+
+    // Required for registry
+    typedef keymaster_algorithm_t KeyType;
+    virtual keymaster_algorithm_t registry_key() const = 0;
+
+    // Factory methods.
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                             keymaster_error_t* error) = 0;
+    virtual Key* ImportKey(const AuthorizationSet& key_description,
+                           keymaster_key_format_t key_format, const uint8_t* key_data,
+                           size_t key_data_length, const Logger& logger,
+                           keymaster_error_t* error) = 0;
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                         keymaster_error_t* error) = 0;
+
+    // Informational methods.
+    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) = 0;
+    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) = 0;
+};
+
+typedef AbstractFactoryRegistry<KeyFactory> KeyFactoryRegistry;
 
 class KeyBlob;
 class Operation;
@@ -29,14 +63,6 @@ class UnencryptedKeyBlob;
 
 class Key {
   public:
-    static Key* CreateKey(const UnencryptedKeyBlob& blob, const Logger& logger,
-                          keymaster_error_t* error);
-    static Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                            keymaster_error_t* error);
-    static Key* ImportKey(const AuthorizationSet& key_description,
-                          keymaster_key_format_t key_format, const uint8_t* key_data,
-                          size_t key_data_length, const Logger& logger, keymaster_error_t* error);
-
     virtual ~Key() {}
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) = 0;
 

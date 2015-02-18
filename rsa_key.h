@@ -23,17 +23,16 @@
 
 namespace keymaster {
 
+class RsaKeyFactory;
+
 class RsaKey : public AsymmetricKey {
   public:
-    static RsaKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                               keymaster_error_t* error);
-    static RsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                             const Logger& logger, keymaster_error_t* error);
-    RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
 
   private:
+    friend class RsaKeyFactory;
+
+    RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     RsaKey(RSA* rsa_key, const AuthorizationSet& auths, const Logger& logger)
         : AsymmetricKey(auths, logger), rsa_key_(rsa_key) {}
 

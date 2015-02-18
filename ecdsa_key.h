@@ -23,22 +23,18 @@
 
 namespace keymaster {
 
+class EcdsaKeyFactory;
+
 class EcdsaKey : public AsymmetricKey {
   public:
-    static EcdsaKey* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                                 keymaster_error_t* error);
-    static EcdsaKey* ImportKey(const AuthorizationSet& key_description, EVP_PKEY* pkey,
-                               const Logger& logger, keymaster_error_t* error);
-    EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-
     virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
 
   private:
+    friend EcdsaKeyFactory;
+
+    EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     EcdsaKey(EC_KEY* ecdsa_key, const AuthorizationSet auths, const Logger& logger)
         : AsymmetricKey(auths, logger), ecdsa_key_(ecdsa_key) {}
-
-    static EC_GROUP* choose_group(size_t key_size_bits);
-    static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
 
     virtual int evp_key_type() { return EVP_PKEY_EC; }
     virtual bool InternalToEvp(EVP_PKEY* pkey) const;
@@ -46,10 +42,6 @@ class EcdsaKey : public AsymmetricKey {
 
     struct ECDSA_Delete {
         void operator()(EC_KEY* p) { EC_KEY_free(p); }
-    };
-
-    struct EC_GROUP_Delete {
-        void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
     };
 
     UniquePtr<EC_KEY, ECDSA_Delete> ecdsa_key_;

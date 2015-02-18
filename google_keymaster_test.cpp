@@ -379,8 +379,9 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     size_t len;
     keymaster_algorithm_t* algorithms;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_algorithms(device(), &algorithms, &len));
-    EXPECT_TRUE(ResponseContains({KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES},
-                                 algorithms, len));
+    EXPECT_TRUE(ResponseContains(
+        {KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES, KM_ALGORITHM_HMAC}, algorithms,
+        len));
     free(algorithms);
 }
 
@@ -842,7 +843,7 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey().NoDigestOrPadding(),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().RsaSigningKey().NoDigestOrPadding(),
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
@@ -865,8 +866,7 @@ TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
               ImportKey(ParamBuilder()
-                            .SigningKey()
-                            .Option(TAG_KEY_SIZE, 2048)  // Doesn't match key
+                            .RsaSigningKey(2048)  // Size doesn't match key
                             .NoDigestOrPadding(),
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
@@ -876,7 +876,7 @@ TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
               ImportKey(ParamBuilder()
-                            .SigningKey()
+                            .RsaSigningKey()
                             .Option(TAG_RSA_PUBLIC_EXPONENT, 3)  // Doesn't match key
                             .NoDigestOrPadding(),
                         KM_KEY_FORMAT_PKCS8, pk8_key));
@@ -886,7 +886,8 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey(), KM_KEY_FORMAT_PKCS8, pk8_key));
+    ASSERT_EQ(KM_ERROR_OK,
+              ImportKey(ParamBuilder().EcdsaSigningKey(), KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
@@ -906,8 +907,8 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 256),
-                                     KM_KEY_FORMAT_PKCS8, pk8_key));
+    ASSERT_EQ(KM_ERROR_OK,
+              ImportKey(ParamBuilder().EcdsaSigningKey(256), KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
@@ -927,8 +928,8 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              ImportKey(ParamBuilder().SigningKey().Option(TAG_KEY_SIZE, 224), KM_KEY_FORMAT_PKCS8,
-                        pk8_key));
+              ImportKey(ParamBuilder().EcdsaSigningKey(224),  // Size does not match key
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
 typedef KeymasterTest VersionTest;

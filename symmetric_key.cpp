@@ -27,27 +27,13 @@
 
 namespace keymaster {
 
-/* static */
-SymmetricKey* SymmetricKey::GenerateKey(keymaster_algorithm_t algorithm,
-                                        const AuthorizationSet& key_description,
-                                        const Logger& logger, keymaster_error_t* error) {
+Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+                                      keymaster_error_t* error) {
     if (!error)
         return NULL;
-
     *error = KM_ERROR_OK;
 
-    UniquePtr<SymmetricKey> key;
-    switch (algorithm) {
-    case KM_ALGORITHM_AES:
-        key.reset(new AesKey(key_description, logger));
-        break;
-    case KM_ALGORITHM_HMAC:
-        key.reset(new HmacKey(key_description, logger));
-        break;
-    default:
-        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-        return NULL;
-    };
+    UniquePtr<SymmetricKey> key(CreateKey(key_description, logger));
 
     uint32_t key_size_bits;
     if (!key_description.GetTagValue(TAG_KEY_SIZE, &key_size_bits) || key_size_bits % 8 != 0) {
@@ -56,7 +42,7 @@ SymmetricKey* SymmetricKey::GenerateKey(keymaster_algorithm_t algorithm,
     }
 
     key->key_data_size_ = key_size_bits / 8;
-    if (key->key_data_size_ > MAX_KEY_SIZE) {
+    if (key->key_data_size_ > SymmetricKey::MAX_KEY_SIZE) {
         *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
         return NULL;
     }
@@ -71,37 +57,16 @@ SymmetricKey* SymmetricKey::GenerateKey(keymaster_algorithm_t algorithm,
     return key.release();
 }
 
-/* static */
-SymmetricKey* SymmetricKey::CreateKey(keymaster_algorithm_t algorithm,
-                                      const UnencryptedKeyBlob& blob, const Logger& logger,
-                                      keymaster_error_t* error) {
-    switch (algorithm) {
-    case KM_ALGORITHM_AES:
-        return new AesKey(blob, logger, error);
-    case KM_ALGORITHM_HMAC:
-        return new HmacKey(blob, logger, error);
-    default:
-        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-        return NULL;
-    }
-}
-
 SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger,
                            keymaster_error_t* error)
     : Key(blob, logger), key_data_size_(blob.unencrypted_key_material_length()) {
+    memcpy(key_data_, blob.unencrypted_key_material(), key_data_size_);
     if (error)
-        *error = LoadKey(blob);
+        *error = KM_ERROR_OK;
 }
 
 SymmetricKey::~SymmetricKey() {
     memset_s(key_data_, 0, MAX_KEY_SIZE);
-}
-
-keymaster_error_t SymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
-    assert(blob.unencrypted_key_material_length() == key_data_size_);
-    memcpy(key_data_, blob.unencrypted_key_material(), key_data_size_);
-
-    return KM_ERROR_OK;
 }
 
 keymaster_error_t SymmetricKey::key_material(UniquePtr<uint8_t[]>* key_material,
