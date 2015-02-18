@@ -151,6 +151,23 @@ class Eraser {
     size_t size_;
 };
 
+/**
+ * ArrayWrapper is a trivial wrapper around a C-style array that provides begin() and end()
+ * methods. This is primarily to facilitate range-based iteration on arrays.  It does not copy, nor
+ * does it take ownership; it just holds pointers.
+ */
+template <typename T> class ArrayWrapper {
+  public:
+    ArrayWrapper(T* array, size_t size) : begin_(array), end_(array + size) {}
+
+    T* begin() { return begin_; }
+    T* end() { return end_; }
+
+  private:
+    T* begin_;
+    T* end_;
+};
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
