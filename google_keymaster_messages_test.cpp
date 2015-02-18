@@ -256,7 +256,17 @@ TEST(RoundTrip, UpdateOperationRequest) {
         msg.op_handle = 0xDEADBEEF;
         msg.input.Reinitialize("foo", 3);
 
-        UniquePtr<UpdateOperationRequest> deserialized(round_trip(ver, msg, 15));
+        UniquePtr<UpdateOperationRequest> deserialized;
+        switch(ver) {
+        case 0:
+            deserialized.reset(round_trip(ver, msg, 15));
+            break;
+        case 1:
+            deserialized.reset(round_trip(ver, msg, 27));
+            break;
+        default:
+            FAIL();
+        }
         EXPECT_EQ(3U, deserialized->input.available_read());
         EXPECT_EQ(0, memcmp(deserialized->input.peek_read(), "foo", 3));
     }
@@ -303,7 +313,17 @@ TEST(RoundTrip, FinishOperationRequest) {
         msg.op_handle = 0xDEADBEEF;
         msg.signature.Reinitialize("bar", 3);
 
-        UniquePtr<FinishOperationRequest> deserialized(round_trip(ver, msg, 15));
+        UniquePtr<FinishOperationRequest> deserialized;
+        switch(ver) {
+        case 0:
+            deserialized.reset(round_trip(ver, msg, 15));
+            break;
+        case 1:
+            deserialized.reset(round_trip(ver, msg, 27));
+            break;
+        default:
+            FAIL();
+        }
         EXPECT_EQ(0xDEADBEEF, deserialized->op_handle);
         EXPECT_EQ(3U, deserialized->signature.available_read());
         EXPECT_EQ(0, memcmp(deserialized->signature.peek_read(), "bar", 3));
