@@ -34,7 +34,8 @@ RsaOperation::~RsaOperation() {
         RSA_free(rsa_key_);
 }
 
-keymaster_error_t RsaOperation::Update(const Buffer& input, Buffer* /* output */,
+keymaster_error_t RsaOperation::Update(const AuthorizationSet& /* additional_params */,
+                                       const Buffer& input, Buffer* /* output */,
                                        size_t* input_consumed) {
     assert(input_consumed);
     switch (purpose()) {
@@ -57,7 +58,8 @@ keymaster_error_t RsaOperation::StoreData(const Buffer& input, size_t* input_con
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                           const Buffer& /* signature */, Buffer* output) {
     assert(output);
     output->Reinitialize(RSA_size(rsa_key_));
     int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
@@ -69,7 +71,8 @@ keymaster_error_t RsaSignOperation::Finish(const Buffer& /* signature */, Buffer
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaVerifyOperation::Finish(const Buffer& signature, Buffer* /* output */) {
+keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                             const Buffer& signature, Buffer* /* output */) {
 #if defined(OPENSSL_IS_BORINGSSL)
     size_t message_size = data_.available_read();
 #else
@@ -99,7 +102,8 @@ keymaster_error_t RsaVerifyOperation::Finish(const Buffer& signature, Buffer* /*
 const int OAEP_PADDING_OVERHEAD = 41;
 const int PKCS1_PADDING_OVERHEAD = 11;
 
-keymaster_error_t RsaEncryptOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                              const Buffer& /* signature */, Buffer* output) {
     assert(output);
     int openssl_padding;
 
@@ -147,7 +151,8 @@ keymaster_error_t RsaEncryptOperation::Finish(const Buffer& /* signature */, Buf
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaDecryptOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                              const Buffer& /* signature */, Buffer* output) {
     assert(output);
     int openssl_padding;
     switch (padding_) {

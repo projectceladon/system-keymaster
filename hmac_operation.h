@@ -29,11 +29,13 @@ class HmacOperation : public Operation {
                   size_t key_data_size, keymaster_digest_t digest, size_t tag_length);
     ~HmacOperation();
 
-    virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
+    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
                                     AuthorizationSet* output_params);
-    virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
+    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                                     Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Abort();
-    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
+    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
+                                     const Buffer& signature, Buffer* output);
 
   private:
     HMAC_CTX ctx_;

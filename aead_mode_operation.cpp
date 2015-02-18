@@ -41,7 +41,8 @@ inline size_t min(size_t a, size_t b) {
     return b;
 }
 
-keymaster_error_t AeadModeOperation::Update(const Buffer& input, Buffer* output,
+keymaster_error_t AeadModeOperation::Update(const AuthorizationSet& /* additional_params */,
+                                            const Buffer& input, Buffer* output,
                                             size_t* input_consumed) {
     // Make an effort to reserve enough output space.  The output buffer will be extended if needed,
     // but this reduces reallocations.
@@ -70,7 +71,8 @@ keymaster_error_t AeadModeOperation::Update(const Buffer& input, Buffer* output,
     return error;
 }
 
-keymaster_error_t AeadModeOperation::Finish(const Buffer& /* signature */, Buffer* output) {
+keymaster_error_t AeadModeOperation::Finish(const AuthorizationSet& /* additional_params */,
+                                            const Buffer& /* signature */, Buffer* output) {
     keymaster_error_t error = KM_ERROR_OK;
     if (!nonce_handled_)
         error = HandleNonce(output);

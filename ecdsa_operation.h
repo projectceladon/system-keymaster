@@ -37,7 +37,8 @@ class EcdsaOperation : public Operation {
                                     AuthorizationSet* /* output_params */) {
         return KM_ERROR_OK;
     }
-    virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
+    virtual keymaster_error_t Update(const AuthorizationSet& /* additional_params */,
+                                     const Buffer& input, Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
 
   protected:
@@ -51,14 +52,16 @@ class EcdsaSignOperation : public EcdsaOperation {
   public:
     EcdsaSignOperation(keymaster_purpose_t purpose, const Logger& logger, EC_KEY* key)
         : EcdsaOperation(purpose, logger, key) {}
-    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
+    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
+                                     const Buffer& signature, Buffer* output);
 };
 
 class EcdsaVerifyOperation : public EcdsaOperation {
   public:
     EcdsaVerifyOperation(keymaster_purpose_t purpose, const Logger& logger, EC_KEY* key)
         : EcdsaOperation(purpose, logger, key) {}
-    virtual keymaster_error_t Finish(const Buffer& signature, Buffer* output);
+    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
+                                     const Buffer& signature, Buffer* output);
 };
 
 }  // namespace keymaster

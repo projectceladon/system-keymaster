@@ -228,8 +228,9 @@ class KeymasterTest : public testing::Test {
         size_t out_length;
         EXPECT_NE(op_handle_, OP_HANDLE_SENTINEL);
         keymaster_error_t error = device()->update(
-            device(), op_handle_, reinterpret_cast<const uint8_t*>(message.c_str()),
-            message.length(), input_consumed, &out_tmp, &out_length);
+            device(), op_handle_, NULL /* additional_params */, 0 /* additional_params_count */,
+            reinterpret_cast<const uint8_t*>(message.c_str()), message.length(), input_consumed,
+            &out_tmp, &out_length);
         if (out_tmp)
             output->append(reinterpret_cast<char*>(out_tmp), out_length);
         free(out_tmp);
@@ -242,8 +243,9 @@ class KeymasterTest : public testing::Test {
         uint8_t* out_tmp = NULL;
         size_t out_length;
         keymaster_error_t error = device()->finish(
-            device(), op_handle_, reinterpret_cast<const uint8_t*>(signature.c_str()),
-            signature.length(), &out_tmp, &out_length);
+            device(), op_handle_, NULL /* additional_params */, 0 /* additional_params_count */,
+            reinterpret_cast<const uint8_t*>(signature.c_str()), signature.length(), &out_tmp,
+            &out_length);
         if (out_tmp)
             output->append(reinterpret_cast<char*>(out_tmp), out_length);
         free(out_tmp);
