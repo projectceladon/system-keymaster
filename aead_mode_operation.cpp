@@ -23,7 +23,8 @@
 
 namespace keymaster {
 
-keymaster_error_t AeadModeOperation::Begin() {
+keymaster_error_t AeadModeOperation::Begin(const AuthorizationSet& /* input_params */,
+                                           AuthorizationSet* /* output_params */) {
     keymaster_error_t error = Initialize(key_, key_size_, nonce_length_, tag_length_);
     if (error == KM_ERROR_OK) {
         buffer_end_ = 0;

@@ -47,7 +47,8 @@ class AeadModeOperation : public Operation {
         delete[] additional_data_.data;
     }
 
-    virtual keymaster_error_t Begin();
+    virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
+                                    AuthorizationSet* output_params);
     virtual keymaster_error_t Update(const Buffer& input, Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Finish(const Buffer& /* signature */, Buffer* output);
 
