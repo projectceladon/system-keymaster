@@ -25,6 +25,7 @@ CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-paramete
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
+	abstract_factory_registry_test.cpp \
 	aead_mode_operation.cpp \
 	aes_key.cpp \
 	aes_operation.cpp \
@@ -58,7 +59,8 @@ DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
 
 LINK.o=$(LINK.cc)
 
-BINARIES=authorization_set_test \
+BINARIES = abstract_factory_registry_test \
+	authorization_set_test \
 	google_keymaster_test \
 	google_keymaster_messages_test \
 	key_blob_test
@@ -152,6 +154,9 @@ google_keymaster_test: google_keymaster_test.o \
 	soft_keymaster_device.o \
 	symmetric_key.o \
 	unencrypted_key_blob.o \
+	$(GTEST)/src/gtest-all.o
+
+abstract_factory_registry_test: abstract_factory_registry_test.o \
 	$(GTEST)/src/gtest-all.o
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
