@@ -241,6 +241,7 @@ struct UpdateOperationRequest : public KeymasterMessage {
 
     keymaster_operation_handle_t op_handle;
     Buffer input;
+    AuthorizationSet additional_params;
 };
 
 struct UpdateOperationResponse : public KeymasterResponse {
@@ -264,6 +265,7 @@ struct FinishOperationRequest : public KeymasterMessage {
 
     keymaster_operation_handle_t op_handle;
     Buffer signature;
+    AuthorizationSet additional_params;
 };
 
 struct FinishOperationResponse : public KeymasterResponse {
