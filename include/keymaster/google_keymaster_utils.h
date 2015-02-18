@@ -62,15 +62,23 @@ template <typename T, size_t N> inline size_t array_length(const T (&)[N]) {
 
 /**
  * Duplicate the array \p a.  The memory for the new array is allocated and the caller takes
+ * responsibility.
+ */
+template <typename T> inline T* dup_array(const T* a, size_t n) {
+    T* dup = new T[n];
+    if (dup != NULL)
+        for (size_t i = 0; i < n; ++i)
+            dup[i] = a[i];
+    return dup;
+}
+
+/**
+ * Duplicate the array \p a.  The memory for the new array is allocated and the caller takes
  * responsibility.  Note that the dup is necessarily returned as a pointer, so size is lost.  Call
  * array_length() on the original array to discover the size.
  */
 template <typename T, size_t N> inline T* dup_array(const T (&a)[N]) {
-    T* dup = new T[N];
-    if (dup != NULL) {
-        memcpy(dup, &a, array_size(a));
-    }
-    return dup;
+    return dup_array(a, N);
 }
 
 /**
@@ -136,7 +144,7 @@ class Eraser {
 
     template <typename T>
     explicit Eraser(T& t)
-        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {}
+        : buf_(reinterpret_cast<uint8_t*> (&t)), size_(sizeof(t)) {}
 
     template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {}
 

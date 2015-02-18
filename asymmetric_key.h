@@ -23,6 +23,19 @@
 
 namespace keymaster {
 
+class AsymmetricKeyFactory : public KeyFactory {
+  protected:
+    EVP_PKEY* ExtractEvpKey(keymaster_key_format_t key_format,
+                            keymaster_algorithm_t expected_algorithm, const uint8_t* key_data,
+                            size_t key_data_length, keymaster_error_t* error);
+
+    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
+    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count);
+
+  private:
+    static int convert_to_evp(keymaster_algorithm_t algorithm);
+};
+
 class AsymmetricKey : public Key {
   public:
   protected:

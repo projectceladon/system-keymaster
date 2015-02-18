@@ -44,6 +44,7 @@ GoogleKeymaster::GoogleKeymaster(size_t operation_table_size, Logger* logger)
     if (operation_table_.get() == NULL)
         operation_table_size_ = 0;
 }
+
 GoogleKeymaster::~GoogleKeymaster() {
     for (size_t i = 0; i < operation_table_size_; ++i)
         if (operation_table_[i].operation != NULL)
@@ -60,14 +61,13 @@ typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 // methods that return the same information.  They'll get out of sync.  Best to put the knowledge in
 // the keytypes and provide some mechanism for GoogleKeymaster to query the keytypes for the
 // information.
-
-keymaster_algorithm_t supported_algorithms[] = {
-    KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES,
-};
+//
+// UPDATE: This TODO has been completed for supported algorithms.  It still needs to be done for
+// modes, padding, etc.  This will be done with a registry of operation factories.
 
 template <typename T>
 bool check_supported(keymaster_algorithm_t algorithm, SupportedResponse<T>* response) {
-    if (!array_contains(supported_algorithms, algorithm)) {
+    if (KeyFactoryRegistry::Get(algorithm) == NULL) {
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return false;
     }
@@ -88,7 +88,24 @@ void GoogleKeymaster::SupportedAlgorithms(
     SupportedResponse<keymaster_algorithm_t>* response) const {
     if (response == NULL)
         return;
-    response->SetResults(supported_algorithms);
+
+    size_t factory_count = 0;
+    const KeyFactory** factories = KeyFactoryRegistry::GetAll(&factory_count);
+    assert(factories != NULL);
+    assert(factory_count > 0);
+
+    UniquePtr<keymaster_algorithm_t[]> algorithms(new keymaster_algorithm_t[factory_count]);
+    if (!algorithms.get()) {
+        response->error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
+
+    for (size_t i = 0; i < factory_count; ++i)
+        algorithms[i] = factories[i]->registry_key();
+
+    response->results = algorithms.release();
+    response->results_length = factory_count;
+    response->error = KM_ERROR_OK;
 }
 
 void GoogleKeymaster::SupportedBlockModes(
@@ -153,42 +170,26 @@ void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
     }
 }
 
-keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
 void GoogleKeymaster::SupportedImportFormats(
     keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
 
-    response->error = KM_ERROR_OK;
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-    case KM_ALGORITHM_DSA:
-    case KM_ALGORITHM_ECDSA:
-        response->SetResults(supported_import_formats);
-        break;
-    default:
-        response->results_length = 0;
-        break;
-    }
+    size_t count;
+    const keymaster_key_format_t* formats =
+        KeyFactoryRegistry::Get(algorithm)->SupportedImportFormats(&count);
+    response->SetResults(formats, count);
 }
 
-keymaster_key_format_t supported_export_formats[] = {KM_KEY_FORMAT_X509};
 void GoogleKeymaster::SupportedExportFormats(
     keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
 
-    response->error = KM_ERROR_OK;
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-    case KM_ALGORITHM_DSA:
-    case KM_ALGORITHM_ECDSA:
-        response->SetResults(supported_export_formats);
-        break;
-    default:
-        response->results_length = 0;
-        break;
-    }
+    size_t count;
+    const keymaster_key_format_t* formats =
+        KeyFactoryRegistry::Get(algorithm)->SupportedExportFormats(&count);
+    response->SetResults(formats, count);
 }
 
 void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
@@ -196,7 +197,15 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     if (response == NULL)
         return;
 
-    UniquePtr<Key> key(Key::GenerateKey(request.key_description, logger(), &response->error));
+    keymaster_algorithm_t algorithm;
+    KeyFactory* factory = 0;
+    UniquePtr<Key> key;
+    if (!request.key_description.GetTagValue(TAG_ALGORITHM, &algorithm) ||
+        !(factory = KeyFactoryRegistry::Get(algorithm)))
+        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    else
+        key.reset(factory->GenerateKey(request.key_description, logger(), &response->error));
+
     if (response->error != KM_ERROR_OK)
         return;
 
@@ -310,8 +319,16 @@ void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespon
     if (response == NULL)
         return;
 
-    UniquePtr<Key> key(Key::ImportKey(request.key_description, request.key_format, request.key_data,
-                                      request.key_data_length, logger(), &response->error));
+    keymaster_algorithm_t algorithm;
+    KeyFactory* factory = 0;
+    UniquePtr<Key> key;
+    if (!request.key_description.GetTagValue(TAG_ALGORITHM, &algorithm) ||
+        !(factory = KeyFactoryRegistry::Get(algorithm)))
+        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    else
+        key.reset(factory->ImportKey(request.key_description, request.key_format, request.key_data,
+                                     request.key_data_length, logger(), &response->error));
+
     if (response->error != KM_ERROR_OK)
         return;
 
@@ -369,7 +386,12 @@ Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
     UniquePtr<UnencryptedKeyBlob> blob(LoadKeyBlob(key, client_params, error));
     if (*error != KM_ERROR_OK)
         return NULL;
-    return Key::CreateKey(*blob, logger(), error);
+
+    KeyFactory* factory = 0;
+    if ((factory = KeyFactoryRegistry::Get(blob->algorithm())))
+        return factory->LoadKey(*blob, logger(), error);
+    *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    return NULL;
 }
 
 UnencryptedKeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,

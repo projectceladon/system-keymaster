@@ -23,6 +23,22 @@
 
 namespace keymaster {
 
+class HmacKeyFactory : public SymmetricKeyFactory {
+  public:
+    keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_HMAC; }
+
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                         keymaster_error_t* error) {
+        return new HmacKey(blob, logger, error);
+    }
+
+    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths, const Logger& logger) {
+        return new HmacKey(auths, logger);
+    }
+};
+
+static KeyFactoryRegistry::Registration<HmacKeyFactory> registration;
+
 Operation* HmacKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
     *error = KM_ERROR_OK;
 

@@ -26,6 +26,22 @@
 
 namespace keymaster {
 
+class AesKeyFactory : public SymmetricKeyFactory {
+  public:
+    keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_AES; }
+
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
+                         keymaster_error_t* error) {
+        return new AesKey(blob, logger, error);
+    }
+
+    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths, const Logger& logger) {
+        return new AesKey(auths, logger);
+    }
+};
+
+static KeyFactoryRegistry::Registration<AesKeyFactory> registration;
+
 Operation* AesKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
     keymaster_block_mode_t block_mode;
     if (!authorizations().GetTagValue(TAG_BLOCK_MODE, &block_mode)) {
