@@ -253,8 +253,8 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
         return;
     }
 
-    response->error =
-        entry->operation->Update(request.input, &response->output, &response->input_consumed);
+    response->error = entry->operation->Update(request.additional_params, request.input,
+                                               &response->output, &response->input_consumed);
     if (response->error != KM_ERROR_OK) {
         // Any error invalidates the operation.
         DeleteOperation(entry);
@@ -272,7 +272,8 @@ void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
         return;
     }
 
-    response->error = entry->operation->Finish(request.signature, &response->output);
+    response->error =
+        entry->operation->Finish(request.additional_params, request.signature, &response->output);
     DeleteOperation(entry);
 }
 

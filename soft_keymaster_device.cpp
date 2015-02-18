@@ -652,9 +652,10 @@ SoftKeymasterDevice::begin(const struct keymaster_device* dev, keymaster_purpose
 /* static */
 keymaster_error_t SoftKeymasterDevice::update(const struct keymaster_device* dev,
                                               keymaster_operation_handle_t operation_handle,
-                                              const uint8_t* input, size_t input_length,
-                                              size_t* input_consumed, uint8_t** output,
-                                              size_t* output_length) {
+                                              const keymaster_key_param_t* params,
+                                              size_t params_count, const uint8_t* input,
+                                              size_t input_length, size_t* input_consumed,
+                                              uint8_t** output, size_t* output_length) {
     if (!input)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
@@ -664,6 +665,7 @@ keymaster_error_t SoftKeymasterDevice::update(const struct keymaster_device* dev
     UpdateOperationRequest request;
     request.op_handle = operation_handle;
     request.input.Reinitialize(input, input_length);
+    request.additional_params.Reinitialize(params, params_count);
 
     UpdateOperationResponse response;
     convert_device(dev)->impl_->UpdateOperation(request, &response);
@@ -682,8 +684,10 @@ keymaster_error_t SoftKeymasterDevice::update(const struct keymaster_device* dev
 /* static */
 keymaster_error_t SoftKeymasterDevice::finish(const struct keymaster_device* dev,
                                               keymaster_operation_handle_t operation_handle,
-                                              const uint8_t* signature, size_t signature_length,
-                                              uint8_t** output, size_t* output_length) {
+                                              const keymaster_key_param_t* params,
+                                              size_t params_count, const uint8_t* signature,
+                                              size_t signature_length, uint8_t** output,
+                                              size_t* output_length) {
     if (!output || !output_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -691,6 +695,7 @@ keymaster_error_t SoftKeymasterDevice::finish(const struct keymaster_device* dev
     request.op_handle = operation_handle;
     if (signature)
         request.signature.Reinitialize(signature, signature_length);
+    request.additional_params.Reinitialize(params, params_count);
 
     FinishOperationResponse response;
     convert_device(dev)->impl_->FinishOperation(request, &response);
