@@ -55,16 +55,23 @@ const uint32_t GET_VERSION = 7;
  * versioned.
  */
 const int32_t MAX_MESSAGE_VERSION = 1;
-inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t subminor_ver) {
-    uint32_t composite_ver = (major_ver << 16) | (minor_ver << 8) | subminor_ver;
-    switch (composite_ver) {
-    case 0x000:
-        return 0;
-    case 0x100:
-        return 1;
-    default:
-        return -1;
-    }
+inline int32_t MessageVersion(uint8_t major_ver, uint8_t /* minor_ver */,
+                              uint8_t /* subminor_ver */) {
+    int32_t message_version = -1;
+    switch (major_ver) {
+    case 0:
+        // For the moment we still support version 0, though in general the plan is not to support
+        // non-matching major versions.
+        message_version = 0;
+        break;
+    case 1:
+        // Currently all 1.X.X versions are interoperable and all use message version 1.  In the
+        // future minor numbers may indicate incompatibility. Subminor version should never matter
+        // for compatibility.
+        message_version = 1;
+        break;
+    };
+    return message_version;
 }
 
 struct KeymasterMessage : public Serializable {
