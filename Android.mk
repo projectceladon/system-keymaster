@@ -78,13 +78,12 @@ include $(BUILD_SHARED_LIBRARY)
 
 
 ###
-# soft_keymaster_device provides a software-based keymaster HAL implementation.
-# This is used by keystore as a fallback when there is no HW keymaster
-# implementation available, or it doesn't provide needed features.
+# libsoftkeymaster provides a software-based keymaster HAL implementation.
+# This is used by keystore as a fallback for when the hardware keymaster does
+# not support the request.
 ###
 include $(CLEAR_VARS)
-LOCAL_MODULE := soft_keymaster_device
-LOCAL_MODULE_RELATIVE_PATH := hw
+LOCAL_MODULE := libsoftkeymasterdevice
 LOCAL_SRC_FILES := \
 	soft_keymaster_device.cpp \
 	soft_keymaster_logger.cpp
@@ -94,4 +93,5 @@ LOCAL_CFLAGS = -Wall -Werror
 LOCAL_SHARED_LIBRARIES := libkeymaster liblog
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 include $(BUILD_SHARED_LIBRARY)
