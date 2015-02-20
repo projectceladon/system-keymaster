@@ -38,9 +38,6 @@
 
 #include "google_softkeymaster.h"
 
-const uint32_t SEND_BUF_SIZE = 8192;
-const uint32_t RECV_BUF_SIZE = 8192;
-
 struct keystore_module soft_keymaster_device_module = {
     .common =
         {
