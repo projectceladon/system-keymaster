@@ -114,17 +114,17 @@ template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T va
  * optimized away.  This is important because we often need to wipe blocks of sensitive data from
  * memory.  As an additional convenience, this implementation avoids writing to NULL pointers.
  */
-#ifdef KEYMASTER_CLANG_TEST_BUILD
-#define OPTIMIZE(x)
-#else  // not KEYMASTER_CLANG_TEST_BUILD
-#define OPTIMIZE(x) __attribute__((optimize(x)))
-#endif  // not KEYMASTER_CLANG_TEST_BUILD
-inline OPTIMIZE("O0") void* memset_s(void* s, int c, size_t n) {
+#ifdef __clang__
+#define OPTNONE __attribute__((optnone))
+#else  // not __clang__
+#define OPTNONE __attribute__((optimize("O0")))
+#endif  // not __clang__
+inline OPTNONE void* memset_s(void* s, int c, size_t n) {
     if (!s)
         return s;
     return memset(s, c, n);
 }
-#undef OPTIMIZE
+#undef OPTNONE
 
 /**
  * Variant of memcmp that has the same runtime regardless of whether the data matches (i.e. doesn't
