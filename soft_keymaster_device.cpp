@@ -27,7 +27,7 @@
 
 #include <type_traits>
 
-#include <hardware/keymaster.h>
+#include <hardware/keymaster1.h>
 #define LOG_TAG "SoftKeymasterDevice"
 #include <cutils/log.h>
 
@@ -42,7 +42,7 @@ struct keystore_module soft_keymaster_device_module = {
     .common =
         {
          .tag = HARDWARE_MODULE_TAG,
-         .module_api_version = KEYMASTER_MODULE_API_VERSION_0_4,
+         .module_api_version = KEYMASTER_MODULE_API_VERSION_1_0,
          .hal_api_version = HARDWARE_HAL_API_VERSION,
          .id = KEYSTORE_HARDWARE_MODULE_ID,
          .name = "Keymaster OpenSSL HAL",
@@ -141,8 +141,8 @@ static void AddClientAndAppData(const keymaster_blob_t* client_id, const keymast
         request->additional_params.push_back(TAG_APPLICATION_DATA, *app_data);
 }
 
-static inline SoftKeymasterDevice* convert_device(const keymaster_device* dev) {
-    return reinterpret_cast<SoftKeymasterDevice*>(const_cast<keymaster_device*>(dev));
+static inline SoftKeymasterDevice* convert_device(const keymaster1_device_t* dev) {
+    return reinterpret_cast<SoftKeymasterDevice*>(const_cast<keymaster1_device_t*>(dev));
 }
 
 /* static */
@@ -152,7 +152,7 @@ int SoftKeymasterDevice::close_device(hw_device_t* dev) {
 }
 
 /* static */
-int SoftKeymasterDevice::generate_keypair(const keymaster_device_t* dev,
+int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
                                           const keymaster_keypair_t key_type,
                                           const void* key_params, uint8_t** key_blob,
                                           size_t* key_blob_length) {
@@ -212,7 +212,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster_device_t* dev,
 }
 
 /* static */
-int SoftKeymasterDevice::import_keypair(const keymaster_device_t* dev, const uint8_t* key,
+int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const uint8_t* key,
                                         const size_t key_length, uint8_t** key_blob,
                                         size_t* key_blob_length) {
     convert_device(dev)->impl_->logger().debug("Device received import_keypair");
@@ -244,7 +244,7 @@ int SoftKeymasterDevice::import_keypair(const keymaster_device_t* dev, const uin
 }
 
 /* static */
-int SoftKeymasterDevice::get_keypair_public(const struct keymaster_device* dev,
+int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
                                             const uint8_t* key_blob, const size_t key_blob_length,
                                             uint8_t** x509_data, size_t* x509_data_length) {
     convert_device(dev)->impl_->logger().debug("Device received get_keypair_public");
@@ -273,7 +273,7 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster_device* dev,
 }
 
 /* static */
-int SoftKeymasterDevice::sign_data(const keymaster_device_t* dev, const void* params,
+int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* params,
                                    const uint8_t* key_blob, const size_t key_blob_length,
                                    const uint8_t* data, const size_t data_length,
                                    uint8_t** signed_data, size_t* signed_data_length) {
@@ -328,7 +328,7 @@ int SoftKeymasterDevice::sign_data(const keymaster_device_t* dev, const void* pa
 }
 
 /* static */
-int SoftKeymasterDevice::verify_data(const keymaster_device_t* dev, const void* params,
+int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void* params,
                                      const uint8_t* key_blob, const size_t key_blob_length,
                                      const uint8_t* signed_data, const size_t signed_data_length,
                                      const uint8_t* signature, const size_t signature_length) {
@@ -377,7 +377,7 @@ int SoftKeymasterDevice::verify_data(const keymaster_device_t* dev, const void* 
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const keymaster1_device_t* dev,
                                                                 keymaster_algorithm_t** algorithms,
                                                                 size_t* algorithms_length) {
     if (!algorithms || !algorithms_length)
@@ -402,7 +402,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const struct key
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const keymaster1_device_t* dev,
                                                                  keymaster_algorithm_t algorithm,
                                                                  keymaster_purpose_t purpose,
                                                                  keymaster_block_mode_t** modes,
@@ -429,9 +429,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const struct ke
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(
-    const struct keymaster_device* dev, keymaster_algorithm_t algorithm,
-    keymaster_purpose_t purpose, keymaster_padding_t** modes, size_t* modes_length) {
+keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(const keymaster1_device_t* dev,
+                                                                   keymaster_algorithm_t algorithm,
+                                                                   keymaster_purpose_t purpose,
+                                                                   keymaster_padding_t** modes,
+                                                                   size_t* modes_length) {
     if (!modes || !modes_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -453,7 +455,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::get_supported_digests(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::get_supported_digests(const keymaster1_device_t* dev,
                                                              keymaster_algorithm_t algorithm,
                                                              keymaster_purpose_t purpose,
                                                              keymaster_digest_t** digests,
@@ -480,7 +482,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_digests(const struct keymas
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
-    const struct keymaster_device* dev, keymaster_algorithm_t algorithm,
+    const keymaster1_device_t* dev, keymaster_algorithm_t algorithm,
     keymaster_key_format_t** formats, size_t* formats_length) {
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
@@ -505,7 +507,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
-    const struct keymaster_device* dev, keymaster_algorithm_t algorithm,
+    const keymaster1_device_t* dev, keymaster_algorithm_t algorithm,
     keymaster_key_format_t** formats, size_t* formats_length) {
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
@@ -529,7 +531,7 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const struct keymaster_device* /* dev */,
+keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* /* dev */,
                                                        const uint8_t* /* data */,
                                                        size_t /* data_length */) {
     return KM_ERROR_UNIMPLEMENTED;
@@ -537,7 +539,7 @@ keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const struct keymaster_de
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::generate_key(
-    const struct keymaster_device* dev, const keymaster_key_param_t* params, size_t params_count,
+    const keymaster1_device_t* dev, const keymaster_key_param_t* params, size_t params_count,
     keymaster_key_blob_t* key_blob, keymaster_key_characteristics_t** characteristics) {
 
     if (!key_blob)
@@ -569,7 +571,7 @@ keymaster_error_t SoftKeymasterDevice::generate_key(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
-    const struct keymaster_device* dev, const keymaster_key_blob_t* key_blob,
+    const keymaster1_device_t* dev, const keymaster_key_blob_t* key_blob,
     const keymaster_blob_t* client_id, const keymaster_blob_t* app_data,
     keymaster_key_characteristics_t** characteristics) {
     if (!key_blob)
@@ -595,7 +597,7 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::rescope(
-    const struct keymaster_device* /* dev */, const keymaster_key_param_t* /* new_params */,
+    const keymaster1_device_t* /* dev */, const keymaster_key_param_t* /* new_params */,
     size_t /* new_params_count */, const keymaster_key_blob_t* /* key_blob */,
     const keymaster_blob_t* /* client_id */, const keymaster_blob_t* /* app_data */,
     keymaster_key_blob_t* /* rescoped_key_blob */,
@@ -605,7 +607,7 @@ keymaster_error_t SoftKeymasterDevice::rescope(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::import_key(
-    const struct keymaster_device* dev, const keymaster_key_param_t* params, size_t params_count,
+    const keymaster1_device_t* dev, const keymaster_key_param_t* params, size_t params_count,
     keymaster_key_format_t key_format, const uint8_t* key_data, size_t key_data_length,
     keymaster_key_blob_t* key_blob, keymaster_key_characteristics_t** characteristics) {
     if (!params || !key_data)
@@ -643,7 +645,7 @@ keymaster_error_t SoftKeymasterDevice::import_key(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::export_key(
-    const struct keymaster_device* dev, keymaster_key_format_t export_format,
+    const keymaster1_device_t* dev, keymaster_key_format_t export_format,
     const keymaster_key_blob_t* key_to_export, const keymaster_blob_t* client_id,
     const keymaster_blob_t* app_data, uint8_t** export_data, size_t* export_data_length) {
     if (!key_to_export || !key_to_export->key_material)
@@ -674,12 +676,10 @@ keymaster_error_t SoftKeymasterDevice::export_key(
 }
 
 /* static */
-keymaster_error_t
-SoftKeymasterDevice::begin(const struct keymaster_device* dev, keymaster_purpose_t purpose,
-                           const keymaster_key_blob_t* key, const keymaster_key_param_t* params,
-                           size_t params_count, keymaster_key_param_t** out_params,
-                           size_t* out_params_count,
-                           keymaster_operation_handle_t* operation_handle) {
+keymaster_error_t SoftKeymasterDevice::begin(
+    const keymaster1_device_t* dev, keymaster_purpose_t purpose, const keymaster_key_blob_t* key,
+    const keymaster_key_param_t* params, size_t params_count, keymaster_key_param_t** out_params,
+    size_t* out_params_count, keymaster_operation_handle_t* operation_handle) {
     if (!key || !key->key_material)
         return KM_ERROR_INVALID_KEY_BLOB;
 
@@ -704,7 +704,7 @@ SoftKeymasterDevice::begin(const struct keymaster_device* dev, keymaster_purpose
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::update(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::update(const keymaster1_device_t* dev,
                                               keymaster_operation_handle_t operation_handle,
                                               const keymaster_key_param_t* params,
                                               size_t params_count, const uint8_t* input,
@@ -736,7 +736,7 @@ keymaster_error_t SoftKeymasterDevice::update(const struct keymaster_device* dev
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::finish(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::finish(const keymaster1_device_t* dev,
                                               keymaster_operation_handle_t operation_handle,
                                               const keymaster_key_param_t* params,
                                               size_t params_count, const uint8_t* signature,
@@ -765,7 +765,7 @@ keymaster_error_t SoftKeymasterDevice::finish(const struct keymaster_device* dev
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::abort(const struct keymaster_device* dev,
+keymaster_error_t SoftKeymasterDevice::abort(const keymaster1_device_t* dev,
                                              keymaster_operation_handle_t operation_handle) {
     return convert_device(dev)->impl_->AbortOperation(operation_handle);
 }
@@ -787,7 +787,7 @@ keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const void* signing_
             return KM_ERROR_UNSUPPORTED_DIGEST;
         if (rsa_params->padding_type != PADDING_NONE)
             return KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        if (!auth_set->push_back(TAG_DIGEST, DIGEST_NONE) ||
+        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE) ||
             !auth_set->push_back(TAG_PADDING, KM_PAD_NONE))
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     } break;
@@ -796,7 +796,7 @@ keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const void* signing_
             reinterpret_cast<const keymaster_dsa_sign_params_t*>(signing_params);
         if (dsa_params->digest_type != DIGEST_NONE)
             return KM_ERROR_UNSUPPORTED_DIGEST;
-        if (!auth_set->push_back(TAG_DIGEST, DIGEST_NONE))
+        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE))
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     } break;
     case KM_ALGORITHM_ECDSA: {
@@ -804,7 +804,7 @@ keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const void* signing_
             reinterpret_cast<const keymaster_ec_sign_params_t*>(signing_params);
         if (ecdsa_params->digest_type != DIGEST_NONE)
             return KM_ERROR_UNSUPPORTED_DIGEST;
-        if (!auth_set->push_back(TAG_DIGEST, DIGEST_NONE))
+        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE))
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     } break;
     default:
@@ -822,7 +822,7 @@ void SoftKeymasterDevice::StoreDefaultNewKeyParams(AuthorizationSet* auth_set) {
     uint64_t now = java_time(time(NULL));
     auth_set->push_back(TAG_CREATION_DATETIME, now);
     auth_set->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
-    auth_set->push_back(TAG_DIGEST, DIGEST_NONE);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE);
     auth_set->push_back(TAG_PADDING, KM_PAD_NONE);
 }
 

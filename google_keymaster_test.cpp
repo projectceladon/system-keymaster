@@ -179,7 +179,9 @@ class KeymasterTest : public testing::Test {
         FreeKeyBlob();
     }
 
-    keymaster_device* device() { return reinterpret_cast<keymaster_device*>(device_.hw_device()); }
+    keymaster1_device_t* device() {
+        return reinterpret_cast<keymaster1_device_t*>(device_.hw_device());
+    }
 
     keymaster_error_t GenerateKey(const ParamBuilder& builder) {
         AuthorizationSet params(builder.build());
@@ -526,45 +528,6 @@ TEST_F(CheckSupported, SupportedExportFormats) {
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
     EXPECT_EQ(0, len);
     free(formats);
-}
-
-TEST_F(KeymasterTest, TestFlags) {
-    EXPECT_TRUE(device()->flags & KEYMASTER_SOFTWARE_ONLY);
-    EXPECT_TRUE(device()->flags & KEYMASTER_BLOBS_ARE_STANDALONE);
-    EXPECT_FALSE(device()->flags & KEYMASTER_SUPPORTS_DSA);
-    EXPECT_TRUE(device()->flags & KEYMASTER_SUPPORTS_EC);
-}
-
-typedef KeymasterTest OldKeyGeneration;
-
-TEST_F(OldKeyGeneration, Rsa) {
-    keymaster_rsa_keygen_params_t params = {.modulus_size = 256, .public_exponent = 3};
-    uint8_t* key_blob;
-    size_t key_blob_length;
-    EXPECT_EQ(0,
-              device()->generate_keypair(device(), TYPE_RSA, &params, &key_blob, &key_blob_length));
-    EXPECT_GT(key_blob_length, 0);
-
-    free(key_blob);
-}
-
-TEST_F(OldKeyGeneration, Ecdsa256) {
-    keymaster_ec_keygen_params_t params = {.field_size = 256};
-    uint8_t* key_blob;
-    size_t key_blob_length;
-    EXPECT_EQ(0,
-              device()->generate_keypair(device(), TYPE_EC, &params, &key_blob, &key_blob_length));
-    EXPECT_GT(key_blob_length, 0);
-
-    free(key_blob);
-}
-
-TEST_F(OldKeyGeneration, Ecdsa192Fails) {
-    keymaster_ec_keygen_params_t params = {.field_size = 192};
-    uint8_t* key_blob;
-    size_t key_blob_length;
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              device()->generate_keypair(device(), TYPE_EC, &params, &key_blob, &key_blob_length));
 }
 
 class NewKeyGeneration : public KeymasterTest {
