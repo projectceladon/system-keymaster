@@ -533,8 +533,7 @@ TEST_F(OldKeyGeneration, Rsa) {
     free(key_blob);
 }
 
-TEST_F(OldKeyGeneration, Ecdsa) {
-
+TEST_F(OldKeyGeneration, Ecdsa256) {
     keymaster_ec_keygen_params_t params = {.field_size = 256};
     uint8_t* key_blob;
     size_t key_blob_length;
@@ -543,6 +542,14 @@ TEST_F(OldKeyGeneration, Ecdsa) {
     EXPECT_GT(key_blob_length, 0);
 
     free(key_blob);
+}
+
+TEST_F(OldKeyGeneration, Ecdsa192Fails) {
+    keymaster_ec_keygen_params_t params = {.field_size = 192};
+    uint8_t* key_blob;
+    size_t key_blob_length;
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
+              device()->generate_keypair(device(), TYPE_EC, &params, &key_blob, &key_blob_length));
 }
 
 class NewKeyGeneration : public KeymasterTest {
