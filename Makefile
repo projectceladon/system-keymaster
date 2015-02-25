@@ -21,7 +21,7 @@ CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Wmissing-declarations -ftest-coverage \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
-	$(COMPILER_SPECIFIC_ARGS)
+	$(COMPILER_SPECIFIC_ARGS) -DDEBUG
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
@@ -45,6 +45,8 @@ CPPSRCS=\
 	key.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
+	logger.cpp \
+	operation.cpp \
 	rsa_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
@@ -118,6 +120,7 @@ key_blob_test: key_blob_test.o \
 	authorization_set.o \
 	google_keymaster_test_utils.o \
 	key_blob.o \
+	logger.o \
 	ocb.o \
 	serializable.o \
 	unencrypted_key_blob.o \
@@ -147,6 +150,7 @@ google_keymaster_test: google_keymaster_test.o \
 	hmac_operation.o \
 	key.o \
 	key_blob.o \
+	logger.o \
 	ocb.o \
 	operation.o \
 	rsa_key.o \

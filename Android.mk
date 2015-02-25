@@ -61,6 +61,7 @@ LOCAL_SRC_FILES:= \
 		hmac_operation.cpp \
 		key.cpp \
 		key_blob.cpp \
+		logger.cpp \
 		ocb.c \
 		operation.cpp \
 		rsa_key.cpp \

@@ -100,40 +100,31 @@ inline bool contains(const AuthorizationSet& set, keymaster_tag_t tag) {
 
 class StdoutLogger : public Logger {
   public:
-    int debug(const char* fmt, ...) const {
-        va_list args;
-        va_start(args, fmt);
-        int result = vprintf(fmt, args);
-        result += printf("\n");
-        va_end(args);
-        return result;
-    }
+    StdoutLogger() { set_instance(this); }
 
-    int info(const char* fmt, ...) const {
-        va_list args;
-        va_start(args, fmt);
-        int result = vprintf(fmt, args);
-        result += printf("\n");
-        va_end(args);
-        return result;
-    }
+    int log_msg(LogLevel level, const char* fmt, va_list args) const {
+        int output_len = 0;
+        switch (level) {
+        case DEBUG_LVL:
+            output_len = printf("DEBUG: ");
+            break;
+        case INFO_LVL:
+            output_len = printf("INFO: ");
+            break;
+        case WARNING_LVL:
+            output_len = printf("WARNING: ");
+            break;
+        case ERROR_LVL:
+            output_len = printf("ERROR: ");
+            break;
+        case SEVERE_LVL:
+            output_len = printf("SEVERE: ");
+            break;
+        }
 
-    int error(const char* fmt, ...) const {
-        va_list args;
-        va_start(args, fmt);
-        int result = vfprintf(stderr, fmt, args);
-        result += printf("\n");
-        va_end(args);
-        return result;
-    }
-
-    int severe(const char* fmt, ...) const {
-        va_list args;
-        va_start(args, fmt);
-        int result = vfprintf(stderr, fmt, args);
-        result += printf("\n");
-        va_end(args);
-        return result;
+        output_len += vprintf(fmt, args);
+        output_len += printf("\n");
+        return output_len;
     }
 };
 
