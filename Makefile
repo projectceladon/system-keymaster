@@ -47,6 +47,7 @@ CPPSRCS=\
 	key_blob_test.cpp \
 	logger.cpp \
 	operation.cpp \
+	openssl_err.cpp \
 	rsa_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
@@ -153,6 +154,7 @@ google_keymaster_test: google_keymaster_test.o \
 	logger.o \
 	ocb.o \
 	operation.o \
+	openssl_err.o \
 	rsa_key.o \
 	rsa_operation.o \
 	serializable.o \
