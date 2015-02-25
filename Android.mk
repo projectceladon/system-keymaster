@@ -62,6 +62,7 @@ LOCAL_SRC_FILES:= \
 		key.cpp \
 		key_blob.cpp \
 		ocb.c \
+		operation.cpp \
 		rsa_key.cpp \
 		rsa_operation.cpp \
 		serializable.cpp \

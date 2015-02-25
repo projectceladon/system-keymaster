@@ -24,13 +24,12 @@
 namespace keymaster {
 
 class RsaKeyFactory;
+class RsaOperationFactory;
 
 class RsaKey : public AsymmetricKey {
-  public:
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
-
   private:
     friend class RsaKeyFactory;
+    friend class RsaOperationFactory;
 
     RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     RsaKey(RSA* rsa_key, const AuthorizationSet& auths, const Logger& logger)
@@ -47,7 +46,9 @@ class RsaKey : public AsymmetricKey {
         void operator()(RSA* p) { RSA_free(p); }
     };
 
-    UniquePtr<RSA, RSA_Delete> rsa_key_;
+    RSA* key() const;
+
+    mutable UniquePtr<RSA, RSA_Delete> rsa_key_;
 };
 
 }  // namespace keymaster

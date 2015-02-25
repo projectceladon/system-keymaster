@@ -19,6 +19,9 @@
 
 #include <UniquePtr.h>
 
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
 #include <keymaster/key_blob.h>
 
 #include "operation.h"

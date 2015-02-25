@@ -108,66 +108,54 @@ void GoogleKeymaster::SupportedAlgorithms(
     response->error = KM_ERROR_OK;
 }
 
-void GoogleKeymaster::SupportedBlockModes(
-    keymaster_algorithm_t algorithm, keymaster_purpose_t /* purpose */,
-    SupportedResponse<keymaster_block_mode_t>* response) const {
-    if (response == NULL || !check_supported(algorithm, response))
-        return;
-    response->error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
+static OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
+                                             keymaster_purpose_t purpose,
+                                             keymaster_error_t* error) {
+    assert(error);
+    if (error)
+        *error = KM_ERROR_OK;
+
+    OperationFactory* factory =
+        OperationFactoryRegistry::Get(OperationFactory::KeyType(algorithm, purpose));
+    if (factory == NULL && error)
+        *error = KM_ERROR_UNSUPPORTED_PURPOSE;
+
+    return factory;
 }
 
-keymaster_padding_t supported_rsa_crypt_padding[] = {KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
-keymaster_padding_t supported_rsa_sign_padding[] = {KM_PAD_NONE};
-keymaster_padding_t supported_padding[] = {KM_PAD_NONE};
+template <typename T>
+void GetSupported(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
+                  const T* (OperationFactory::*get_supported_method)(size_t* count) const,
+                  SupportedResponse<T>* response) {
+    if (response == NULL || !check_supported(algorithm, response))
+        return;
+
+    OperationFactory* factory = GetOperationFactory(algorithm, purpose, &response->error);
+    if (!factory) {
+        response->error = KM_ERROR_UNSUPPORTED_PURPOSE;
+        return;
+    }
+
+    size_t count;
+    const T* supported = (factory->*get_supported_method)(&count);
+    response->SetResults(supported, count);
+}
+
+void GoogleKeymaster::SupportedBlockModes(
+    keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
+    SupportedResponse<keymaster_block_mode_t>* response) const {
+    GetSupported(algorithm, purpose, &OperationFactory::SupportedBlockModes, response);
+}
 
 void GoogleKeymaster::SupportedPaddingModes(
     keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
     SupportedResponse<keymaster_padding_t>* response) const {
-    if (response == NULL || !check_supported(algorithm, response))
-        return;
-
-    response->error = KM_ERROR_OK;
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-        switch (purpose) {
-        case KM_PURPOSE_ENCRYPT:
-        case KM_PURPOSE_DECRYPT:
-            response->SetResults(supported_rsa_crypt_padding);
-            break;
-        case KM_PURPOSE_SIGN:
-        case KM_PURPOSE_VERIFY:
-            response->SetResults(supported_rsa_sign_padding);
-            break;
-        }
-        break;
-    case KM_ALGORITHM_DSA:
-    case KM_ALGORITHM_ECDSA:
-        response->SetResults(supported_padding);
-        break;
-    default:
-        response->results_length = 0;
-        break;
-    }
+    GetSupported(algorithm, purpose, &OperationFactory::SupportedPaddingModes, response);
 }
 
-keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
-void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
-                                       keymaster_purpose_t /* purpose */,
+void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
                                        SupportedResponse<keymaster_digest_t>* response) const {
-    if (response == NULL || !check_supported(algorithm, response))
-        return;
-
-    response->error = KM_ERROR_OK;
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-    case KM_ALGORITHM_DSA:
-    case KM_ALGORITHM_ECDSA:
-        response->SetResults(supported_digests);
-        break;
-    default:
-        response->results_length = 0;
-        break;
-    }
+    GetSupported(algorithm, purpose, &OperationFactory::SupportedDigests, response);
 }
 
 void GoogleKeymaster::SupportedImportFormats(
@@ -235,11 +223,20 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
     response->op_handle = 0;
 
-    UniquePtr<Key> key(LoadKey(request.key_blob, request.additional_params, &response->error));
+    keymaster_algorithm_t algorithm;
+    UniquePtr<Key> key(
+        LoadKey(request.key_blob, request.additional_params, &algorithm, &response->error));
     if (key.get() == NULL)
         return;
 
-    UniquePtr<Operation> operation(key->CreateOperation(request.purpose, &response->error));
+    OperationFactory::KeyType op_type(algorithm, request.purpose);
+    OperationFactory* factory = OperationFactoryRegistry::Get(op_type);
+    if (!factory) {
+        response->error = KM_ERROR_UNSUPPORTED_PURPOSE;
+        return;
+    }
+
+    UniquePtr<Operation> operation(factory->CreateOperation(*key, logger(), &response->error));
     if (operation.get() == NULL)
         return;
 
@@ -301,8 +298,9 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
     if (response == NULL)
         return;
 
+    keymaster_algorithm_t algorithm;
     UniquePtr<Key> to_export(
-        LoadKey(request.key_blob, request.additional_params, &response->error));
+        LoadKey(request.key_blob, request.additional_params, &algorithm, &response->error));
     if (to_export.get() == NULL)
         return;
 
@@ -382,13 +380,16 @@ keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_or
 }
 
 Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
-                              const AuthorizationSet& client_params, keymaster_error_t* error) {
+                              const AuthorizationSet& client_params,
+                              keymaster_algorithm_t* algorithm, keymaster_error_t* error) {
     UniquePtr<UnencryptedKeyBlob> blob(LoadKeyBlob(key, client_params, error));
     if (*error != KM_ERROR_OK)
         return NULL;
 
+    *algorithm = blob->algorithm();
+
     KeyFactory* factory = 0;
-    if ((factory = KeyFactoryRegistry::Get(blob->algorithm())))
+    if ((factory = KeyFactoryRegistry::Get(*algorithm)))
         return factory->LoadKey(*blob, logger(), error);
     *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     return NULL;

@@ -14,16 +14,211 @@
  * limitations under the License.
  */
 
+#include "rsa_operation.h"
+
 #include <limits.h>
 
 #include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/rsa.h>
 
-#include "rsa_operation.h"
 #include "openssl_utils.h"
+#include "rsa_key.h"
 
 namespace keymaster {
+
+/**
+ * Abstract base for all RSA operation factories.  This class exists mainly to centralize some code
+ * common to all RSA operation factories.
+ */
+class RsaOperationFactory : public OperationFactory {
+  public:
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_RSA, purpose()); }
+    virtual keymaster_purpose_t purpose() const = 0;
+
+  protected:
+    bool GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
+                               keymaster_error_t* error) const;
+    bool GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
+                              keymaster_error_t* error) const;
+    static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
+};
+
+bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
+                                                keymaster_error_t* error) const {
+    *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    if (!key.authorizations().GetTagValue(TAG_PADDING, padding))
+        return false;
+
+    size_t padding_count;
+    const keymaster_padding_t* supported_paddings = SupportedPaddingModes(&padding_count);
+    for (size_t i = 0; i < padding_count; ++i) {
+        if (*padding == supported_paddings[i]) {
+            *error = KM_ERROR_OK;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool RsaOperationFactory::GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
+                                               keymaster_error_t* error) const {
+    *error = KM_ERROR_UNSUPPORTED_DIGEST;
+    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest))
+        return false;
+
+    size_t digest_count;
+    const keymaster_digest_t* supported_digests = SupportedDigests(&digest_count);
+    for (size_t i = 0; i < digest_count; ++i) {
+        if (*digest == supported_digests[i]) {
+            *error = KM_ERROR_OK;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* static */
+RSA* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
+    const RsaKey* rsa_key = static_cast<const RsaKey*>(&key);
+    assert(rsa_key);
+    if (!rsa_key || !rsa_key->key()) {
+        *error = KM_ERROR_UNKNOWN_ERROR;
+        return NULL;
+    }
+    return RSAPrivateKey_dup(rsa_key->key());
+}
+
+static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
+static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE};
+
+/**
+ * Abstract base for RSA operations that digest their input (signing and verification).  This class
+ * does most of the work of creation of RSA digesting operations, delegating only the actual
+ * operation instantiation.
+ */
+class RsaDigestingOperationFactory : public RsaOperationFactory {
+  public:
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error);
+
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
+        *digest_count = array_length(supported_digests);
+        return supported_digests;
+    }
+
+    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
+        *padding_mode_count = array_length(supported_sig_padding);
+        return supported_sig_padding;
+    }
+
+  private:
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
+                                            keymaster_padding_t padding, RSA* key) = 0;
+};
+
+Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key, const Logger& logger,
+                                                         keymaster_error_t* error) {
+    keymaster_padding_t padding;
+    keymaster_digest_t digest;
+    RSA* rsa;
+    if (!GetAndValidateDigest(key, &digest, error) ||
+        !GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
+        return NULL;
+
+    Operation* op = InstantiateOperation(logger, digest, padding, rsa);
+    if (!op)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return op;
+}
+
+static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_RSA_OAEP,
+                                                              KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
+
+/**
+ * Abstract base for en/de-crypting RSA operation factories.  This class does most of the work of
+ * creating such operations, delegating only the actual operation instantiation.
+ */
+class RsaCryptingOperationFactory : public RsaOperationFactory {
+  public:
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error);
+
+    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
+        *padding_mode_count = array_length(supported_crypt_padding);
+        return supported_crypt_padding;
+    }
+
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
+        *digest_count = 0;
+        return NULL;
+    }
+
+  private:
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
+                                            RSA* key) = 0;
+};
+
+Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key, const Logger& logger,
+                                                        keymaster_error_t* error) {
+    keymaster_padding_t padding;
+    RSA* rsa;
+    if (!GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
+        return NULL;
+
+    Operation* op = InstantiateOperation(logger, padding, rsa);
+    if (!op)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return op;
+}
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaSigningOperationFactory : public RsaDigestingOperationFactory {
+  public:
+    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_SIGN; }
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
+                                            keymaster_padding_t padding, RSA* key) {
+        return new RsaSignOperation(logger, digest, padding, key);
+    }
+};
+static OperationFactoryRegistry::Registration<RsaSigningOperationFactory> sign_registration;
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
+    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_VERIFY; }
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_digest_t digest,
+                                            keymaster_padding_t padding, RSA* key) {
+        return new RsaVerifyOperation(logger, digest, padding, key);
+    }
+};
+static OperationFactoryRegistry::Registration<RsaVerificationOperationFactory> verify_registration;
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
+    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_ENCRYPT; }
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
+                                            RSA* key) {
+        return new RsaEncryptOperation(logger, padding, key);
+    }
+};
+static OperationFactoryRegistry::Registration<RsaEncryptionOperationFactory> encrypt_registration;
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
+    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_DECRYPT; }
+    virtual Operation* InstantiateOperation(const Logger& logger, keymaster_padding_t padding,
+                                            RSA* key) {
+        return new RsaDecryptOperation(logger, padding, key);
+    }
+};
+
+static OperationFactoryRegistry::Registration<RsaDecryptionOperationFactory> decrypt_registration;
 
 struct RSA_Delete {
     void operator()(RSA* p) const { RSA_free(p); }

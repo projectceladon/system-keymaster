@@ -45,9 +45,9 @@ static const size_t DEFAULT_REGISTRY_CAPACITY = 8;
  *     d.  Factory methods (likely all pure virtual).
  *
  * 2.  Create one or more concrete subclasses of AbstractFactory.  The concrete factories must have
- *     failure-proof no-argument constructors.  Note that by design it is impossible to register two
- *     factories which return the same value from registry_key().  Attempting to do so will cause
- *     both to be removed.
+ *     failure-proof, no-argument constructors.  Note that by design it is impossible to register
+ *     two factories which return the same value from registry_key().  Attempting to do so will
+ *     cause both to be removed.
  *
  * 3.  Define the registry instance pointer using the DEFINE_ABSTRACT_FACTORY_REGISTRY_INSTANCE
  *     macro.

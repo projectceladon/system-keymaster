@@ -64,7 +64,6 @@ class UnencryptedKeyBlob;
 class Key {
   public:
     virtual ~Key() {}
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) = 0;
 
     /**
      * Return a copy of raw key material, in the key's preferred binary format.
