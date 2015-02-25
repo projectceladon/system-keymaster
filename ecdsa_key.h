@@ -24,13 +24,14 @@
 namespace keymaster {
 
 class EcdsaKeyFactory;
+class EcdsaSignOperationFactory;
+class EcdsaVerifyOperationFactory;
 
 class EcdsaKey : public AsymmetricKey {
-  public:
-    virtual Operation* CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error);
-
   private:
     friend EcdsaKeyFactory;
+    friend EcdsaSignOperationFactory;
+    friend EcdsaVerifyOperationFactory;
 
     EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     EcdsaKey(EC_KEY* ecdsa_key, const AuthorizationSet auths, const Logger& logger)
@@ -43,6 +44,8 @@ class EcdsaKey : public AsymmetricKey {
     struct ECDSA_Delete {
         void operator()(EC_KEY* p) { EC_KEY_free(p); }
     };
+
+    EC_KEY* key() const { return EC_KEY_dup(ecdsa_key_.get()); }
 
     UniquePtr<EC_KEY, ECDSA_Delete> ecdsa_key_;
 };

@@ -23,6 +23,7 @@ namespace keymaster {
 
 class AeadModeOperation : public Operation {
   public:
+    static const size_t MAX_CHUNK_LENGTH = 64 * 1024;
     static const size_t MAX_NONCE_LENGTH = 12;
     static const size_t MAX_TAG_LENGTH = 16;
     static const size_t MAX_KEY_LENGTH = 32;

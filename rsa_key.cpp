@@ -155,46 +155,8 @@ RsaKey::RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_e
         *error = LoadKey(blob);
 }
 
-Operation* RsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
-
-    keymaster_padding_t padding = static_cast<keymaster_padding_t>(-1);
-    authorizations().GetTagValue(TAG_PADDING, &padding);
-    if (!SupportedMode(purpose, padding)) {
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        return NULL;
-    }
-
-    keymaster_digest_t digest = static_cast<keymaster_digest_t>(-1);
-    authorizations().GetTagValue(TAG_DIGEST, &digest);
-    if (!SupportedMode(purpose, digest)) {
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
-        return NULL;
-    }
-
-    Operation* op = NULL;
-    switch (purpose) {
-    case KM_PURPOSE_SIGN:
-        op = new RsaSignOperation(logger_, digest, padding, rsa_key_.release());
-        break;
-    case KM_PURPOSE_VERIFY:
-        op = new RsaVerifyOperation(logger_, digest, padding, rsa_key_.release());
-        break;
-    case KM_PURPOSE_ENCRYPT:
-        op = new RsaEncryptOperation(logger_, padding, rsa_key_.release());
-        break;
-    case KM_PURPOSE_DECRYPT:
-        op = new RsaDecryptOperation(logger_, padding, rsa_key_.release());
-        break;
-    default:
-        *error = KM_ERROR_UNSUPPORTED_PURPOSE;
-        return NULL;
-    }
-
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    return op;
+RSA* RsaKey::key() const {
+    return rsa_key_.get();
 }
 
 bool RsaKey::EvpToInternal(const EVP_PKEY* pkey) {

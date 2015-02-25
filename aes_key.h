@@ -28,12 +28,6 @@ class AesKey : public SymmetricKey {
     AesKey(const AuthorizationSet& auths, const Logger& logger) : SymmetricKey(auths, logger) {}
     AesKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
         : SymmetricKey(blob, logger, error) {}
-
-
-    virtual Operation* CreateOperation(keymaster_purpose_t, keymaster_error_t* error);
-
-  private:
-    Operation* CreateOcbOperation(keymaster_purpose_t, keymaster_error_t* error);
 };
 
 }  // namespace keymaster

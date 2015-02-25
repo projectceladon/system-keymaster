@@ -25,9 +25,53 @@
 #include <hardware/keymaster_defs.h>
 #include <keymaster/logger.h>
 
+#include "abstract_factory_registry.h"
+
 namespace keymaster {
 
 class AuthorizationSet;
+class Key;
+class Operation;
+
+class OperationFactory {
+  public:
+    virtual ~OperationFactory() {}
+
+    // Required for registry
+    struct KeyType {
+        KeyType(keymaster_algorithm_t alg, keymaster_purpose_t purp)
+            : algorithm(alg), purpose(purp) {}
+
+        keymaster_algorithm_t algorithm;
+        keymaster_purpose_t purpose;
+
+        bool operator==(const KeyType& rhs) const {
+            return algorithm == rhs.algorithm && purpose == rhs.purpose;
+        }
+    };
+    virtual KeyType registry_key() const = 0;
+
+    // Factory methods
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error) = 0;
+
+    // Informational methods.  The returned arrays reference static memory and must not be
+    // deallocated or modified.
+    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_count) const {
+        *padding_count = 0;
+        return NULL;
+    }
+    virtual const keymaster_block_mode_t* SupportedBlockModes(size_t* block_mode_count) const {
+        *block_mode_count = 0;
+        return NULL;
+    }
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
+        *digest_count = 0;
+        return NULL;
+    }
+};
+
+typedef AbstractFactoryRegistry<OperationFactory> OperationFactoryRegistry;
 
 /**
  * Abstract base for all cryptographic operations.
