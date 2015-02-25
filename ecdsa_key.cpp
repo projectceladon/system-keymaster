@@ -191,23 +191,6 @@ EcdsaKey::EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymast
         *error = LoadKey(blob);
 }
 
-Operation* EcdsaKey::CreateOperation(keymaster_purpose_t purpose, keymaster_error_t* error) {
-    Operation* op;
-    switch (purpose) {
-    case KM_PURPOSE_SIGN:
-        op = new EcdsaSignOperation(purpose, logger_, ecdsa_key_.release());
-        break;
-    case KM_PURPOSE_VERIFY:
-        op = new EcdsaVerifyOperation(purpose, logger_, ecdsa_key_.release());
-        break;
-    default:
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return NULL;
-    }
-    *error = op ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return op;
-}
-
 bool EcdsaKey::EvpToInternal(const EVP_PKEY* pkey) {
     ecdsa_key_.reset(EVP_PKEY_get1_EC_KEY(const_cast<EVP_PKEY*>(pkey)));
     return ecdsa_key_.get() != NULL;

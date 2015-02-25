@@ -61,14 +61,11 @@ class SymmetricKey : public Key {
         return KM_ERROR_UNIMPLEMENTED;
     }
 
-  protected:
-    keymaster_error_t error_;
-
-    SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-
     const uint8_t* key_data() const { return key_data_; }
     size_t key_data_size() const { return key_data_size_; }
 
+  protected:
+    SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
     SymmetricKey(const AuthorizationSet& auths, const Logger& logger) : Key(auths, logger) {}
 
   private:

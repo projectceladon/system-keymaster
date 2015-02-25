@@ -16,10 +16,67 @@
 
 #include <openssl/ecdsa.h>
 
+#include "ecdsa_key.h"
 #include "ecdsa_operation.h"
 #include "openssl_utils.h"
 
 namespace keymaster {
+
+class EcdsaSignOperationFactory : public OperationFactory {
+  public:
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN); }
+
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error){
+        const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
+        if (!ecdsa_key) {
+            *error = KM_ERROR_UNKNOWN_ERROR;
+            return NULL;
+        }
+
+        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, logger, ecdsa_key->key());
+        if (!op)
+            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return op;
+    }
+};
+static OperationFactoryRegistry::Registration<EcdsaSignOperationFactory> sign_registration;
+
+class EcdsaVerifyOperationFactory : public OperationFactory {
+  public:
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_VERIFY); }
+
+    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
+                                       keymaster_error_t* error){
+        const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
+        if (!ecdsa_key) {
+            *error = KM_ERROR_UNKNOWN_ERROR;
+            return NULL;
+        }
+
+        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, logger, ecdsa_key->key());
+        if (!op)
+            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return op;
+    }
+
+    // Informational methods
+    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_count) const {
+        *padding_count = 0;
+        return NULL;
+    }
+
+    virtual const keymaster_block_mode_t* SupportedBlockModes(size_t* block_mode_count) const {
+        *block_mode_count = 0;
+        return NULL;
+    }
+
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
+        *digest_count = 0;
+        return NULL;
+    }
+};
+static OperationFactoryRegistry::Registration<EcdsaVerifyOperationFactory> verify_registration;
 
 EcdsaOperation::~EcdsaOperation() {
     if (ecdsa_key_ != NULL)
