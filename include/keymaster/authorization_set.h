@@ -212,6 +212,18 @@ class AuthorizationSet : public Serializable {
     }
 
     /**
+     * If exactly one instance of the specified enumeration-typed \p tag exists, places its value in
+     * \p val and returns true.  If \p tag is not present or if multiple copies are present, leaves
+     * \p val unmodified and returns false.
+     */
+    template <keymaster_tag_t Tag, typename T>
+    bool GetTagValue(TypedEnumTag<KM_ENUM_REP, Tag, T> tag, T* val) const {
+        if (GetTagCount(tag) != 1)
+            return false;
+        return GetTagValueEnumRep(tag, 0, reinterpret_cast<uint32_t*>(val));
+    }
+
+    /**
      * If the specified date-typed \p tag exists, places its value in \p val and returns
      * true.  If \p tag is not present, leaves \p val unmodified and returns false.
      */
