@@ -19,8 +19,6 @@ LOCAL_PATH := $(call my-dir)
 # GoogleKeymaster implementation, e.g. one running in TrustZone.
 ##
 include $(CLEAR_VARS)
-# Disable clang until we find a way to suppress clang optmization in google_keymaster_utils.h.
-LOCAL_CLANG := false
 LOCAL_MODULE:= libkeymaster_messages
 LOCAL_SRC_FILES:= \
 		authorization_set.cpp \
@@ -43,8 +41,6 @@ include $(BUILD_SHARED_LIBRARY)
 # function-based keymaster HAL API to the message-based GoogleKeymaster API.
 ###
 include $(CLEAR_VARS)
-# Disable clang until we find a way to suppress clang optmization in google_keymaster_utils.h.
-LOCAL_CLANG := false
 LOCAL_MODULE:= libkeymaster
 LOCAL_SRC_FILES:= \
 		aead_mode_operation.cpp \
@@ -74,6 +70,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_SHARED_LIBRARIES := libcrypto
 LOCAL_CFLAGS = -Wall -Werror
+# Ignore benigh warnings for now.
+LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
@@ -93,6 +91,8 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := \
 	system/security/keystore
 LOCAL_CFLAGS = -Wall -Werror
+# Ignore benigh warnings for now.
+LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
 LOCAL_SHARED_LIBRARIES := libkeymaster liblog
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
