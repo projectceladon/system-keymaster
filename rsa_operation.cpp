@@ -84,7 +84,8 @@ RSA* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
         *error = KM_ERROR_UNKNOWN_ERROR;
         return NULL;
     }
-    return RSAPrivateKey_dup(rsa_key->key());
+    RSA_up_ref(rsa_key->key());
+    return rsa_key->key();
 }
 
 static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
