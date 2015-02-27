@@ -273,19 +273,11 @@ TEST_F(NewKeyGeneration, Rsa) {
 }
 
 TEST_F(NewKeyGeneration, RsaDefaultSize) {
-    ASSERT_EQ(
-        KM_ERROR_OK,
-        GenerateKey(
-            AuthorizationSetBuilder().Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA).SigningKey()));
-
-    CheckBaseParams();
-
-    // Check specified tags are all present in unenforced characteristics
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_RSA));
-
-    // Now check that unspecified, defaulted tags are correct.
-    EXPECT_TRUE(contains(sw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 65537));
-    EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 2048));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
+              GenerateKey(AuthorizationSetBuilder()
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                              .Authorization(TAG_RSA_PUBLIC_EXPONENT, 3)
+                              .SigningKey()));
 }
 
 TEST_F(NewKeyGeneration, Ecdsa) {

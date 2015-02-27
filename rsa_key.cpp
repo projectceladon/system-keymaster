@@ -29,9 +29,6 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
-const uint32_t RSA_DEFAULT_KEY_SIZE = 2048;
-const uint64_t RSA_DEFAULT_EXPONENT = 65537;
-
 class RsaKeyFactory : public AsymmetricKeyFactory {
   public:
     virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_RSA; }
@@ -53,18 +50,24 @@ Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, keymast
 
     AuthorizationSet authorizations(key_description);
 
-    uint64_t public_exponent = RSA_DEFAULT_EXPONENT;
-    if (!authorizations.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent))
-        authorizations.push_back(Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent));
+    uint64_t public_exponent;
+    if (!authorizations.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent)) {
+        LOG_E("%s", "No public exponent specified for RSA key generation");
+        *error = KM_ERROR_INVALID_ARGUMENT;
+        return NULL;
+    }
 
-    uint32_t key_size = RSA_DEFAULT_KEY_SIZE;
-    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size))
-        authorizations.push_back(Authorization(TAG_KEY_SIZE, key_size));
+    uint32_t key_size;
+    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
+        LOG_E("%s", "No key size specified for RSA key generation");
+        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        return NULL;
+    }
 
     UniquePtr<BIGNUM, BIGNUM_Delete> exponent(BN_new());
     UniquePtr<RSA, RsaKey::RSA_Delete> rsa_key(RSA_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
-    if (rsa_key.get() == NULL || pkey.get() == NULL) {
+    if (exponent.get() == NULL || rsa_key.get() == NULL || pkey.get() == NULL) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return NULL;
     }
