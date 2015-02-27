@@ -33,14 +33,10 @@ namespace test {
 
 TEST(Construction, ListProvided) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "my_app", 6),
+        Authorization(TAG_KEY_SIZE, 256), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
     AuthorizationSet set(params, array_length(params));
     EXPECT_EQ(8U, set.size());
@@ -48,14 +44,10 @@ TEST(Construction, ListProvided) {
 
 TEST(Construction, Copy) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_USER_ID, 7),
+        Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "my_app", 6),
+        Authorization(TAG_KEY_SIZE, 256), Authorization(TAG_AUTH_TIMEOUT, 300),
     };
     AuthorizationSet set(params, array_length(params));
     AuthorizationSet set2(set);
@@ -63,17 +55,16 @@ TEST(Construction, Copy) {
 }
 
 TEST(Lookup, NonRepeated) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
+
     EXPECT_EQ(8U, set.size());
 
     int pos = set.find(TAG_ALGORITHM);
@@ -95,17 +86,15 @@ TEST(Lookup, NonRepeated) {
 }
 
 TEST(Lookup, Repeated) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
     EXPECT_EQ(8U, set.size());
 
     int pos = set.find(TAG_PURPOSE);
@@ -121,17 +110,15 @@ TEST(Lookup, Repeated) {
 }
 
 TEST(Lookup, Indexed) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
     EXPECT_EQ(8U, set.size());
 
     EXPECT_EQ(KM_TAG_PURPOSE, set[0].tag);
@@ -143,20 +130,18 @@ TEST(Lookup, Indexed) {
 }
 
 TEST(Serialization, RoundTrip) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-        Authorization(TAG_ALL_USERS),
-        Authorization(TAG_RSA_PUBLIC_EXPONENT, 3),
-        Authorization(TAG_ACTIVE_DATETIME, 10),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300)
+                             .Authorization(TAG_ALL_USERS)
+                             .Authorization(TAG_RSA_PUBLIC_EXPONENT, 3)
+                             .Authorization(TAG_ACTIVE_DATETIME, 10));
 
     size_t size = set.SerializedSize();
     EXPECT_TRUE(size > 0);
@@ -176,17 +161,15 @@ TEST(Serialization, RoundTrip) {
 }
 
 TEST(Deserialization, Deserialize) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     size_t size = set.SerializedSize();
     EXPECT_TRUE(size > 0);
@@ -223,17 +206,15 @@ TEST(Deserialization, TooShortBuffer) {
 }
 
 TEST(Deserialization, InvalidLengthField) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     size_t size = set.SerializedSize();
     EXPECT_TRUE(size > 0);
@@ -264,11 +245,9 @@ static void add_to_uint32(uint8_t* buf, int delta) {
 }
 
 TEST(Deserialization, MalformedIndirectData) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_APPLICATION_DATA, "foo", 3),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_APPLICATION_DATA, "foo", 3));
     size_t size = set.SerializedSize();
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
@@ -410,37 +389,35 @@ TEST(Growable, InsufficientIndirectBuf) {
 }
 
 TEST(Growable, PushBackSets) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_KEY_SIZE, 256),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set1(params, array_length(params));
-    AuthorizationSet set2(params, array_length(params));
+    AuthorizationSetBuilder builder;
+    builder.Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+        .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+        .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+        .Authorization(TAG_USER_ID, 7)
+        .Authorization(TAG_USER_AUTH_ID, 8)
+        .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+        .Authorization(TAG_KEY_SIZE, 256)
+        .Authorization(TAG_AUTH_TIMEOUT, 300);
+
+    AuthorizationSet set1(builder.build());
+    AuthorizationSet set2(builder.build());
 
     AuthorizationSet combined;
     EXPECT_TRUE(combined.push_back(set1));
     EXPECT_TRUE(combined.push_back(set2));
-    EXPECT_EQ(array_length(params) * 2, combined.size());
+    EXPECT_EQ(set1.size() + set2.size(), combined.size());
     EXPECT_EQ(12U, combined.indirect_size());
 }
 
 TEST(GetValue, GetInt) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     uint32_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_USER_ID, &val));
@@ -451,16 +428,15 @@ TEST(GetValue, GetInt) {
 }
 
 TEST(GetValue, GetIntRep) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     uint32_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_USER_AUTH_ID, 0, &val));
@@ -471,18 +447,16 @@ TEST(GetValue, GetIntRep) {
 }
 
 TEST(GetValue, GetLong) {
-    keymaster_key_param_t params1[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        keymaster_param_long(TAG_RSA_PUBLIC_EXPONENT, 3),
-    };
-    AuthorizationSet set1(params1, array_length(params1));
+    AuthorizationSet set1(AuthorizationSetBuilder()
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                              .Authorization(TAG_RSA_PUBLIC_EXPONENT, 3));
 
-    keymaster_key_param_t params2[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-    };
-    AuthorizationSet set2(params2, array_length(params2));
+    AuthorizationSet set2(AuthorizationSetBuilder()
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA));
 
     uint64_t val;
     EXPECT_TRUE(set1.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &val));
@@ -493,16 +467,14 @@ TEST(GetValue, GetLong) {
 }
 
 TEST(GetValue, GetEnum) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     keymaster_algorithm_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_ALGORITHM, &val));
@@ -514,16 +486,14 @@ TEST(GetValue, GetEnum) {
 }
 
 TEST(GetValue, GetEnumRep) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     keymaster_purpose_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_PURPOSE, 0, &val));
@@ -536,16 +506,15 @@ TEST(GetValue, GetEnumRep) {
 }
 
 TEST(GetValue, GetDate) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_ACTIVE_DATETIME, 10),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_ACTIVE_DATETIME, 10)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     uint64_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_ACTIVE_DATETIME, &val));
@@ -556,16 +525,14 @@ TEST(GetValue, GetDate) {
 }
 
 TEST(GetValue, GetBlob) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_ACTIVE_DATETIME, 10),
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_USER_ID, 7),
-        Authorization(TAG_USER_AUTH_ID, 8),
-        Authorization(TAG_APPLICATION_ID, "my_app", 6),
-        Authorization(TAG_AUTH_TIMEOUT, 300),
-    };
-    AuthorizationSet set(params, array_length(params));
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8)
+                             .Authorization(TAG_APPLICATION_ID, "my_app", 6)
+                             .Authorization(TAG_AUTH_TIMEOUT, 300));
 
     keymaster_blob_t val;
     EXPECT_TRUE(set.GetTagValue(TAG_APPLICATION_ID, &val));
@@ -574,6 +541,77 @@ TEST(GetValue, GetBlob) {
 
     // Find one that isn't there
     EXPECT_FALSE(set.GetTagValue(TAG_APPLICATION_DATA, &val));
+}
+
+TEST(Deduplication, NoDuplicates) {
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_ACTIVE_DATETIME, 10)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8));
+    AuthorizationSet copy(set);
+
+    EXPECT_EQ(copy, set);
+    set.Deduplicate();
+    EXPECT_EQ(copy.size(), set.size());
+
+    // Sets no longer compare equal, because of ordering (ugh, maybe it should be
+    // AuthorizationList, not AuthorizationSet).
+    EXPECT_NE(copy, set);
+}
+
+TEST(Deduplication, NoDuplicatesHasInvalid) {
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_ACTIVE_DATETIME, 10)
+                             .Authorization(TAG_INVALID)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_AUTH_ID, 8));
+    AuthorizationSet copy(set);
+
+    EXPECT_EQ(copy, set);
+    set.Deduplicate();
+
+    // Deduplicate should have removed the invalid.
+    EXPECT_EQ(copy.size() - 1, set.size());
+    EXPECT_NE(copy, set);
+}
+
+TEST(Deduplication, DuplicateEnum) {
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ACTIVE_DATETIME, 10)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_USER_AUTH_ID, 8));
+    AuthorizationSet copy(set);
+
+    EXPECT_EQ(copy, set);
+    set.Deduplicate();
+    EXPECT_EQ(copy.size() - 2, set.size());
+    EXPECT_NE(copy, set);
+}
+
+TEST(Deduplication, DuplicateBlob) {
+    AuthorizationSet set(AuthorizationSetBuilder()
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_ACTIVE_DATETIME, 10)
+                             .Authorization(TAG_APPLICATION_DATA, "data", 4)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                             .Authorization(TAG_APPLICATION_DATA, "data", 4)
+                             .Authorization(TAG_APPLICATION_DATA, "foo", 3)
+                             .Authorization(TAG_USER_AUTH_ID, 8));
+    AuthorizationSet copy(set);
+
+    EXPECT_EQ(copy, set);
+    set.Deduplicate();
+    EXPECT_EQ(copy.size() - 3, set.size());
+    EXPECT_NE(copy, set);
+
+    // The real test here is that valgrind reports no leak.
 }
 
 }  // namespace test

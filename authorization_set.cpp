@@ -36,6 +36,29 @@ AuthorizationSet::AuthorizationSet(const AuthorizationSet& set)
     Reinitialize(set.elems_, set.elems_size_);
 }
 
+AuthorizationSet::AuthorizationSet(AuthorizationSetBuilder& builder) {
+    elems_ = builder.set.elems_;
+    builder.set.elems_ = NULL;
+
+    elems_size_ = builder.set.elems_size_;
+    builder.set.elems_size_ = 0;
+
+    elems_capacity_ = builder.set.elems_capacity_;
+    builder.set.elems_capacity_ = 0;
+
+    indirect_data_ = builder.set.indirect_data_;
+    builder.set.indirect_data_ = NULL;
+
+    indirect_data_capacity_ = builder.set.indirect_data_capacity_;
+    builder.set.indirect_data_capacity_ = 0;
+
+    indirect_data_size_ = builder.set.indirect_data_size_;
+    builder.set.indirect_data_size_ = 0;
+
+    error_ = builder.set.error_;
+    builder.set.error_ = OK;
+}
+
 AuthorizationSet::~AuthorizationSet() {
     FreeData();
 }
@@ -101,6 +124,33 @@ bool AuthorizationSet::Reinitialize(const keymaster_key_param_t* elems, const si
 void AuthorizationSet::set_invalid(Error error) {
     FreeData();
     error_ = error;
+}
+
+void AuthorizationSet::Deduplicate() {
+    qsort(elems_, elems_size_, sizeof(*elems_),
+          reinterpret_cast<int (*)(const void*, const void*)>(keymaster_param_compare));
+
+    size_t invalid_count = 0;
+    for (size_t i = 1; i < size(); ++i) {
+        if (elems_[i - 1].tag == KM_TAG_INVALID)
+            ++invalid_count;
+        else if (keymaster_param_compare(elems_ + i - 1, elems_ + i) == 0) {
+            // Mark dups as invalid.  Note that this "leaks" the data referenced by KM_BYTES and
+            // KM_BIGNUM entries, but those are just pointers into indirect_data_, so it will all
+            // get cleaned up.
+            elems_[i - 1].tag = KM_TAG_INVALID;
+            ++invalid_count;
+        }
+    }
+    if (size() > 0 && elems_[size() - 1].tag == KM_TAG_INVALID)
+        ++invalid_count;
+
+    if (invalid_count == 0)
+        return;
+
+    // Since KM_TAG_INVALID == 0, all of the invalid entries are first.
+    elems_size_ -= invalid_count;
+    memmove(elems_, elems_ + invalid_count, size() * sizeof(*elems_));
 }
 
 void AuthorizationSet::CopyToParamSet(keymaster_key_param_set_t* set) const {
