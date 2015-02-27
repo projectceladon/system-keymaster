@@ -23,8 +23,14 @@
 
 #include <stdarg.h>
 
+#include <algorithm>
 #include <ostream>
+#include <string>
+#include <vector>
 
+#include <gtest/gtest.h>
+
+#include <hardware/keymaster1.h>
 #include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
 #include <keymaster/logger.h>
@@ -127,6 +133,120 @@ class StdoutLogger : public Logger {
         output_len += printf("\n");
         return output_len;
     }
+};
+
+inline std::string make_string(const uint8_t* data, size_t length) {
+    return std::string(reinterpret_cast<const char*>(data), length);
+}
+
+template <size_t N> std::string make_string(const uint8_t(&a)[N]) {
+    return make_string(a, N);
+}
+
+const uint64_t OP_HANDLE_SENTINEL = 0xFFFFFFFFFFFFFFFF;
+class Keymaster1Test : public testing::Test {
+  protected:
+    Keymaster1Test();
+    ~Keymaster1Test();
+
+    void init(keymaster1_device_t* device) { device_ = device; }
+
+    keymaster1_device_t* device();
+
+    keymaster_error_t GenerateKey(const AuthorizationSetBuilder& builder);
+
+    keymaster_error_t ImportKey(const AuthorizationSetBuilder& builder,
+                                keymaster_key_format_t format, const std::string& key_material);
+
+    keymaster_error_t ExportKey(keymaster_key_format_t format, std::string* export_data);
+
+    keymaster_error_t GetCharacteristics();
+
+    keymaster_error_t BeginOperation(keymaster_purpose_t purpose);
+    keymaster_error_t BeginOperation(keymaster_purpose_t purpose, const AuthorizationSet& input_set,
+                                     AuthorizationSet* output_set = NULL);
+
+    keymaster_error_t UpdateOperation(const std::string& message, std::string* output,
+                                      size_t* input_consumed);
+    keymaster_error_t UpdateOperation(const AuthorizationSet& additional_params,
+                                      const std::string& message, std::string* output,
+                                      size_t* input_consumed);
+
+    keymaster_error_t FinishOperation(std::string* output);
+    keymaster_error_t FinishOperation(const std::string& signature, std::string* output);
+    keymaster_error_t FinishOperation(const AuthorizationSet& additional_params,
+                                      const std::string& signature, std::string* output);
+
+    keymaster_error_t AbortOperation();
+
+    keymaster_error_t GetVersion(uint8_t* major, uint8_t* minor, uint8_t* subminor);
+
+    keymaster_error_t Rescope(const AuthorizationSet& new_params,
+                              keymaster_key_blob_t* rescoped_blob,
+                              keymaster_key_characteristics_t** rescoped_characteristics);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
+                               const AuthorizationSet& begin_params,
+                               const AuthorizationSet& update_params,
+                               AuthorizationSet* output_params = NULL);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
+                               const std::string& signature);
+
+    void SignMessage(const std::string& message, std::string* signature);
+
+    void VerifyMessage(const std::string& message, const std::string& signature);
+
+    std::string EncryptMessage(const std::string& message, std::string* generated_nonce = NULL);
+    std::string EncryptMessage(const AuthorizationSet& update_params, const std::string& message,
+                               std::string* generated_nonce = NULL);
+    std::string EncryptMessageWithParams(const std::string& message,
+                                         const AuthorizationSet& begin_params,
+                                         const AuthorizationSet& update_params,
+                                         AuthorizationSet* output_params);
+
+    std::string DecryptMessage(const std::string& ciphertext);
+    std::string DecryptMessage(const std::string& ciphertext, const std::string& nonce);
+    std::string DecryptMessage(const AuthorizationSet& update_params, const std::string& ciphertext,
+                               const std::string& nonce);
+
+    void CheckHmacTestVector(std::string key, std::string message, keymaster_digest_t digest,
+                             std::string expected_mac);
+    void CheckAesOcbTestVector(const std::string& key, const std::string& nonce,
+                               const std::string& associated_data, const std::string& message,
+                               const std::string& expected_ciphertext);
+
+    AuthorizationSet UserAuthParams();
+    AuthorizationSet ClientParams();
+
+    template <typename T>
+    bool ResponseContains(const std::vector<T>& expected, const T* values, size_t len) {
+        return expected.size() == len &&
+               std::is_permutation(values, values + len, expected.begin());
+    }
+
+    template <typename T> bool ResponseContains(T expected, const T* values, size_t len) {
+        return (len == 1 && *values == expected);
+    }
+
+    AuthorizationSet hw_enforced();
+    AuthorizationSet sw_enforced();
+
+    void FreeCharacteristics();
+    void FreeKeyBlob();
+
+    void corrupt_key_blob();
+
+  private:
+    keymaster1_device_t* device_;
+    keymaster_blob_t client_id_ = {.data = reinterpret_cast<const uint8_t*>("app_id"),
+                                   .data_length = 6};
+    keymaster_key_param_t client_params_[1] = {
+        Authorization(TAG_APPLICATION_ID, client_id_.data, client_id_.data_length)};
+
+    uint64_t op_handle_;
+
+    keymaster_key_blob_t blob_;
+    keymaster_key_characteristics_t* characteristics_;
 };
 
 }  // namespace test
