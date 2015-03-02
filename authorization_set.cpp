@@ -108,6 +108,11 @@ bool AuthorizationSet::reserve_indirect(size_t length) {
 bool AuthorizationSet::Reinitialize(const keymaster_key_param_t* elems, const size_t count) {
     FreeData();
 
+    if (elems == NULL || count == 0) {
+        error_ = OK;
+        return true;
+    }
+
     if (!reserve_elems(count))
         return false;
 
