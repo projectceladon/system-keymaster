@@ -22,9 +22,14 @@
 namespace keymaster {
 
 class HmacKey : public SymmetricKey {
+    static const size_t MAX_HMAC_KEY_SIZE = 256; /* Arbitrary limit, for DoS prevention */
+
   public:
     HmacKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
     HmacKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
+
+  private:
+    virtual bool size_supported(size_t key_size) { return key_size < MAX_HMAC_KEY_SIZE; }
 };
 
 }  // namespace keymaster
