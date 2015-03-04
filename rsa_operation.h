@@ -28,6 +28,11 @@
 
 namespace keymaster {
 
+/**
+ * Base class for all RSA operations.
+ *
+ * This class provides RSA key management, plus buffering of data for non-digesting modes.
+ */
 class RsaOperation : public Operation {
   public:
     RsaOperation(keymaster_purpose_t purpose, keymaster_padding_t padding, RSA* key)
@@ -50,28 +55,64 @@ class RsaOperation : public Operation {
     Buffer data_;
 };
 
-class RsaSignOperation : public RsaOperation {
+/**
+ * Base class for all RSA operations.
+ *
+ * This class adds digesting support, for digesting modes.  For non-digesting modes, it falls back
+ * on the RsaOperation input buffering.
+ */
+class RsaDigestingOperation : public RsaOperation {
+  public:
+    RsaDigestingOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                          keymaster_padding_t padding, RSA* key);
+    ~RsaDigestingOperation();
+
+    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
+                                    AuthorizationSet* output_params);
+    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                                     Buffer* output, size_t* input_consumed);
+
+  protected:
+    uint8_t* FinishDigest(unsigned* digest_size);
+
+    const keymaster_digest_t digest_;
+    const EVP_MD* digest_algorithm_;
+    EVP_MD_CTX digest_ctx_;
+};
+
+/**
+ * RSA private key signing operation.
+ */
+class RsaSignOperation : public RsaDigestingOperation {
   public:
     RsaSignOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
-        : RsaOperation(KM_PURPOSE_SIGN, padding, key), digest_(digest) {}
+        : RsaDigestingOperation(KM_PURPOSE_SIGN, digest, padding, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 
   private:
-    keymaster_digest_t digest_;
+    int SignUndigested(Buffer* output);
+    int SignDigested(Buffer* output);
 };
 
-class RsaVerifyOperation : public RsaOperation {
+/**
+ * RSA public key verification operation.
+ */
+class RsaVerifyOperation : public RsaDigestingOperation {
   public:
     RsaVerifyOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
-        : RsaOperation(KM_PURPOSE_VERIFY, padding, key), digest_(digest) {}
+        : RsaDigestingOperation(KM_PURPOSE_VERIFY, digest, padding, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 
   private:
-    keymaster_digest_t digest_;
+    keymaster_error_t VerifyUndigested(uint8_t* decrypted_data);
+    keymaster_error_t VerifyDigested(uint8_t* decrypted_data);
 };
 
+/**
+ * RSA public key encryption operation.
+ */
 class RsaEncryptOperation : public RsaOperation {
   public:
     RsaEncryptOperation(keymaster_padding_t padding, RSA* key)
@@ -80,6 +121,9 @@ class RsaEncryptOperation : public RsaOperation {
                                      const Buffer& signature, Buffer* output);
 };
 
+/**
+ * RSA private key decryption operation.
+ */
 class RsaDecryptOperation : public RsaOperation {
   public:
     RsaDecryptOperation(keymaster_padding_t padding, RSA* key)

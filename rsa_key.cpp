@@ -183,7 +183,7 @@ bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_digest_t diges
     switch (purpose) {
     case KM_PURPOSE_SIGN:
     case KM_PURPOSE_VERIFY:
-        return digest == KM_DIGEST_NONE;
+        return digest == KM_DIGEST_NONE || digest == KM_DIGEST_SHA_2_256;
         break;
     case KM_PURPOSE_ENCRYPT:
     case KM_PURPOSE_DECRYPT:
