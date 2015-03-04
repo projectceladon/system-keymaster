@@ -19,7 +19,6 @@
 
 #include <keymaster/authorization_set.h>
 #include <keymaster/google_keymaster_messages.h>
-#include <keymaster/logger.h>
 
 namespace keymaster {
 
@@ -44,7 +43,7 @@ class UnencryptedKeyBlob;
  */
 class GoogleKeymaster {
   public:
-    GoogleKeymaster(size_t operation_table_size, Logger* logger);
+    GoogleKeymaster(size_t operation_table_size);
     virtual ~GoogleKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
@@ -77,8 +76,6 @@ class GoogleKeymaster {
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
     keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
     void GetVersion(const GetVersionRequest& request, GetVersionResponse* response);
-
-    const Logger& logger() const { return *logger_; }
 
   private:
     virtual bool is_enforced(keymaster_tag_t tag) = 0;
@@ -120,7 +117,6 @@ class GoogleKeymaster {
 
     UniquePtr<OpTableEntry[]> operation_table_;
     size_t operation_table_size_;
-    UniquePtr<Logger> logger_;
 };
 
 }  // namespace keymaster

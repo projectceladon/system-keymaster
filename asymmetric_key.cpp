@@ -21,6 +21,7 @@
 #include <hardware/keymaster_defs.h>
 
 #include "ecdsa_key.h"
+#include "openssl_err.h"
 #include "openssl_utils.h"
 #include "rsa_key.h"
 #include "unencrypted_key_blob.h"
@@ -99,7 +100,7 @@ keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
         return KM_ERROR_INVALID_KEY_BLOB;
     }
     if (!EvpToInternal(evp_key.get()))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     return KM_ERROR_OK;
 }
@@ -113,11 +114,11 @@ keymaster_error_t AsymmetricKey::key_material(UniquePtr<uint8_t[]>* material, si
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     if (!InternalToEvp(pkey.get()))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     *size = i2d_PrivateKey(pkey.get(), NULL /* key_data*/);
     if (*size <= 0)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     material->reset(new uint8_t[*size]);
     uint8_t* tmp = material->get();
@@ -137,11 +138,11 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
 
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (!InternalToEvp(pkey.get()))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     int key_data_length = i2d_PUBKEY(pkey.get(), NULL);
     if (key_data_length <= 0)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     material->reset(new uint8_t[key_data_length]);
     if (material->get() == NULL)
@@ -150,7 +151,7 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
     uint8_t* tmp = material->get();
     if (i2d_PUBKEY(pkey.get(), &tmp) != key_data_length) {
         material->reset();
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
     }
 
     *size = key_data_length;

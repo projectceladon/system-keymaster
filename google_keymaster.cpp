@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <keymaster/google_keymaster.h>
+
 #include <assert.h>
 #include <string.h>
 
@@ -24,11 +26,11 @@
 
 #include <UniquePtr.h>
 
-#include <keymaster/google_keymaster.h>
 #include <keymaster/google_keymaster_utils.h>
 
 #include "ae.h"
 #include "key.h"
+#include "openssl_err.h"
 #include "operation.h"
 #include "unencrypted_key_blob.h"
 
@@ -38,9 +40,9 @@ const uint8_t MAJOR_VER = 1;
 const uint8_t MINOR_VER = 0;
 const uint8_t SUBMINOR_VER = 0;
 
-GoogleKeymaster::GoogleKeymaster(size_t operation_table_size, Logger* logger)
+GoogleKeymaster::GoogleKeymaster(size_t operation_table_size)
     : operation_table_(new OpTableEntry[operation_table_size]),
-      operation_table_size_(operation_table_size), logger_(logger) {
+      operation_table_size_(operation_table_size) {
     if (operation_table_.get() == NULL)
         operation_table_size_ = 0;
 }
@@ -192,7 +194,7 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
         !(factory = KeyFactoryRegistry::Get(algorithm)))
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     else
-        key.reset(factory->GenerateKey(request.key_description, logger(), &response->error));
+        key.reset(factory->GenerateKey(request.key_description, &response->error));
 
     if (response->error != KM_ERROR_OK)
         return;
@@ -236,7 +238,7 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
     }
 
-    UniquePtr<Operation> operation(factory->CreateOperation(*key, logger(), &response->error));
+    UniquePtr<Operation> operation(factory->CreateOperation(*key, &response->error));
     if (operation.get() == NULL)
         return;
 
@@ -325,7 +327,7 @@ void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespon
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     else
         key.reset(factory->ImportKey(request.key_description, request.key_format, request.key_data,
-                                     request.key_data_length, logger(), &response->error));
+                                     request.key_data_length, &response->error));
 
     if (response->error != KM_ERROR_OK)
         return;
@@ -390,7 +392,7 @@ Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
 
     KeyFactory* factory = 0;
     if ((factory = KeyFactoryRegistry::Get(*algorithm)))
-        return factory->LoadKey(*blob, logger(), error);
+        return factory->LoadKey(*blob, error);
     *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     return NULL;
 }
@@ -489,7 +491,7 @@ keymaster_error_t GoogleKeymaster::AddOperation(Operation* operation,
                                                 keymaster_operation_handle_t* op_handle) {
     UniquePtr<Operation> op(operation);
     if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) == 0)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
     if (*op_handle == 0) {
         // Statistically this is vanishingly unlikely, which means if it ever happens in practice,
         // it indicates a broken RNG.

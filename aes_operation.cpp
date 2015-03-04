@@ -19,6 +19,8 @@
 #include <openssl/aes.h>
 #include <openssl/rand.h>
 
+#include <keymaster/logger.h>
+
 #include "aes_key.h"
 #include "aes_operation.h"
 
@@ -32,15 +34,13 @@ class AesOcbOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_AES, purpose()); }
 
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
     virtual const keymaster_block_mode_t* SupportedBlockModes(size_t* block_mode_count) const;
 
     virtual keymaster_purpose_t purpose() const = 0;
 };
 
-Operation* AesOcbOperationFactory::CreateOperation(const Key& key, const Logger& logger,
-                                                   keymaster_error_t* error) {
+Operation* AesOcbOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
     *error = KM_ERROR_OK;
 
     keymaster_block_mode_t block_mode;
@@ -87,9 +87,9 @@ Operation* AesOcbOperationFactory::CreateOperation(const Key& key, const Logger&
     keymaster_blob_t additional_data = {0, 0};
     symmetric_key->authorizations().GetTagValue(TAG_ASSOCIATED_DATA, &additional_data);
 
-    Operation* op = new AesOcbOperation(purpose(), logger, symmetric_key->key_data(),
-                                        symmetric_key->key_data_size(), chunk_length, tag_length,
-                                        additional_data);
+    Operation* op =
+        new AesOcbOperation(purpose(), symmetric_key->key_data(), symmetric_key->key_data_size(),
+                            chunk_length, tag_length, additional_data);
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return op;

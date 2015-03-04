@@ -18,6 +18,7 @@
 
 #include "ecdsa_key.h"
 #include "ecdsa_operation.h"
+#include "openssl_err.h"
 #include "openssl_utils.h"
 
 namespace keymaster {
@@ -26,15 +27,14 @@ class EcdsaSignOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN); }
 
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error){
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
         const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
             return NULL;
         }
 
-        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, logger, ecdsa_key->key());
+        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, ecdsa_key->key());
         if (!op)
             *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return op;
@@ -46,15 +46,14 @@ class EcdsaVerifyOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_VERIFY); }
 
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error){
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
         const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
             return NULL;
         }
 
-        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, logger, ecdsa_key->key());
+        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, ecdsa_key->key());
         if (!op)
             *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return op;
@@ -111,7 +110,7 @@ keymaster_error_t EcdsaSignOperation::Finish(const AuthorizationSet& /* addition
     unsigned int siglen;
     if (!ECDSA_sign(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
                     output->peek_write(), &siglen, ecdsa_key_))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
     output->advance_write(siglen);
     return KM_ERROR_OK;
 }
@@ -121,7 +120,7 @@ keymaster_error_t EcdsaVerifyOperation::Finish(const AuthorizationSet& /* additi
     int result = ECDSA_verify(0 /* type -- ignored */, data_.peek_read(), data_.available_read(),
                               signature.peek_read(), signature.available_read(), ecdsa_key_);
     if (result < 0)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
     else if (result == 0)
         return KM_ERROR_VERIFICATION_FAILED;
     else
