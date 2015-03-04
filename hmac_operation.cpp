@@ -104,6 +104,9 @@ HmacOperation::HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_dat
 
     const EVP_MD* md;
     switch (digest) {
+    case KM_DIGEST_SHA1:
+        md = EVP_sha1();
+        break;
     case KM_DIGEST_SHA_2_224:
         md = EVP_sha224();
         break;
