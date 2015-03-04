@@ -169,7 +169,8 @@ bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_padding_t padd
     switch (purpose) {
     case KM_PURPOSE_SIGN:
     case KM_PURPOSE_VERIFY:
-        return padding == KM_PAD_NONE;
+        return padding == KM_PAD_NONE || padding == KM_PAD_RSA_PSS ||
+               padding == KM_PAD_RSA_PKCS1_1_5_SIGN;
         break;
     case KM_PURPOSE_ENCRYPT:
     case KM_PURPOSE_DECRYPT:
