@@ -53,8 +53,8 @@ CPPSRCS=\
 	keymaster_enforcement_test.cpp \
 	logger.cpp \
 	openssl_err.cpp \
+	openssl_utils.cpp \
 	operation.cpp \
-	openssl_err.cpp \
 	rsa_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
@@ -164,6 +164,7 @@ google_keymaster_test: google_keymaster_test.o \
 	ocb.o \
 	operation.o \
 	openssl_err.o \
+	openssl_utils.o \
 	rsa_key.o \
 	rsa_operation.o \
 	serializable.o \
