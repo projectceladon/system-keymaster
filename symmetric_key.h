@@ -26,19 +26,17 @@ class SymmetricKey;
 class SymmetricKeyFactory : public KeyFactory {
     virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
     virtual Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
-                           keymaster_error_t* error) {
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return NULL;
-    }
+                           keymaster_error_t* error);
 
-    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) {
-        return NoFormats(format_count);
-    }
+    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) {
         return NoFormats(format_count);
     };
 
   private:
+    SymmetricKey* CreateKeyAndValidateSize(const AuthorizationSet& key_description,
+                                           keymaster_error_t* error);
+
     virtual SymmetricKey* CreateKey(const AuthorizationSet& auths) = 0;
     const keymaster_key_format_t* NoFormats(size_t* format_count) {
         *format_count = 0;
@@ -57,10 +55,10 @@ class SymmetricKey : public Key {
     virtual keymaster_error_t key_material(UniquePtr<uint8_t[]>* key_material, size_t* size) const;
     virtual keymaster_error_t formatted_key_material(keymaster_key_format_t, UniquePtr<uint8_t[]>*,
                                                      size_t*) const {
-        return KM_ERROR_UNIMPLEMENTED;
+        return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
     }
 
-    const uint8_t* key_data() const { return key_data_; }
+    const uint8_t* key_data() const { return key_data_.get(); }
     size_t key_data_size() const { return key_data_size_; }
 
   protected:
@@ -71,9 +69,11 @@ class SymmetricKey : public Key {
     friend SymmetricKeyFactory;
 
     keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
+    keymaster_error_t set_size(size_t key_size);
+    virtual bool size_supported(size_t key_size) = 0;
 
     size_t key_data_size_;
-    uint8_t key_data_[MAX_KEY_SIZE];
+    UniquePtr<uint8_t[]> key_data_;
 };
 
 }  // namespace keymaster
