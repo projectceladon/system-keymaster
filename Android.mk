@@ -59,8 +59,8 @@ LOCAL_SRC_FILES:= \
 		key_blob.cpp \
 		logger.cpp \
 		ocb.c \
-		operation.cpp \
 		openssl_err.cpp \
+		operation.cpp \
 		rsa_key.cpp \
 		rsa_operation.cpp \
 		serializable.cpp \

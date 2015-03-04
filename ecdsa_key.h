@@ -33,9 +33,9 @@ class EcdsaKey : public AsymmetricKey {
     friend EcdsaSignOperationFactory;
     friend EcdsaVerifyOperationFactory;
 
-    EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-    EcdsaKey(EC_KEY* ecdsa_key, const AuthorizationSet auths, const Logger& logger)
-        : AsymmetricKey(auths, logger), ecdsa_key_(ecdsa_key) {}
+    EcdsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
+    EcdsaKey(EC_KEY* ecdsa_key, const AuthorizationSet auths)
+        : AsymmetricKey(auths), ecdsa_key_(ecdsa_key) {}
 
     virtual int evp_key_type() { return EVP_PKEY_EC; }
     virtual bool InternalToEvp(EVP_PKEY* pkey) const;

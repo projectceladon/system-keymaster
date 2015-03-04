@@ -19,7 +19,10 @@
 #include <openssl/aes.h>
 #include <openssl/rand.h>
 
+#include <keymaster/logger.h>
+
 #include "aead_mode_operation.h"
+#include "openssl_err.h"
 
 namespace keymaster {
 
@@ -90,7 +93,7 @@ keymaster_error_t AeadModeOperation::ProcessChunk(Buffer* output) {
         if (buffered_data_length() < tag_length_)
             return KM_ERROR_INVALID_INPUT_LENGTH;
         ExtractTagFromBuffer();
-        logger().info("AeadMode decrypting %d", buffered_data_length());
+        LOG_D("AeadMode decrypting %d", buffered_data_length());
         if (!output->reserve(output->available_read() + buffered_data_length()))
             error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         else
@@ -121,7 +124,7 @@ size_t AeadModeOperation::EstimateOutputSize(const Buffer& input, Buffer* output
         return output->available_read() + chunk_length * chunk_count;
     }
     default:
-        logger().error("Encountered invalid purpose %d", purpose());
+        LOG_E("Encountered invalid purpose %d", purpose());
         return 0;
     }
 }
@@ -130,8 +133,8 @@ keymaster_error_t AeadModeOperation::HandleNonce(Buffer* output) {
     switch (purpose()) {
     case KM_PURPOSE_ENCRYPT:
         if (!RAND_bytes(nonce_, nonce_length_)) {
-            logger().error("Failed to generate nonce");
-            return KM_ERROR_UNKNOWN_ERROR;
+            LOG_S("Failed to generate %d-byte nonce", nonce_length_);
+            return TranslateLastOpenSslError();
         }
         if (!output->reserve(nonce_length_))
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;

@@ -31,9 +31,8 @@ class RsaKey : public AsymmetricKey {
     friend class RsaKeyFactory;
     friend class RsaOperationFactory;
 
-    RsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-    RsaKey(RSA* rsa_key, const AuthorizationSet& auths, const Logger& logger)
-        : AsymmetricKey(auths, logger), rsa_key_(rsa_key) {}
+    RsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
+    RsaKey(RSA* rsa_key, const AuthorizationSet& auths) : AsymmetricKey(auths), rsa_key_(rsa_key) {}
 
     virtual int evp_key_type() { return EVP_PKEY_RSA; }
     virtual bool InternalToEvp(EVP_PKEY* pkey) const;

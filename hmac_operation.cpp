@@ -19,6 +19,7 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
+#include "openssl_err.h"
 #include "symmetric_key.h"
 
 #if defined(OPENSSL_IS_BORINGSSL)
@@ -37,16 +38,14 @@ class HmacOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_HMAC, purpose()); }
 
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
 
     virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const;
 
     virtual keymaster_purpose_t purpose() const = 0;
 };
 
-Operation* HmacOperationFactory::CreateOperation(const Key& key, const Logger& logger,
-                                                 keymaster_error_t* error) {
+Operation* HmacOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
     *error = KM_ERROR_OK;
 
     uint32_t tag_length;
@@ -66,7 +65,7 @@ Operation* HmacOperationFactory::CreateOperation(const Key& key, const Logger& l
         return NULL;
     }
 
-    Operation* op = new HmacOperation(purpose(), logger, symmetric_key->key_data(),
+    Operation* op = new HmacOperation(purpose(), symmetric_key->key_data(),
                                       symmetric_key->key_data_size(), digest, tag_length);
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -97,10 +96,9 @@ class HmacVerifyOperationFactory : public HmacOperationFactory {
 };
 static OperationFactoryRegistry::Registration<HmacVerifyOperationFactory> verify_registration;
 
-HmacOperation::HmacOperation(keymaster_purpose_t purpose, const Logger& logger,
-                             const uint8_t* key_data, size_t key_data_size,
-                             keymaster_digest_t digest, size_t tag_length)
-    : Operation(purpose, logger), error_(KM_ERROR_OK), tag_length_(tag_length) {
+HmacOperation::HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_data,
+                             size_t key_data_size, keymaster_digest_t digest, size_t tag_length)
+    : Operation(purpose), error_(KM_ERROR_OK), tag_length_(tag_length) {
     // Initialize CTX first, so dtor won't crash even if we error out later.
     HMAC_CTX_init(&ctx_);
 
@@ -144,7 +142,7 @@ keymaster_error_t HmacOperation::Update(const AuthorizationSet& /* additional_pa
                                         const Buffer& input, Buffer* /* output */,
                                         size_t* input_consumed) {
     if (!HMAC_Update(&ctx_, input.peek_read(), input.available_read()))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
     *input_consumed = input.available_read();
     return KM_ERROR_OK;
 }
@@ -158,7 +156,7 @@ keymaster_error_t HmacOperation::Finish(const AuthorizationSet& /* additional_pa
     uint8_t digest[EVP_MAX_MD_SIZE];
     unsigned int digest_len;
     if (!HMAC_Final(&ctx_, digest, &digest_len))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     switch (purpose()) {
     case KM_PURPOSE_SIGN:

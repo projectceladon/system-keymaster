@@ -40,7 +40,7 @@ class AuthorizationSet;
  */
 class SoftKeymasterDevice {
   public:
-    SoftKeymasterDevice(Logger* logger);
+    SoftKeymasterDevice();
 
     hw_device_t* hw_device();
 

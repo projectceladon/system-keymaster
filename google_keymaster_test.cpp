@@ -163,12 +163,12 @@ class ParamBuilder {
     AuthorizationSet set;
 };
 
+StdoutLogger logger;
+
 const uint64_t OP_HANDLE_SENTINEL = 0xFFFFFFFFFFFFFFFF;
 class KeymasterTest : public testing::Test {
   protected:
-    KeymasterTest()
-        : device_(new StdoutLogger), out_params_(NULL), op_handle_(OP_HANDLE_SENTINEL),
-          characteristics_(NULL) {
+    KeymasterTest() : out_params_(NULL), op_handle_(OP_HANDLE_SENTINEL), characteristics_(NULL) {
         blob_.key_material = NULL;
         RAND_seed("foobar", 6);
         blob_.key_material = 0;
@@ -672,7 +672,7 @@ TEST_F(SigningOperationsTest, RsaAbort) {
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256, KM_PAD_NONE));
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_MD5, KM_PAD_NONE));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 

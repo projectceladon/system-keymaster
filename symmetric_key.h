@@ -24,10 +24,9 @@ namespace keymaster {
 class SymmetricKey;
 
 class SymmetricKeyFactory : public KeyFactory {
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                             keymaster_error_t* error);
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
     virtual Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
-                           const Logger&, keymaster_error_t* error) {
+                           keymaster_error_t* error) {
         *error = KM_ERROR_UNIMPLEMENTED;
         return NULL;
     }
@@ -40,7 +39,7 @@ class SymmetricKeyFactory : public KeyFactory {
     };
 
   private:
-    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths, const Logger& logger) = 0;
+    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths) = 0;
     const keymaster_key_format_t* NoFormats(size_t* format_count) {
         *format_count = 0;
         return NULL;
@@ -65,8 +64,8 @@ class SymmetricKey : public Key {
     size_t key_data_size() const { return key_data_size_; }
 
   protected:
-    SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error);
-    SymmetricKey(const AuthorizationSet& auths, const Logger& logger) : Key(auths, logger) {}
+    SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
+    SymmetricKey(const AuthorizationSet& auths) : Key(auths) {}
 
   private:
     friend SymmetricKeyFactory;

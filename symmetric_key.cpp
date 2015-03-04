@@ -21,19 +21,22 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
+#include <keymaster/logger.h>
+
 #include "aes_key.h"
 #include "hmac_key.h"
+#include "openssl_err.h"
 #include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
-Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                       keymaster_error_t* error) {
     if (!error)
         return NULL;
     *error = KM_ERROR_OK;
 
-    UniquePtr<SymmetricKey> key(CreateKey(key_description, logger));
+    UniquePtr<SymmetricKey> key(CreateKey(key_description));
 
     uint32_t key_size_bits;
     if (!key_description.GetTagValue(TAG_KEY_SIZE, &key_size_bits) || key_size_bits % 8 != 0) {
@@ -47,8 +50,8 @@ Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description, c
         return NULL;
     }
     if (!RAND_bytes(key->key_data_, key->key_data_size_)) {
-        logger.error("Error %ul generating %d bit AES key", ERR_get_error(), key_size_bits);
-        *error = KM_ERROR_UNKNOWN_ERROR;
+        LOG_E("Error %ul generating %d bit AES key", ERR_get_error(), key_size_bits);
+        *error = TranslateLastOpenSslError();
         return NULL;
     }
 
@@ -57,9 +60,8 @@ Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description, c
     return key.release();
 }
 
-SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, const Logger& logger,
-                           keymaster_error_t* error)
-    : Key(blob, logger), key_data_size_(blob.unencrypted_key_material_length()) {
+SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error)
+    : Key(blob), key_data_size_(blob.unencrypted_key_material_length()) {
     memcpy(key_data_, blob.unencrypted_key_material(), key_data_size_);
     if (error)
         *error = KM_ERROR_OK;

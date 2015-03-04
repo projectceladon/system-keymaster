@@ -21,7 +21,11 @@ CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Wmissing-declarations -ftest-coverage \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
-	$(COMPILER_SPECIFIC_ARGS) -DDEBUG
+	$(COMPILER_SPECIFIC_ARGS)
+
+# Uncomment to enable debug logging.
+# CXXFLAGS += -DDEBUG
+
 LDLIBS=-lcrypto -lpthread -lstdc++
 
 CPPSRCS=\
@@ -123,6 +127,7 @@ key_blob_test: key_blob_test.o \
 	key_blob.o \
 	logger.o \
 	ocb.o \
+	openssl_err.o \
 	serializable.o \
 	unencrypted_key_blob.o \
 	$(GTEST)/src/gtest-all.o
