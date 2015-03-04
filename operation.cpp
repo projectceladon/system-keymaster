@@ -20,4 +20,31 @@ namespace keymaster {
 
 DEFINE_ABSTRACT_FACTORY_REGISTRY_INSTANCE(OperationFactory);
 
+bool OperationFactory::supported(keymaster_padding_t padding) const {
+    size_t padding_count;
+    const keymaster_padding_t* supported_paddings = SupportedPaddingModes(&padding_count);
+    for (size_t i = 0; i < padding_count; ++i)
+        if (padding == supported_paddings[i])
+            return true;
+    return false;
+}
+
+bool OperationFactory::supported(keymaster_block_mode_t block_mode) const {
+    size_t block_mode_count;
+    const keymaster_block_mode_t* supported_block_modes = SupportedBlockModes(&block_mode_count);
+    for (size_t i = 0; i < block_mode_count; ++i)
+        if (block_mode == supported_block_modes[i])
+            return true;
+    return false;
+}
+
+bool OperationFactory::supported(keymaster_digest_t digest) const {
+    size_t digest_count;
+    const keymaster_digest_t* supported_digests = SupportedDigests(&digest_count);
+    for (size_t i = 0; i < digest_count; ++i)
+        if (digest == supported_digests[i])
+            return true;
+    return false;
+}
+
 }  // namespace keymaster

@@ -68,6 +68,11 @@ class OperationFactory {
         *digest_count = 0;
         return NULL;
     }
+
+    // Convenience methods
+    bool supported(keymaster_padding_t padding) const;
+    bool supported(keymaster_block_mode_t padding) const;
+    bool supported(keymaster_digest_t padding) const;
 };
 
 typedef AbstractFactoryRegistry<OperationFactory> OperationFactoryRegistry;
