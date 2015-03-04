@@ -52,8 +52,7 @@ class OperationFactory {
     virtual KeyType registry_key() const = 0;
 
     // Factory methods
-    virtual Operation* CreateOperation(const Key& key, const Logger& logger,
-                                       keymaster_error_t* error) = 0;
+    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) = 0;
 
     // Informational methods.  The returned arrays reference static memory and must not be
     // deallocated or modified.
@@ -78,13 +77,10 @@ typedef AbstractFactoryRegistry<OperationFactory> OperationFactoryRegistry;
  */
 class Operation {
   public:
-    Operation(keymaster_purpose_t purpose, const Logger& logger)
-        : purpose_(purpose), logger_(logger) {}
+    Operation(keymaster_purpose_t purpose) : purpose_(purpose) {}
     virtual ~Operation() {}
 
     keymaster_purpose_t purpose() const { return purpose_; }
-
-    const Logger& logger() { return logger_; }
 
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
                                     AuthorizationSet* output_params) = 0;
@@ -96,7 +92,6 @@ class Operation {
 
   private:
     const keymaster_purpose_t purpose_;
-    const Logger& logger_;
 };
 
 }  // namespace keymaster

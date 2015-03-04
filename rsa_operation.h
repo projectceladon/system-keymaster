@@ -30,9 +30,8 @@ namespace keymaster {
 
 class RsaOperation : public Operation {
   public:
-    RsaOperation(keymaster_purpose_t purpose, const Logger& logger, keymaster_padding_t padding,
-                 RSA* key)
-        : Operation(purpose, logger), rsa_key_(key), padding_(padding) {}
+    RsaOperation(keymaster_purpose_t purpose, keymaster_padding_t padding, RSA* key)
+        : Operation(purpose), rsa_key_(key), padding_(padding) {}
     ~RsaOperation();
 
     virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
@@ -53,9 +52,8 @@ class RsaOperation : public Operation {
 
 class RsaSignOperation : public RsaOperation {
   public:
-    RsaSignOperation(const Logger& logger, keymaster_digest_t digest, keymaster_padding_t padding,
-                     RSA* key)
-        : RsaOperation(KM_PURPOSE_SIGN, logger, padding, key), digest_(digest) {}
+    RsaSignOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
+        : RsaOperation(KM_PURPOSE_SIGN, padding, key), digest_(digest) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 
@@ -65,9 +63,8 @@ class RsaSignOperation : public RsaOperation {
 
 class RsaVerifyOperation : public RsaOperation {
   public:
-    RsaVerifyOperation(const Logger& logger, keymaster_digest_t digest, keymaster_padding_t padding,
-                       RSA* key)
-        : RsaOperation(KM_PURPOSE_VERIFY, logger, padding, key), digest_(digest) {}
+    RsaVerifyOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
+        : RsaOperation(KM_PURPOSE_VERIFY, padding, key), digest_(digest) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 
@@ -77,16 +74,16 @@ class RsaVerifyOperation : public RsaOperation {
 
 class RsaEncryptOperation : public RsaOperation {
   public:
-    RsaEncryptOperation(const Logger& logger, keymaster_padding_t padding, RSA* key)
-        : RsaOperation(KM_PURPOSE_ENCRYPT, logger, padding, key) {}
+    RsaEncryptOperation(keymaster_padding_t padding, RSA* key)
+        : RsaOperation(KM_PURPOSE_ENCRYPT, padding, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };
 
 class RsaDecryptOperation : public RsaOperation {
   public:
-    RsaDecryptOperation(const Logger& logger, keymaster_padding_t padding, RSA* key)
-        : RsaOperation(KM_PURPOSE_DECRYPT, logger, padding, key) {}
+    RsaDecryptOperation(keymaster_padding_t padding, RSA* key)
+        : RsaOperation(KM_PURPOSE_DECRYPT, padding, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };

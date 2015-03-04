@@ -23,9 +23,8 @@ namespace keymaster {
 
 class HmacKey : public SymmetricKey {
   public:
-    HmacKey(const AuthorizationSet& auths, const Logger& logger) : SymmetricKey(auths, logger) {}
-    HmacKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
-        : SymmetricKey(blob, logger, error) {}
+    HmacKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
+    HmacKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
 };
 
 }  // namespace keymaster

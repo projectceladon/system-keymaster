@@ -16,6 +16,7 @@
 
 #include "ecdsa_key.h"
 #include "ecdsa_operation.h"
+#include "openssl_err.h"
 #include "openssl_utils.h"
 #include "unencrypted_key_blob.h"
 
@@ -27,14 +28,12 @@ class EcdsaKeyFactory : public AsymmetricKeyFactory {
   public:
     virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_ECDSA; }
 
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
-                             keymaster_error_t* error);
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
     virtual Key* ImportKey(const AuthorizationSet& key_description,
                            keymaster_key_format_t key_format, const uint8_t* key_data,
-                           size_t key_data_length, const Logger& logger, keymaster_error_t* error);
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
-                         keymaster_error_t* error) {
-        return new EcdsaKey(blob, logger, error);
+                           size_t key_data_length, keymaster_error_t* error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+        return new EcdsaKey(blob, error);
     }
 
   private:
@@ -47,7 +46,7 @@ class EcdsaKeyFactory : public AsymmetricKeyFactory {
 };
 static KeyFactoryRegistry::Registration<EcdsaKeyFactory> registration;
 
-Key* EcdsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const Logger& logger,
+Key* EcdsaKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                   keymaster_error_t* error) {
     if (!error)
         return NULL;
@@ -79,19 +78,18 @@ Key* EcdsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, const
 
     if (EC_KEY_set_group(ecdsa_key.get(), group.get()) != 1 ||
         EC_KEY_generate_key(ecdsa_key.get()) != 1 || EC_KEY_check_key(ecdsa_key.get()) < 0) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
+        *error = TranslateLastOpenSslError();
         return NULL;
     }
 
-    EcdsaKey* new_key = new EcdsaKey(ecdsa_key.release(), authorizations, logger);
+    EcdsaKey* new_key = new EcdsaKey(ecdsa_key.release(), authorizations);
     *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return new_key;
 }
 
 Key* EcdsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
                                 keymaster_key_format_t key_format, const uint8_t* key_data,
-                                size_t key_data_length, const Logger& logger,
-                                keymaster_error_t* error) {
+                                size_t key_data_length, keymaster_error_t* error) {
     if (!error)
         return NULL;
 
@@ -103,7 +101,7 @@ Key* EcdsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
 
     UniquePtr<EC_KEY, EcdsaKey::ECDSA_Delete> ecdsa_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
     if (!ecdsa_key.get()) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
+        *error = TranslateLastOpenSslError();
         return NULL;
     }
 
@@ -140,7 +138,7 @@ Key* EcdsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
     // missing, the error will be diagnosed when the key is used (when auth checking is
     // implemented).
     *error = KM_ERROR_OK;
-    return new EcdsaKey(ecdsa_key.release(), authorizations, logger);
+    return new EcdsaKey(ecdsa_key.release(), authorizations);
 }
 
 /* static */
@@ -185,8 +183,7 @@ keymaster_error_t EcdsaKeyFactory::get_group_size(const EC_GROUP& group, size_t*
     return KM_ERROR_OK;
 }
 
-EcdsaKey::EcdsaKey(const UnencryptedKeyBlob& blob, const Logger& logger, keymaster_error_t* error)
-    : AsymmetricKey(blob, logger) {
+EcdsaKey::EcdsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
     if (error)
         *error = LoadKey(blob);
 }

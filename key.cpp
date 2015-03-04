@@ -29,7 +29,7 @@ namespace keymaster {
 /* static */
 template <> KeyFactoryRegistry* KeyFactoryRegistry::instance_ptr = 0;
 
-Key::Key(const KeyBlob& blob, const Logger& logger) : logger_(logger) {
+Key::Key(const KeyBlob& blob) {
     authorizations_.push_back(blob.unenforced());
     authorizations_.push_back(blob.enforced());
 }

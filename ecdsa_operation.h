@@ -29,8 +29,8 @@ namespace keymaster {
 
 class EcdsaOperation : public Operation {
   public:
-    EcdsaOperation(keymaster_purpose_t purpose, const Logger& logger, EC_KEY* key)
-        : Operation(purpose, logger), ecdsa_key_(key) {}
+    EcdsaOperation(keymaster_purpose_t purpose, EC_KEY* key)
+        : Operation(purpose), ecdsa_key_(key) {}
     ~EcdsaOperation();
 
     virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
@@ -50,16 +50,14 @@ class EcdsaOperation : public Operation {
 
 class EcdsaSignOperation : public EcdsaOperation {
   public:
-    EcdsaSignOperation(keymaster_purpose_t purpose, const Logger& logger, EC_KEY* key)
-        : EcdsaOperation(purpose, logger, key) {}
+    EcdsaSignOperation(keymaster_purpose_t purpose, EC_KEY* key) : EcdsaOperation(purpose, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };
 
 class EcdsaVerifyOperation : public EcdsaOperation {
   public:
-    EcdsaVerifyOperation(keymaster_purpose_t purpose, const Logger& logger, EC_KEY* key)
-        : EcdsaOperation(purpose, logger, key) {}
+    EcdsaVerifyOperation(keymaster_purpose_t purpose, EC_KEY* key) : EcdsaOperation(purpose, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };

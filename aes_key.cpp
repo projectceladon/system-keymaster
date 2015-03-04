@@ -30,14 +30,11 @@ class AesKeyFactory : public SymmetricKeyFactory {
   public:
     keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_AES; }
 
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, const Logger& logger,
-                         keymaster_error_t* error) {
-        return new AesKey(blob, logger, error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+        return new AesKey(blob, error);
     }
 
-    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths, const Logger& logger) {
-        return new AesKey(auths, logger);
-    }
+    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths) { return new AesKey(auths); }
 };
 static KeyFactoryRegistry::Registration<AesKeyFactory> registration;
 
