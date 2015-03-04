@@ -63,9 +63,6 @@ typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 // methods that return the same information.  They'll get out of sync.  Best to put the knowledge in
 // the keytypes and provide some mechanism for GoogleKeymaster to query the keytypes for the
 // information.
-//
-// UPDATE: This TODO has been completed for supported algorithms.  It still needs to be done for
-// modes, padding, etc.  This will be done with a registry of operation factories.
 
 template <typename T>
 bool check_supported(keymaster_algorithm_t algorithm, SupportedResponse<T>* response) {
