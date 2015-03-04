@@ -17,6 +17,8 @@
 #ifndef SYSTEM_KEYMASTER_AES_OPERATION_H_
 #define SYSTEM_KEYMASTER_AES_OPERATION_H_
 
+#include <openssl/evp.h>
+
 #include "aead_mode_operation.h"
 #include "ocb_utils.h"
 #include "operation.h"
@@ -26,8 +28,6 @@ namespace keymaster {
 class AesOcbOperation : public AeadModeOperation {
   public:
     static const size_t NONCE_LENGTH = 12;
-    static const size_t MAX_TAG_LENGTH = 16;
-    static const size_t MAX_KEY_LENGTH = 32;
 
     AesOcbOperation(keymaster_purpose_t purpose, const uint8_t* key, size_t key_size,
                     size_t chunk_length, size_t tag_length, keymaster_blob_t additional_data)
@@ -54,6 +54,53 @@ class AesOcbOperation : public AeadModeOperation {
                                            const keymaster_blob_t additional_data, uint8_t* chunk,
                                            size_t chunk_size, Buffer* output);
     AeCtx ctx_;
+};
+
+class AesEvpOperation : public Operation {
+  public:
+    AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
+                    keymaster_padding_t padding, const uint8_t* key, size_t key_size);
+    ~AesEvpOperation();
+
+    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
+                                    AuthorizationSet* output_params);
+    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                                     Buffer* output, size_t* input_consumed);
+    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
+                                     const Buffer& /* signature */, Buffer* output);
+    virtual keymaster_error_t Abort();
+
+    virtual int evp_encrypt_mode() = 0;
+
+  private:
+    keymaster_error_t InitializeCipher();
+    bool need_iv() const;
+
+    EVP_CIPHER_CTX ctx_;
+    const size_t key_size_;
+    const keymaster_block_mode_t block_mode_;
+    const keymaster_padding_t padding_;
+    bool cipher_initialized_;
+    uint8_t iv_buffered_;
+    uint8_t iv_[AES_BLOCK_SIZE];
+    uint8_t key_[SymmetricKey::MAX_KEY_SIZE];
+};
+
+class AesEvpEncryptOperation : public AesEvpOperation {
+  public:
+    AesEvpEncryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
+                           const uint8_t* key, size_t key_size)
+        : AesEvpOperation(KM_PURPOSE_ENCRYPT, block_mode, padding, key, key_size) {}
+    int evp_encrypt_mode() { return 1; }
+};
+
+class AesEvpDecryptOperation : public AesEvpOperation {
+  public:
+    AesEvpDecryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
+                           const uint8_t* key, size_t key_size)
+        : AesEvpOperation(KM_PURPOSE_DECRYPT, block_mode, padding, key, key_size) {}
+
+    int evp_encrypt_mode() { return 0; }
 };
 
 }  // namespace keymaster
