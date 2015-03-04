@@ -28,6 +28,8 @@
 
 namespace keymaster {
 
+static const int MIN_PSS_SALT_LEN = 8 /* salt len */ + 2 /* overhead */;
+
 /**
  * Abstract base for all RSA operation factories.  This class exists mainly to centralize some code
  * common to all RSA operation factories.
@@ -92,7 +94,8 @@ RSA* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
 }
 
 static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE, KM_DIGEST_SHA_2_256};
-static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE};
+static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN,
+                                                            KM_PAD_RSA_PSS};
 
 /**
  * Abstract base for RSA operations that digest their input (signing and verification).  This class
@@ -257,15 +260,29 @@ RsaDigestingOperation::RsaDigestingOperation(keymaster_purpose_t purpose, keymas
 }
 RsaDigestingOperation::~RsaDigestingOperation() {
     EVP_MD_CTX_cleanup(&digest_ctx_);
+    memset_s(digest_buf_, 0, sizeof(digest_buf_));
 }
 
 keymaster_error_t RsaDigestingOperation::Begin(const AuthorizationSet& /* input_params */,
                                                AuthorizationSet* /* output_params */) {
-    if (digest_ == KM_DIGEST_NONE)
-        return KM_ERROR_OK;
+    if (require_digest() && digest_ == KM_DIGEST_NONE)
+        return KM_ERROR_INCOMPATIBLE_DIGEST;
+    return InitDigest();
+}
 
-    // TODO(swillden): Factor out EVP_MD selection.  It will be done for many operations.
+keymaster_error_t RsaDigestingOperation::Update(const AuthorizationSet& additional_params,
+                                                const Buffer& input, Buffer* output,
+                                                size_t* input_consumed) {
+    if (digest_ == KM_DIGEST_NONE)
+        return RsaOperation::Update(additional_params, input, output, input_consumed);
+    else
+        return UpdateDigest(input, input_consumed);
+}
+
+keymaster_error_t RsaDigestingOperation::InitDigest() {
     switch (digest_) {
+    case KM_DIGEST_NONE:
+        return KM_ERROR_OK;
     case KM_DIGEST_SHA_2_256:
         digest_algorithm_ = EVP_sha256();
         break;
@@ -278,15 +295,10 @@ keymaster_error_t RsaDigestingOperation::Begin(const AuthorizationSet& /* input_
         LOG_E("Failed to initialize digest: %d %s", err, ERR_error_string(err, NULL));
         return KM_ERROR_UNKNOWN_ERROR;
     }
-
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaDigestingOperation::Update(const AuthorizationSet& additional_params,
-                                                const Buffer& input, Buffer* output,
-                                                size_t* input_consumed) {
-    if (digest_ == KM_DIGEST_NONE)
-        return RsaOperation::Update(additional_params, input, output, input_consumed);
+keymaster_error_t RsaDigestingOperation::UpdateDigest(const Buffer& input, size_t* input_consumed) {
     if (!EVP_DigestUpdate(&digest_ctx_, input.peek_read(), input.available_read())) {
         int err = ERR_get_error();
         LOG_E("Failed to update digest: %d %s", err, ERR_error_string(err, NULL));
@@ -296,89 +308,155 @@ keymaster_error_t RsaDigestingOperation::Update(const AuthorizationSet& addition
     return KM_ERROR_OK;
 }
 
-uint8_t* RsaDigestingOperation::FinishDigest(unsigned* digest_size) {
+keymaster_error_t RsaDigestingOperation::FinishDigest(unsigned* digest_size) {
     assert(digest_algorithm_ != NULL);
-    UniquePtr<uint8_t[]> digest(new uint8_t[EVP_MAX_MD_SIZE]);
-    if (!EVP_DigestFinal_ex(&digest_ctx_, digest.get(), digest_size)) {
+    if (!EVP_DigestFinal_ex(&digest_ctx_, digest_buf_, digest_size)) {
         int err = ERR_get_error();
         LOG_E("Failed to finalize digest: %d %s", err, ERR_error_string(err, NULL));
-        return NULL;
+        return KM_ERROR_UNKNOWN_ERROR;
     }
     assert(*digest_size == static_cast<unsigned>(EVP_MD_size(digest_algorithm_)));
-    return digest.release();
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
                                            const Buffer& /* signature */, Buffer* output) {
     assert(output);
     output->Reinitialize(RSA_size(rsa_key_));
+    if (digest_ == KM_DIGEST_NONE)
+        return SignUndigested(output);
+    else
+        return SignDigested(output);
+}
 
-    int bytes_encrypted =
-        (digest_ == KM_DIGEST_NONE) ? SignUndigested(output) : SignDigested(output);
+keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
+    int bytes_encrypted;
+    switch (padding_) {
+    case KM_PAD_NONE:
+        bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
+                                              output->peek_write(), rsa_key_, RSA_NO_PADDING);
+        break;
+    case KM_PAD_RSA_PKCS1_1_5_SIGN:
+        bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
+                                              output->peek_write(), rsa_key_, RSA_PKCS1_PADDING);
+        break;
+    default:
+        return KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    }
 
-    if (bytes_encrypted < 0)
+    if (bytes_encrypted <= 0)
         return KM_ERROR_UNKNOWN_ERROR;
-
-    assert(bytes_encrypted == RSA_size(rsa_key_));
     output->advance_write(bytes_encrypted);
     return KM_ERROR_OK;
 }
 
-int RsaSignOperation::SignUndigested(Buffer* output) {
-    return RSA_private_encrypt(data_.available_read(), data_.peek_read(), output->peek_write(),
-                               rsa_key_, RSA_NO_PADDING);
+keymaster_error_t RsaSignOperation::SignDigested(Buffer* output) {
+    unsigned digest_size = 0;
+    keymaster_error_t error = FinishDigest(&digest_size);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    UniquePtr<uint8_t[]> padded_digest;
+    switch (padding_) {
+    case KM_PAD_NONE:
+        return PrivateEncrypt(digest_buf_, digest_size, RSA_NO_PADDING, output);
+    case KM_PAD_RSA_PKCS1_1_5_SIGN:
+        return PrivateEncrypt(digest_buf_, digest_size, RSA_PKCS1_PADDING, output);
+    case KM_PAD_RSA_PSS:
+        // OpenSSL doesn't verify that the key is large enough for the digest size.  This can cause
+        // a segfault in some cases, and in others can result in a unsafely-small salt.
+        if (RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + (int)digest_size)
+            return KM_ERROR_INCOMPATIBLE_DIGEST;
+
+        if ((error = PssPadDigest(&padded_digest)) != KM_ERROR_OK)
+            return error;
+        return PrivateEncrypt(padded_digest.get(), RSA_size(rsa_key_), RSA_NO_PADDING, output);
+    default:
+        return KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    }
 }
 
-int RsaSignOperation::SignDigested(Buffer* output) {
-    unsigned digest_size = 0;
-    UniquePtr<uint8_t[]> digest(FinishDigest(&digest_size));
-    if (!digest.get())
+keymaster_error_t RsaSignOperation::PssPadDigest(UniquePtr<uint8_t[]>* padded_digest) {
+    padded_digest->reset(new uint8_t[RSA_size(rsa_key_)]);
+    if (!padded_digest->get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    if (!RSA_padding_add_PKCS1_PSS(rsa_key_, padded_digest->get(), digest_buf_, digest_algorithm_,
+                                   -2 /* Indicates maximum salt length */)) {
+        LOG_E("%s", "Failed to apply PSS padding");
         return KM_ERROR_UNKNOWN_ERROR;
-    return RSA_private_encrypt(digest_size, digest.get(), output->peek_write(), rsa_key_,
-                               RSA_NO_PADDING);
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t RsaSignOperation::PrivateEncrypt(uint8_t* to_encrypt, size_t len,
+                                                   int openssl_padding, Buffer* output) {
+    int bytes_encrypted =
+        RSA_private_encrypt(len, to_encrypt, output->peek_write(), rsa_key_, openssl_padding);
+    if (bytes_encrypted <= 0)
+        return KM_ERROR_UNKNOWN_ERROR;
+    output->advance_write(bytes_encrypted);
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
                                              const Buffer& signature, Buffer* /* output */) {
-    UniquePtr<uint8_t[]> decrypted_data(new uint8_t[RSA_size(rsa_key_)]);
-    int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
-                                             decrypted_data.get(), rsa_key_, RSA_NO_PADDING);
-    if (bytes_decrypted < 0)
-        return KM_ERROR_UNKNOWN_ERROR;
-    assert(bytes_decrypted == RSA_size(rsa_key_));
-
-    if (digest_ == KM_DIGEST_NONE) {
-        if (data_.available_read() != signature.available_read())
-            return KM_ERROR_VERIFICATION_FAILED;
-        return VerifyUndigested(decrypted_data.get());
-    }
-    return VerifyDigested(decrypted_data.get());
+    if (digest_ == KM_DIGEST_NONE)
+        return VerifyUndigested(signature);
+    else
+        return VerifyDigested(signature);
 }
 
-keymaster_error_t RsaVerifyOperation::VerifyUndigested(uint8_t* decrypted_data) {
-#if defined(OPENSSL_IS_BORINGSSL)
-    size_t message_size = data_.available_read();
-#else
-    if (data_.available_read() > INT_MAX)
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-    int message_size = (int)data_.available_read();
-#endif
-    if (message_size != RSA_size(rsa_key_))
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
-    if (memcmp_s(decrypted_data, data_.peek_read(), data_.available_read()) == 0)
-        return KM_ERROR_OK;
-
-    return KM_ERROR_VERIFICATION_FAILED;
+keymaster_error_t RsaVerifyOperation::VerifyUndigested(const Buffer& signature) {
+    return DecryptAndMatch(signature, data_.peek_read(), data_.available_read());
 }
 
-keymaster_error_t RsaVerifyOperation::VerifyDigested(uint8_t* decrypted_data) {
+keymaster_error_t RsaVerifyOperation::VerifyDigested(const Buffer& signature) {
     unsigned digest_size = 0;
-    UniquePtr<uint8_t[]> digest(FinishDigest(&digest_size));
-    if (!digest.get())
-        return KM_ERROR_UNKNOWN_ERROR;
+    keymaster_error_t error = FinishDigest(&digest_size);
+    if (error != KM_ERROR_OK)
+        return error;
+    return DecryptAndMatch(signature, digest_buf_, digest_size);
+}
 
-    if (memcmp_s(decrypted_data, digest.get(), digest_size) == 0)
+keymaster_error_t RsaVerifyOperation::DecryptAndMatch(const Buffer& signature,
+                                                      const uint8_t* to_match, size_t len) {
+#ifdef OPENSSL_IS_BORINGSSL
+    size_t key_len = RSA_size(rsa_key_);
+#else
+    size_t key_len = (size_t)RSA_size(rsa_key_);
+#endif
+
+    int openssl_padding;
+    switch (padding_) {
+    case KM_PAD_NONE:
+        if (len != key_len)
+            return KM_ERROR_INVALID_INPUT_LENGTH;
+        if (len != signature.available_read())
+            return KM_ERROR_VERIFICATION_FAILED;
+        openssl_padding = RSA_NO_PADDING;
+        break;
+    case KM_PAD_RSA_PSS:  // Do a raw decrypt for PSS
+        openssl_padding = RSA_NO_PADDING;
+        break;
+    case KM_PAD_RSA_PKCS1_1_5_SIGN:
+        openssl_padding = RSA_PKCS1_PADDING;
+        break;
+    default:
+        return KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    }
+
+    UniquePtr<uint8_t[]> decrypted_data(new uint8_t[key_len]);
+    int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
+                                             decrypted_data.get(), rsa_key_, openssl_padding);
+    if (bytes_decrypted < 0)
+        return KM_ERROR_VERIFICATION_FAILED;
+
+    if (padding_ == KM_PAD_RSA_PSS &&
+        RSA_verify_PKCS1_PSS(rsa_key_, to_match, digest_algorithm_, decrypted_data.get(),
+                             -2 /* salt length recovered from signature */))
+        return KM_ERROR_OK;
+    else if (padding_ != KM_PAD_RSA_PSS && memcmp_s(decrypted_data.get(), to_match, len) == 0)
         return KM_ERROR_OK;
 
     return KM_ERROR_VERIFICATION_FAILED;
@@ -393,27 +471,26 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     int openssl_padding;
 
 #if defined(OPENSSL_IS_BORINGSSL)
-    size_t message_size = data_.available_read();
+    size_t key_len = RSA_size(rsa_key_);
 #else
-    if (data_.available_read() > INT_MAX)
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-    int message_size = (int)data_.available_read();
+    size_t key_len = (size_t)RSA_size(rsa_key_);
 #endif
 
+    size_t message_size = data_.available_read();
     switch (padding_) {
     case KM_PAD_RSA_OAEP:
         openssl_padding = RSA_PKCS1_OAEP_PADDING;
-        if (message_size >= RSA_size(rsa_key_) - OAEP_PADDING_OVERHEAD) {
+        if (message_size + OAEP_PADDING_OVERHEAD >= key_len) {
             LOG_E("Cannot encrypt %d bytes with %d-byte key and OAEP padding",
-                  data_.available_read(), RSA_size(rsa_key_));
+                  data_.available_read(), key_len);
             return KM_ERROR_INVALID_INPUT_LENGTH;
         }
         break;
     case KM_PAD_RSA_PKCS1_1_5_ENCRYPT:
         openssl_padding = RSA_PKCS1_PADDING;
-        if (message_size >= RSA_size(rsa_key_) - PKCS1_PADDING_OVERHEAD) {
+        if (message_size + PKCS1_PADDING_OVERHEAD >= key_len) {
             LOG_E("Cannot encrypt %d bytes with %d-byte key and PKCS1 padding",
-                  data_.available_read(), RSA_size(rsa_key_));
+                  data_.available_read(), key_len);
             return KM_ERROR_INVALID_INPUT_LENGTH;
         }
         break;

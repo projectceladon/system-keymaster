@@ -438,7 +438,8 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     keymaster_padding_t* modes;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    EXPECT_TRUE(ResponseContains({KM_PAD_NONE}, modes, len));
+    EXPECT_TRUE(
+        ResponseContains({KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN, KM_PAD_RSA_PSS}, modes, len));
     free(modes);
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
@@ -490,12 +491,6 @@ TEST_F(CheckSupported, SupportedDigests) {
     EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
                                   KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1},
                                  digests, len));
-    free(digests);
-
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
-                                                           KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
-                    KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1}, digests, len));
     free(digests);
 }
 
@@ -664,11 +659,44 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
 
 TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
     // Note that without padding, key size must exactly match digest size.
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256)));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+}
+
+TEST_F(SigningOperationsTest, RsaPssSha256Success) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
+}
+
+TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256,
+                                                                    KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+}
+
+TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
+    // Key must be at least 10 bytes larger than hash, to provide minimal random salt, so verify
+    // that 9 bytes larger than hash won't work.
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(
+                               256 + 9 * 8, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    string message(1024, 'a');
+    string signature;
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, FinishOperation(signature, &result));
 }
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
@@ -687,22 +715,29 @@ TEST_F(SigningOperationsTest, RsaAbort) {
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_MD5, KM_PAD_NONE));
+    GenerateKey(
+        ParamBuilder().RsaSigningKey(256, KM_DIGEST_MD5, KM_PAD_RSA_PSS /* supported padding */));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_NONE, KM_PAD_RSA_OAEP));
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256 /* supported digest */,
+                                             KM_PAD_PKCS7));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaNoDigest) {
+    // Digest must be specified.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(
                                TAG_PADDING, KM_PAD_NONE)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
+    // PSS requires a digest.
+    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_NONE, KM_PAD_RSA_PSS));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaNoPadding) {
+    // Padding must be specified
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaKey(256).SigningKey().Option(
                                TAG_DIGEST, KM_DIGEST_NONE)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
@@ -796,17 +831,14 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
 TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
     // Note that without padding, key size must exactly match digest size.
     GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
-    // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
     VerifyMessage(message, signature);
 }
 
-TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptSignature) {
-    // Note that without padding, key size must exactly match digest size.
+TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
     GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
-    // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -821,9 +853,35 @@ TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptSignature) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
-TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptInput) {
-    // Note that without padding, key size must exactly match digest size.
-    GenerateKey(ParamBuilder().RsaSigningKey(256, KM_DIGEST_SHA_2_256));
+TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
+    GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    ++signature[signature.size() / 2];
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+}
+
+TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
@@ -837,6 +895,123 @@ TEST_F(VerificationOperationsTest, RsaSha256DigestCorruptInput) {
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+}
+
+TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
+    GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    VerifyMessage(message, signature);
+}
+
+TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
+    GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    ++signature[signature.size() / 2];
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+}
+
+TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().RsaSigningKey(512, KM_DIGEST_SHA_2_256,
+                                                                    KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    // Use large message, which won't work without digesting.
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature);
+    ++message[message.size() / 2];
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+}
+
+template <typename T> vector<T> make_vector(const T* array, size_t len) {
+    return vector<T>(array, array + len);
+}
+
+TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
+    // Get all supported digests and padding modes.
+    size_t digests_len;
+    keymaster_digest_t* digests;
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_digests(device(), KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, &digests,
+                                              &digests_len));
+
+    size_t padding_modes_len;
+    keymaster_padding_t* padding_modes;
+    EXPECT_EQ(KM_ERROR_OK,
+              device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_SIGN,
+                                                    &padding_modes, &padding_modes_len));
+
+    // Try them.
+    for (keymaster_padding_t padding_mode : make_vector(padding_modes, padding_modes_len)) {
+        for (keymaster_digest_t digest : make_vector(digests, digests_len)) {
+            // Compute key & message size that will work.
+            size_t key_bits = 256;
+            size_t message_len = 1000;
+            switch (digest) {
+            case KM_DIGEST_NONE:
+                switch (padding_mode) {
+                case KM_PAD_NONE:
+                    // Match key size.
+                    message_len = key_bits / 8;
+                    break;
+                case KM_PAD_RSA_PKCS1_1_5_SIGN:
+                    message_len = key_bits / 8 - 11;
+                    break;
+                case KM_PAD_RSA_PSS:
+                    // PSS requires a digest.
+                    continue;
+                default:
+                    FAIL() << "Missing padding";
+                    break;
+                }
+                break;
+
+            case KM_DIGEST_SHA_2_256:
+                switch (padding_mode) {
+                case KM_PAD_NONE:
+                    // Key size matches digest size
+                    break;
+                case KM_PAD_RSA_PKCS1_1_5_SIGN:
+                    key_bits += 8 * 11;
+                    break;
+                case KM_PAD_RSA_PSS:
+                    key_bits += 8 * 10;
+                    break;
+                default:
+                    FAIL() << "Missing padding";
+                    break;
+                }
+                break;
+            default:
+                FAIL() << "Missing digest";
+            }
+
+            GenerateKey(ParamBuilder().RsaSigningKey(key_bits, digest, padding_mode));
+            string message(message_len, 'a');
+            string signature;
+            SignMessage(message, &signature);
+            VerifyMessage(message, signature);
+        }
+    }
+
+    free(padding_modes);
+    free(digests);
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
