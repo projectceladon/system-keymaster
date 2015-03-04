@@ -73,11 +73,15 @@ class RsaDigestingOperation : public RsaOperation {
                                      Buffer* output, size_t* input_consumed);
 
   protected:
-    uint8_t* FinishDigest(unsigned* digest_size);
+    bool require_digest() const { return padding_ == KM_PAD_RSA_PSS; }
+    keymaster_error_t InitDigest();
+    keymaster_error_t UpdateDigest(const Buffer& input, size_t* input_consumed);
+    keymaster_error_t FinishDigest(unsigned* digest_size);
 
     const keymaster_digest_t digest_;
     const EVP_MD* digest_algorithm_;
     EVP_MD_CTX digest_ctx_;
+    uint8_t digest_buf_[EVP_MAX_MD_SIZE];
 };
 
 /**
@@ -91,8 +95,11 @@ class RsaSignOperation : public RsaDigestingOperation {
                                      const Buffer& signature, Buffer* output);
 
   private:
-    int SignUndigested(Buffer* output);
-    int SignDigested(Buffer* output);
+    keymaster_error_t SignUndigested(Buffer* output);
+    keymaster_error_t SignDigested(Buffer* output);
+    keymaster_error_t PrivateEncrypt(uint8_t* to_encrypt, size_t len, int openssl_padding,
+                                     Buffer* output);
+    keymaster_error_t PssPadDigest(UniquePtr<uint8_t[]>* padded_digest);
 };
 
 /**
@@ -106,8 +113,9 @@ class RsaVerifyOperation : public RsaDigestingOperation {
                                      const Buffer& signature, Buffer* output);
 
   private:
-    keymaster_error_t VerifyUndigested(uint8_t* decrypted_data);
-    keymaster_error_t VerifyDigested(uint8_t* decrypted_data);
+    keymaster_error_t VerifyUndigested(const Buffer& signature);
+    keymaster_error_t VerifyDigested(const Buffer& signature);
+    keymaster_error_t DecryptAndMatch(const Buffer& signature, const uint8_t* to_match, size_t len);
 };
 
 /**
