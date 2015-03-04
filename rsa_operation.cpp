@@ -91,7 +91,7 @@ RSA* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
     return rsa_key->key();
 }
 
-static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
+static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE, KM_DIGEST_SHA_2_256};
 static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE};
 
 /**
@@ -250,35 +250,96 @@ keymaster_error_t RsaOperation::StoreData(const Buffer& input, size_t* input_con
     return KM_ERROR_OK;
 }
 
+RsaDigestingOperation::RsaDigestingOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                                             keymaster_padding_t padding, RSA* key)
+    : RsaOperation(purpose, padding, key), digest_(digest), digest_algorithm_(NULL) {
+    EVP_MD_CTX_init(&digest_ctx_);
+}
+RsaDigestingOperation::~RsaDigestingOperation() {
+    EVP_MD_CTX_cleanup(&digest_ctx_);
+}
+
+keymaster_error_t RsaDigestingOperation::Begin(const AuthorizationSet& /* input_params */,
+                                               AuthorizationSet* /* output_params */) {
+    if (digest_ == KM_DIGEST_NONE)
+        return KM_ERROR_OK;
+
+    // TODO(swillden): Factor out EVP_MD selection.  It will be done for many operations.
+    switch (digest_) {
+    case KM_DIGEST_SHA_2_256:
+        digest_algorithm_ = EVP_sha256();
+        break;
+    default:
+        return KM_ERROR_UNSUPPORTED_DIGEST;
+    }
+
+    if (!EVP_DigestInit_ex(&digest_ctx_, digest_algorithm_, NULL /* engine */)) {
+        int err = ERR_get_error();
+        LOG_E("Failed to initialize digest: %d %s", err, ERR_error_string(err, NULL));
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t RsaDigestingOperation::Update(const AuthorizationSet& additional_params,
+                                                const Buffer& input, Buffer* output,
+                                                size_t* input_consumed) {
+    if (digest_ == KM_DIGEST_NONE)
+        return RsaOperation::Update(additional_params, input, output, input_consumed);
+    if (!EVP_DigestUpdate(&digest_ctx_, input.peek_read(), input.available_read())) {
+        int err = ERR_get_error();
+        LOG_E("Failed to update digest: %d %s", err, ERR_error_string(err, NULL));
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    *input_consumed = input.available_read();
+    return KM_ERROR_OK;
+}
+
+uint8_t* RsaDigestingOperation::FinishDigest(unsigned* digest_size) {
+    assert(digest_algorithm_ != NULL);
+    UniquePtr<uint8_t[]> digest(new uint8_t[EVP_MAX_MD_SIZE]);
+    if (!EVP_DigestFinal_ex(&digest_ctx_, digest.get(), digest_size)) {
+        int err = ERR_get_error();
+        LOG_E("Failed to finalize digest: %d %s", err, ERR_error_string(err, NULL));
+        return NULL;
+    }
+    assert(*digest_size == static_cast<unsigned>(EVP_MD_size(digest_algorithm_)));
+    return digest.release();
+}
+
 keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
                                            const Buffer& /* signature */, Buffer* output) {
     assert(output);
     output->Reinitialize(RSA_size(rsa_key_));
-    int bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
-                                              output->peek_write(), rsa_key_, RSA_NO_PADDING);
+
+    int bytes_encrypted =
+        (digest_ == KM_DIGEST_NONE) ? SignUndigested(output) : SignDigested(output);
+
     if (bytes_encrypted < 0)
         return KM_ERROR_UNKNOWN_ERROR;
+
     assert(bytes_encrypted == RSA_size(rsa_key_));
     output->advance_write(bytes_encrypted);
     return KM_ERROR_OK;
 }
 
+int RsaSignOperation::SignUndigested(Buffer* output) {
+    return RSA_private_encrypt(data_.available_read(), data_.peek_read(), output->peek_write(),
+                               rsa_key_, RSA_NO_PADDING);
+}
+
+int RsaSignOperation::SignDigested(Buffer* output) {
+    unsigned digest_size = 0;
+    UniquePtr<uint8_t[]> digest(FinishDigest(&digest_size));
+    if (!digest.get())
+        return KM_ERROR_UNKNOWN_ERROR;
+    return RSA_private_encrypt(digest_size, digest.get(), output->peek_write(), rsa_key_,
+                               RSA_NO_PADDING);
+}
+
 keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
                                              const Buffer& signature, Buffer* /* output */) {
-#if defined(OPENSSL_IS_BORINGSSL)
-    size_t message_size = data_.available_read();
-#else
-    if (data_.available_read() > INT_MAX)
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-    int message_size = (int)data_.available_read();
-#endif
-
-    if (message_size != RSA_size(rsa_key_))
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
-    if (data_.available_read() != signature.available_read())
-        return KM_ERROR_VERIFICATION_FAILED;
-
     UniquePtr<uint8_t[]> decrypted_data(new uint8_t[RSA_size(rsa_key_)]);
     int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
                                              decrypted_data.get(), rsa_key_, RSA_NO_PADDING);
@@ -286,8 +347,40 @@ keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* addition
         return KM_ERROR_UNKNOWN_ERROR;
     assert(bytes_decrypted == RSA_size(rsa_key_));
 
-    if (memcmp_s(decrypted_data.get(), data_.peek_read(), data_.available_read()) == 0)
+    if (digest_ == KM_DIGEST_NONE) {
+        if (data_.available_read() != signature.available_read())
+            return KM_ERROR_VERIFICATION_FAILED;
+        return VerifyUndigested(decrypted_data.get());
+    }
+    return VerifyDigested(decrypted_data.get());
+}
+
+keymaster_error_t RsaVerifyOperation::VerifyUndigested(uint8_t* decrypted_data) {
+#if defined(OPENSSL_IS_BORINGSSL)
+    size_t message_size = data_.available_read();
+#else
+    if (data_.available_read() > INT_MAX)
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    int message_size = (int)data_.available_read();
+#endif
+    if (message_size != RSA_size(rsa_key_))
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+
+    if (memcmp_s(decrypted_data, data_.peek_read(), data_.available_read()) == 0)
         return KM_ERROR_OK;
+
+    return KM_ERROR_VERIFICATION_FAILED;
+}
+
+keymaster_error_t RsaVerifyOperation::VerifyDigested(uint8_t* decrypted_data) {
+    unsigned digest_size = 0;
+    UniquePtr<uint8_t[]> digest(FinishDigest(&digest_size));
+    if (!digest.get())
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    if (memcmp_s(decrypted_data, digest.get(), digest_size) == 0)
+        return KM_ERROR_OK;
+
     return KM_ERROR_VERIFICATION_FAILED;
 }
 
