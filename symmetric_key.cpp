@@ -32,6 +32,51 @@ namespace keymaster {
 
 Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                       keymaster_error_t* error) {
+    UniquePtr<SymmetricKey> key(CreateKeyAndValidateSize(key_description, error));
+    if (!key.get())
+        return NULL;
+
+    if (!RAND_bytes(key->key_data_.get(), key->key_data_size_)) {
+        LOG_E("Error %ul generating %d bit AES key", ERR_get_error(), key->key_data_size_ * 8);
+        *error = TranslateLastOpenSslError();
+        return NULL;
+    }
+
+    if (*error != KM_ERROR_OK)
+        return NULL;
+    return key.release();
+}
+
+Key* SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_description,
+                                    keymaster_key_format_t format, const uint8_t* key_material,
+                                    size_t key_material_length, keymaster_error_t* error) {
+    UniquePtr<SymmetricKey> key(CreateKeyAndValidateSize(key_description, error));
+    if (!key.get())
+        return NULL;
+
+    if (format != KM_KEY_FORMAT_RAW) {
+        *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+        return NULL;
+    }
+
+    if (key->key_data_size_ != key_material_length) {
+        *error = KM_ERROR_INVALID_KEY_BLOB;
+        return NULL;
+    }
+
+    key->key_data_size_ = key_material_length;
+    memcpy(key->key_data_.get(), key_material, key_material_length);
+    return key.release();
+}
+
+static const keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_RAW};
+const keymaster_key_format_t* SymmetricKeyFactory::SupportedImportFormats(size_t* format_count) {
+    *format_count = array_length(supported_import_formats);
+    return supported_import_formats;
+}
+
+SymmetricKey* SymmetricKeyFactory::CreateKeyAndValidateSize(const AuthorizationSet& key_description,
+                                                            keymaster_error_t* error) {
     if (!error)
         return NULL;
     *error = KM_ERROR_OK;
@@ -44,17 +89,7 @@ Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
         return NULL;
     }
 
-    key->key_data_size_ = key_size_bits / 8;
-    if (key->key_data_size_ > SymmetricKey::MAX_KEY_SIZE) {
-        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
-        return NULL;
-    }
-    if (!RAND_bytes(key->key_data_, key->key_data_size_)) {
-        LOG_E("Error %ul generating %d bit AES key", ERR_get_error(), key_size_bits);
-        *error = TranslateLastOpenSslError();
-        return NULL;
-    }
-
+    *error = key->set_size(key_size_bits / 8);
     if (*error != KM_ERROR_OK)
         return NULL;
     return key.release();
@@ -62,13 +97,21 @@ Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
 
 SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error)
     : Key(blob), key_data_size_(blob.unencrypted_key_material_length()) {
-    memcpy(key_data_, blob.unencrypted_key_material(), key_data_size_);
+    key_data_.reset(new uint8_t[key_data_size_]);
+    if (!key_data_.get()) {
+        if (error)
+            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        key_data_size_ = 0;
+        return;
+    }
+
+    memcpy(key_data_.get(), blob.unencrypted_key_material(), key_data_size_);
     if (error)
         *error = KM_ERROR_OK;
 }
 
 SymmetricKey::~SymmetricKey() {
-    memset_s(key_data_, 0, MAX_KEY_SIZE);
+    memset_s(key_data_.get(), 0, key_data_size_);
 }
 
 keymaster_error_t SymmetricKey::key_material(UniquePtr<uint8_t[]>* key_material,
@@ -77,7 +120,19 @@ keymaster_error_t SymmetricKey::key_material(UniquePtr<uint8_t[]>* key_material,
     key_material->reset(new uint8_t[*size]);
     if (!key_material->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(key_material->get(), key_data_, *size);
+    memcpy(key_material->get(), key_data_.get(), *size);
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t SymmetricKey::set_size(size_t key_size) {
+    if (!size_supported(key_size))
+        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+
+    key_data_.reset(new uint8_t[key_size]);
+    if (!key_data_.get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    key_data_size_ = key_size;
+
     return KM_ERROR_OK;
 }
 
