@@ -87,8 +87,6 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
         return CreateOcbOperation(*symmetric_key, error);
     case KM_MODE_ECB:
     case KM_MODE_CBC:
-    case KM_MODE_OFB:
-    case KM_MODE_CFB:
         return CreateEvpOperation(*symmetric_key, block_mode, padding, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
@@ -152,7 +150,7 @@ Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
 }
 
 static const keymaster_block_mode_t supported_block_modes[] = {
-    KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC, KM_MODE_OFB, KM_MODE_CFB};
+    KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC};
 
 const keymaster_block_mode_t*
 AesOperationFactory::SupportedBlockModes(size_t* block_mode_count) const {
@@ -282,36 +280,6 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
             return KM_ERROR_UNSUPPORTED_KEY_SIZE;
         }
         break;
-    case KM_MODE_OFB:
-        switch (key_size_) {
-        case 16:
-            cipher = EVP_aes_128_ofb();
-            break;
-        case 24:
-            cipher = EVP_aes_192_ofb();
-            break;
-        case 32:
-            cipher = EVP_aes_256_ofb();
-            break;
-        default:
-            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
-        }
-        break;
-    case KM_MODE_CFB:
-        switch (key_size_) {
-        case 16:
-            cipher = EVP_aes_128_cfb();
-            break;
-        case 24:
-            cipher = EVP_aes_192_cfb();
-            break;
-        case 32:
-            cipher = EVP_aes_256_cfb();
-            break;
-        default:
-            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
-        }
-        break;
     default:
         return KM_ERROR_UNSUPPORTED_BLOCK_MODE;
     }
@@ -340,8 +308,6 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
 bool AesEvpOperation::need_iv() const {
     switch (block_mode_) {
     case KM_MODE_CBC:
-    case KM_MODE_OFB:
-    case KM_MODE_CFB:
         return true;
     case KM_MODE_ECB:
         return false;

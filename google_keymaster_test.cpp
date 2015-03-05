@@ -426,8 +426,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
-    EXPECT_TRUE(ResponseContains({KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC, KM_MODE_OFB, KM_MODE_CFB},
-                                 modes, len));
+    EXPECT_TRUE(ResponseContains({KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC}, modes, len));
     free(modes);
 }
 
@@ -1621,68 +1620,6 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
         string message(i, 'a');
         string ciphertext = EncryptMessage(message);
         EXPECT_EQ(i + 32 - (i % 16), ciphertext.size());
-        string plaintext = DecryptMessage(ciphertext);
-        EXPECT_EQ(message, plaintext);
-    }
-}
-
-TEST_F(EncryptionOperationsTest, AesCfbRoundTripSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).Option(TAG_BLOCK_MODE,
-                                                                                   KM_MODE_CFB)));
-    // Two-block message.
-    string message = "12345678901234567890123456789012";
-    string ciphertext1 = EncryptMessage(message);
-    EXPECT_EQ(message.size() + 16, ciphertext1.size());
-
-    string ciphertext2 = EncryptMessage(string(message));
-    EXPECT_EQ(message.size() + 16, ciphertext2.size());
-
-    // CBC uses random IVs, so ciphertexts shouldn't match.
-    EXPECT_NE(ciphertext1, ciphertext2);
-
-    string plaintext = DecryptMessage(ciphertext1);
-    EXPECT_EQ(message, plaintext);
-}
-
-TEST_F(EncryptionOperationsTest, AesCfbIncrementalNoPadding) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder()
-                                           .AesEncryptionKey(128)
-                                           .Option(TAG_BLOCK_MODE, KM_MODE_CFB)
-                                           .Option(TAG_PADDING, KM_PAD_PKCS7)));
-
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).Option(TAG_BLOCK_MODE,
-                                                                                   KM_MODE_CBC)));
-
-    int increment = 15;
-    string message(240, 'a');
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
-    string ciphertext;
-    size_t input_consumed;
-    for (size_t i = 0; i < message.size(); i += increment)
-        EXPECT_EQ(KM_ERROR_OK,
-                  UpdateOperation(message.substr(i, increment), &ciphertext, &input_consumed));
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
-    EXPECT_EQ(message.size() + 16, ciphertext.size());
-
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
-    string plaintext;
-    for (size_t i = 0; i < ciphertext.size(); i += increment)
-        EXPECT_EQ(KM_ERROR_OK,
-                  UpdateOperation(ciphertext.substr(i, increment), &plaintext, &input_consumed));
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
-    EXPECT_EQ(ciphertext.size() - 16, plaintext.size());
-    EXPECT_EQ(message, plaintext);
-}
-
-TEST_F(EncryptionOperationsTest, AesCfbPkcs7Padding) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder().AesEncryptionKey(128).Option(TAG_BLOCK_MODE,
-                                                                                   KM_MODE_CFB)));
-
-    // Try various message lengths; all should work.
-    for (int i = 0; i < 32; ++i) {
-        string message(i, 'a');
-        string ciphertext = EncryptMessage(message);
-        EXPECT_EQ(i + 16, ciphertext.size());
         string plaintext = DecryptMessage(ciphertext);
         EXPECT_EQ(message, plaintext);
     }
