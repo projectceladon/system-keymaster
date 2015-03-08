@@ -351,7 +351,7 @@ keymaster_error_t RsaSignOperation::SignDigested(Buffer* output) {
     case KM_PAD_RSA_PSS:
         // OpenSSL doesn't verify that the key is large enough for the digest size.  This can cause
         // a segfault in some cases, and in others can result in a unsafely-small salt.
-        if (RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + (int)digest_size)
+        if ((unsigned) RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + digest_size)
             return KM_ERROR_INCOMPATIBLE_DIGEST;
 
         if ((error = PssPadDigest(&padded_digest)) != KM_ERROR_OK)
@@ -367,8 +367,9 @@ keymaster_error_t RsaSignOperation::PssPadDigest(UniquePtr<uint8_t[]>* padded_di
     if (!padded_digest->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    if (!RSA_padding_add_PKCS1_PSS(rsa_key_, padded_digest->get(), digest_buf_, digest_algorithm_,
-                                   -2 /* Indicates maximum salt length */)) {
+    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa_key_, padded_digest->get(), digest_buf_,
+                                        digest_algorithm_, NULL,
+                                        -2 /* Indicates maximum salt length */)) {
         LOG_E("%s", "Failed to apply PSS padding");
         return KM_ERROR_UNKNOWN_ERROR;
     }
@@ -439,8 +440,8 @@ keymaster_error_t RsaVerifyOperation::DecryptAndMatch(const Buffer& signature,
         return KM_ERROR_VERIFICATION_FAILED;
 
     if (padding_ == KM_PAD_RSA_PSS &&
-        RSA_verify_PKCS1_PSS(rsa_key_, to_match, digest_algorithm_, decrypted_data.get(),
-                             -2 /* salt length recovered from signature */))
+        RSA_verify_PKCS1_PSS_mgf1(rsa_key_, to_match, digest_algorithm_, NULL, decrypted_data.get(),
+                                  -2 /* salt length recovered from signature */))
         return KM_ERROR_OK;
     else if (padding_ != KM_PAD_RSA_PSS && memcmp_s(decrypted_data.get(), to_match, len) == 0)
         return KM_ERROR_OK;
