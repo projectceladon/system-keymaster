@@ -2295,16 +2295,19 @@ TEST_F(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
                                                                                    KM_MODE_CBC)));
     // Two-block message.
     string message = "12345678901234567890123456789012";
-    string ciphertext1 = EncryptMessage(message);
-    EXPECT_EQ(message.size() + 16, ciphertext1.size());
+    string iv1;
+    string ciphertext1 = EncryptMessage(message, &iv1);
+    EXPECT_EQ(message.size(), ciphertext1.size());
 
-    string ciphertext2 = EncryptMessage(string(message));
-    EXPECT_EQ(message.size() + 16, ciphertext2.size());
+    string iv2;
+    string ciphertext2 = EncryptMessage(message, &iv2);
+    EXPECT_EQ(message.size(), ciphertext2.size());
 
-    // CBC uses random IVs, so ciphertexts shouldn't match.
+    // IVs should be random, so ciphertexts should differ.
+    EXPECT_NE(iv1, iv2);
     EXPECT_NE(ciphertext1, ciphertext2);
 
-    string plaintext = DecryptMessage(ciphertext1);
+    string plaintext = DecryptMessage(ciphertext1, iv1);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -2314,22 +2317,29 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
 
     int increment = 15;
     string message(240, 'a');
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
+    AuthorizationSet input_params;
+    AuthorizationSet output_params;
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
+
     string ciphertext;
     size_t input_consumed;
     for (size_t i = 0; i < message.size(); i += increment)
         EXPECT_EQ(KM_ERROR_OK,
                   UpdateOperation(message.substr(i, increment), &ciphertext, &input_consumed));
     EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
-    EXPECT_EQ(message.size() + 16, ciphertext.size());
+    EXPECT_EQ(message.size(), ciphertext.size());
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
+    // Move TAG_NONCE into input_params
+    input_params.Reinitialize(output_params);
+    output_params.Clear();
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
     string plaintext;
     for (size_t i = 0; i < ciphertext.size(); i += increment)
         EXPECT_EQ(KM_ERROR_OK,
                   UpdateOperation(ciphertext.substr(i, increment), &plaintext, &input_consumed));
     EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
-    EXPECT_EQ(ciphertext.size() - 16, plaintext.size());
+    EXPECT_EQ(ciphertext.size(), plaintext.size());
     EXPECT_EQ(message, plaintext);
 }
 
@@ -2342,9 +2352,10 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
     // Try various message lengths; all should work.
     for (int i = 0; i < 32; ++i) {
         string message(i, 'a');
-        string ciphertext = EncryptMessage(message);
-        EXPECT_EQ(i + 32 - (i % 16), ciphertext.size());
-        string plaintext = DecryptMessage(ciphertext);
+        string iv;
+        string ciphertext = EncryptMessage(message, &iv);
+        EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
+        string plaintext = DecryptMessage(ciphertext, iv);
         EXPECT_EQ(message, plaintext);
     }
 }
