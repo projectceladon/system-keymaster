@@ -30,22 +30,19 @@ class AeadModeOperation : public Operation {
 
     AeadModeOperation(keymaster_purpose_t purpose, const uint8_t* key, size_t key_size,
                       size_t chunk_length, size_t tag_length, size_t nonce_length,
-                      keymaster_blob_t additional_data)
+                      bool caller_nonce)
         : Operation(purpose), key_size_(key_size), tag_length_(tag_length),
           nonce_length_(nonce_length),
           processing_unit_(purpose == KM_PURPOSE_DECRYPT ? chunk_length + tag_length
                                                          : chunk_length),
-          additional_data_(additional_data), nonce_handled_(false) {
-
+          caller_nonce_(caller_nonce) {
         assert(key_size <= MAX_KEY_LENGTH);
         memcpy(key_, key, key_size);
     }
     ~AeadModeOperation() {
         // Wipe sensitive buffers.
         memset_s(buffer_.get(), 0, processing_unit_);
-        memset_s(const_cast<uint8_t*>(additional_data_.data), 0, additional_data_.data_length);
         memset_s(key_, 0, MAX_KEY_LENGTH);
-        delete[] additional_data_.data;
     }
 
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
@@ -79,25 +76,26 @@ class AeadModeOperation : public Operation {
                                            size_t chunk_size, Buffer* output) = 0;
 
     size_t EstimateOutputSize(const Buffer& input, Buffer* output);
-    keymaster_error_t ProcessChunk(Buffer* output);
+    keymaster_error_t ProcessChunk(const keymaster_blob_t& associated_data, Buffer* output);
 
     size_t buffer_free_space() const { return processing_unit_ - buffer_end_; }
 
     const uint8_t* AppendToBuffer(const uint8_t* data, size_t data_length);
-    void ExtractNonceFromBuffer();
     void ExtractTagFromBuffer();
     void ClearBuffer() { buffer_end_ = 0; }
-    keymaster_error_t HandleNonce(Buffer* output);
+    keymaster_error_t HandleNonce(const AuthorizationSet& input_params,
+                                  AuthorizationSet* output_params);
+    keymaster_error_t ExtractNonce(const AuthorizationSet& input_params);
+    keymaster_error_t GenerateNonce();
     void IncrementNonce();
 
     const size_t key_size_;
     const size_t tag_length_;
     const size_t nonce_length_;
     const size_t processing_unit_;
-    const keymaster_blob_t additional_data_;
+    const bool caller_nonce_;
     UniquePtr<uint8_t[]> buffer_;
     size_t buffer_end_;
-    bool nonce_handled_;
     uint8_t __attribute__((aligned(16))) key_[MAX_KEY_LENGTH];
     uint8_t __attribute__((aligned(16))) tag_[MAX_TAG_LENGTH];
     uint8_t __attribute__((aligned(16))) nonce_[MAX_NONCE_LENGTH];

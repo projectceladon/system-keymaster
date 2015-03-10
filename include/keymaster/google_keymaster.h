@@ -58,10 +58,7 @@ class GoogleKeymaster {
     void SupportedExportFormats(keymaster_algorithm_t algorithm,
                                 SupportedResponse<keymaster_key_format_t>* response) const;
 
-    virtual keymaster_error_t AddRngEntropy(AddEntropyRequest& /* request */) {
-        // Not going to implement until post-L.
-        return KM_ERROR_UNIMPLEMENTED;
-    }
+    virtual keymaster_error_t AddRngEntropy(const AddEntropyRequest& request) = 0;
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
