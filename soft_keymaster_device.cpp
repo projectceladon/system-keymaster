@@ -512,10 +512,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* /* dev */,
-                                                       const uint8_t* /* data */,
-                                                       size_t /* data_length */) {
-    return KM_ERROR_UNIMPLEMENTED;
+keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* dev,
+                                                       const uint8_t* data, size_t data_length) {
+    AddEntropyRequest request;
+    request.random_data.Reinitialize(data, data_length);
+    return convert_device(dev)->impl_->AddRngEntropy(request);
 }
 
 /* static */
@@ -679,6 +680,13 @@ keymaster_error_t SoftKeymasterDevice::begin(
     convert_device(dev)->impl_->BeginOperation(request, &response);
     if (response.error != KM_ERROR_OK)
         return response.error;
+
+    if (response.output_params.size() > 0) {
+        keymaster_key_param_set_t out_params_set;
+        response.output_params.CopyToParamSet(&out_params_set);
+        *out_params = out_params_set.params;
+        *out_params_count = out_params_set.length;
+    }
 
     *operation_handle = response.op_handle;
     return KM_ERROR_OK;
