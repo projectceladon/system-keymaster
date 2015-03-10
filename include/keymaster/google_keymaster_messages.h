@@ -35,6 +35,7 @@ const uint32_t ABORT_OPERATION = 4;
 const uint32_t IMPORT_KEY = 5;
 const uint32_t EXPORT_KEY = 6;
 const uint32_t GET_VERSION = 7;
+const uint32_t ADD_RNG_ENTROPY = 8;
 
 /**
  * Keymaster message versions are tied to keymaster versions.  We map the keymaster
