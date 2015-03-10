@@ -19,6 +19,10 @@
 
 #include <keymaster/google_keymaster.h>
 
+#include <openssl/rand.h>
+
+#include "openssl_err.h"
+
 namespace keymaster {
 
 class GoogleSoftKeymaster : public GoogleKeymaster {
@@ -30,6 +34,11 @@ class GoogleSoftKeymaster : public GoogleKeymaster {
     }
     bool is_enforced(keymaster_tag_t /* tag */) { return false; }
     keymaster_key_origin_t origin() { return KM_ORIGIN_SOFTWARE; }
+
+    keymaster_error_t AddRngEntropy(const AddEntropyRequest& request) {
+        RAND_seed(request.random_data.peek_read(), request.random_data.available_read());
+        return KM_ERROR_OK;
+    }
 
   private:
     static uint8_t master_key_[];
