@@ -41,7 +41,7 @@ include $(BUILD_SHARED_LIBRARY)
 # function-based keymaster HAL API to the message-based GoogleKeymaster API.
 ###
 include $(CLEAR_VARS)
-LOCAL_MODULE:= libkeymaster
+LOCAL_MODULE:= libkeymaster1
 LOCAL_SRC_FILES:= \
 		aead_mode_operation.cpp \
 		aes_key.cpp \
@@ -94,7 +94,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS = -Wall -Werror
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
-LOCAL_SHARED_LIBRARIES := libkeymaster liblog
+LOCAL_SHARED_LIBRARIES := libkeymaster1 liblog
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
