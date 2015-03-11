@@ -59,7 +59,8 @@ class AesOcbOperation : public AeadModeOperation {
 class AesEvpOperation : public Operation {
   public:
     AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
-                    keymaster_padding_t padding, const uint8_t* key, size_t key_size);
+                    keymaster_padding_t padding, bool caller_iv, const uint8_t* key,
+                    size_t key_size);
     ~AesEvpOperation();
 
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
@@ -74,23 +75,23 @@ class AesEvpOperation : public Operation {
 
   private:
     keymaster_error_t InitializeCipher();
+    keymaster_error_t GetIv(const AuthorizationSet& input_params);
     bool need_iv() const;
 
     EVP_CIPHER_CTX ctx_;
     const size_t key_size_;
     const keymaster_block_mode_t block_mode_;
     const keymaster_padding_t padding_;
-    bool cipher_initialized_;
-    uint8_t iv_buffered_;
-    uint8_t iv_[AES_BLOCK_SIZE];
+    const bool caller_iv_;
+    UniquePtr<uint8_t> iv_;
     uint8_t key_[SymmetricKey::MAX_KEY_SIZE];
 };
 
 class AesEvpEncryptOperation : public AesEvpOperation {
   public:
     AesEvpEncryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
-                           const uint8_t* key, size_t key_size)
-        : AesEvpOperation(KM_PURPOSE_ENCRYPT, block_mode, padding, key, key_size) {}
+                           bool caller_iv, const uint8_t* key, size_t key_size)
+        : AesEvpOperation(KM_PURPOSE_ENCRYPT, block_mode, padding, caller_iv, key, key_size) {}
     int evp_encrypt_mode() { return 1; }
 };
 
@@ -98,7 +99,8 @@ class AesEvpDecryptOperation : public AesEvpOperation {
   public:
     AesEvpDecryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
                            const uint8_t* key, size_t key_size)
-        : AesEvpOperation(KM_PURPOSE_DECRYPT, block_mode, padding, key, key_size) {}
+        : AesEvpOperation(KM_PURPOSE_DECRYPT, block_mode, padding,
+                          false /* caller_iv -- don't care */, key, key_size) {}
 
     int evp_encrypt_mode() { return 0; }
 };
