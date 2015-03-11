@@ -89,7 +89,8 @@ LOCAL_SRC_FILES := \
 	soft_keymaster_device.cpp \
 	soft_keymaster_logger.cpp
 LOCAL_C_INCLUDES := \
-	system/security/keystore
+	system/security/keystore \
+	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
