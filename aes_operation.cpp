@@ -43,10 +43,12 @@ class AesOperationFactory : public OperationFactory {
     virtual keymaster_purpose_t purpose() const = 0;
 
   private:
-    virtual Operation* CreateOcbOperation(const SymmetricKey& key, keymaster_error_t* error);
+    virtual Operation* CreateOcbOperation(const SymmetricKey& key, bool caller_nonce,
+                                          keymaster_error_t* error);
     virtual Operation* CreateEvpOperation(const SymmetricKey& key,
                                           keymaster_block_mode_t block_mode,
-                                          keymaster_padding_t padding, keymaster_error_t* error);
+                                          keymaster_padding_t padding, bool caller_iv,
+                                          keymaster_error_t* error);
 };
 
 Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
@@ -75,6 +77,8 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
     keymaster_padding_t padding = KM_PAD_NONE;
     key.authorizations().GetTagValue(TAG_PADDING, &padding);
 
+    bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);
+
     if (*error != KM_ERROR_OK)
         return NULL;
 
@@ -84,17 +88,17 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
             *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
             return NULL;
         }
-        return CreateOcbOperation(*symmetric_key, error);
+        return CreateOcbOperation(*symmetric_key, caller_nonce, error);
     case KM_MODE_ECB:
     case KM_MODE_CBC:
-        return CreateEvpOperation(*symmetric_key, block_mode, padding, error);
+        return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
         return NULL;
     }
 }
 
-Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key,
+Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key, bool caller_nonce,
                                                    keymaster_error_t* error) {
     *error = KM_ERROR_OK;
 
@@ -117,8 +121,6 @@ Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key,
     if (*error != KM_ERROR_OK)
         return NULL;
 
-    bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);
-
     Operation* op = new AesOcbOperation(purpose(), key.key_data(), key.key_data_size(),
                                         chunk_length, tag_length, caller_nonce);
     if (!op)
@@ -128,12 +130,13 @@ Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key,
 
 Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
                                                    keymaster_block_mode_t block_mode,
-                                                   keymaster_padding_t padding,
+                                                   keymaster_padding_t padding, bool caller_iv,
                                                    keymaster_error_t* error) {
     Operation* op = NULL;
     switch (purpose()) {
     case KM_PURPOSE_ENCRYPT:
-        op = new AesEvpEncryptOperation(block_mode, padding, key.key_data(), key.key_data_size());
+        op = new AesEvpEncryptOperation(block_mode, padding, caller_iv, key.key_data(),
+                                        key.key_data_size());
         break;
     case KM_PURPOSE_DECRYPT:
         op = new AesEvpDecryptOperation(block_mode, padding, key.key_data(), key.key_data_size());
@@ -148,8 +151,8 @@ Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
     return op;
 }
 
-static const keymaster_block_mode_t supported_block_modes[] = {
-    KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC};
+static const keymaster_block_mode_t supported_block_modes[] = {KM_MODE_OCB, KM_MODE_ECB,
+                                                               KM_MODE_CBC};
 
 const keymaster_block_mode_t*
 AesOperationFactory::SupportedBlockModes(size_t* block_mode_count) const {
@@ -235,9 +238,10 @@ keymaster_error_t AesOcbOperation::DecryptChunk(const uint8_t* nonce, size_t /* 
 }
 
 AesEvpOperation::AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
-                                 keymaster_padding_t padding, const uint8_t* key, size_t key_size)
+                                 keymaster_padding_t padding, bool caller_iv, const uint8_t* key,
+                                 size_t key_size)
     : Operation(purpose), key_size_(key_size), block_mode_(block_mode), padding_(padding),
-      cipher_initialized_(false), iv_buffered_(0) {
+      caller_iv_(caller_iv) {
     memcpy(key_, key, key_size_);
     EVP_CIPHER_CTX_init(&ctx_);
 }
@@ -284,7 +288,7 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
     }
 
     int init_result =
-        EVP_CipherInit_ex(&ctx_, cipher, NULL /* engine */, key_, iv_, evp_encrypt_mode());
+        EVP_CipherInit_ex(&ctx_, cipher, NULL /* engine */, key_, iv_.get(), evp_encrypt_mode());
 
     if (!init_result)
         return KM_ERROR_UNKNOWN_ERROR;
@@ -300,7 +304,6 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
         return KM_ERROR_UNSUPPORTED_PADDING_MODE;
     }
 
-    cipher_initialized_ = true;
     return KM_ERROR_OK;
 }
 
@@ -317,8 +320,55 @@ bool AesEvpOperation::need_iv() const {
     }
 }
 
-keymaster_error_t AesEvpOperation::Begin(const AuthorizationSet& /* input_params */,
-                                         AuthorizationSet* /* output_params */) {
+keymaster_error_t AesEvpOperation::Begin(const AuthorizationSet& input_params,
+                                         AuthorizationSet* output_params) {
+    if (!output_params)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    keymaster_error_t error = KM_ERROR_OK;
+    if (need_iv()) {
+        switch (purpose()) {
+        case KM_PURPOSE_ENCRYPT:
+            if (caller_iv_)
+                error = GetIv(input_params);
+            else {
+                iv_.reset(new uint8_t[AES_BLOCK_SIZE]);
+                if (!iv_.get())
+                    return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+                if (!RAND_bytes(iv_.get(), AES_BLOCK_SIZE))
+                    error = TranslateLastOpenSslError();
+            }
+
+            if (error == KM_ERROR_OK)
+                output_params->push_back(TAG_NONCE, iv_.get(), AES_BLOCK_SIZE);
+            break;
+
+        case KM_PURPOSE_DECRYPT:
+            error = GetIv(input_params);
+            break;
+        default:
+            return KM_ERROR_UNSUPPORTED_PURPOSE;
+        }
+    }
+
+    if (error == KM_ERROR_OK)
+        error = InitializeCipher();
+
+    return error;
+}
+
+keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
+    keymaster_blob_t iv_blob;
+    if (!input_params.GetTagValue(TAG_NONCE, &iv_blob)) {
+        LOG_E("No IV provided", 0);
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    if (iv_blob.data_length != AES_BLOCK_SIZE) {
+        LOG_E("Expected %d-byte IV for AES operation, but got %d bytes", AES_BLOCK_SIZE,
+              iv_blob.data_length);
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
     return KM_ERROR_OK;
 }
 
@@ -335,35 +385,6 @@ keymaster_error_t AesEvpOperation::Update(const AuthorizationSet& /* additional_
 
     const uint8_t* input_pos = input.peek_read();
     const uint8_t* input_end = input_pos + input.available_read();
-
-    if (!cipher_initialized_) {
-        if (need_iv()) {
-            switch (purpose()) {
-            case KM_PURPOSE_DECRYPT: {
-                size_t iv_bytes_to_copy = min(input_end - input_pos, AES_BLOCK_SIZE - iv_buffered_);
-                memcpy(iv_ + iv_buffered_, input_pos, iv_bytes_to_copy);
-                input_pos += iv_bytes_to_copy;
-                iv_buffered_ += iv_bytes_to_copy;
-
-                if (iv_buffered_ < AES_BLOCK_SIZE) {
-                    // Don't yet have enough IV bytes.  Wait for another update.
-                    return KM_ERROR_OK;
-                }
-            } break;
-            case KM_PURPOSE_ENCRYPT:
-                if (!RAND_bytes(iv_, AES_BLOCK_SIZE))
-                    return TranslateLastOpenSslError();
-                output->write(iv_, AES_BLOCK_SIZE);
-                break;
-            default:
-                return KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-            }
-        }
-
-        keymaster_error_t error = InitializeCipher();
-        if (error != KM_ERROR_OK)
-            return error;
-    }
 
     int output_written = -1;
     if (!EVP_CipherUpdate(&ctx_, output->peek_write(), &output_written, input_pos,
