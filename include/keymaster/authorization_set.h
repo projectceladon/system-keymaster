@@ -126,6 +126,11 @@ class AuthorizationSet : public Serializable {
     keymaster_key_param_t operator[](int n) const;
 
     /**
+     * Returns the number of \p tag entries.
+     */
+    size_t GetTagCount(keymaster_tag_t tag) const;
+
+    /**
      * If the specified integer-typed \p tag exists, places its value in \p val and returns true.
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
