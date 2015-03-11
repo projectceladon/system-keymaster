@@ -81,6 +81,7 @@ class KeyBlob : public Serializable {
     inline const AuthorizationSet& unenforced() const { return unenforced_; }
     inline keymaster_algorithm_t algorithm() const { return algorithm_; }
     inline size_t key_size_bits() const { return key_size_bits_; }
+    keymaster_key_origin_t origin() const;
 
   protected:
     /**

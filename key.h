@@ -75,6 +75,7 @@ class Key {
                                                      size_t* size) const = 0;
 
     const AuthorizationSet& authorizations() const { return authorizations_; }
+    bool rescopable() const;
 
   protected:
     Key(const KeyBlob& blob);
