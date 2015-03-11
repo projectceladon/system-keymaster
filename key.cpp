@@ -34,8 +34,10 @@ Key::Key(const KeyBlob& blob) {
     authorizations_.push_back(blob.enforced());
 }
 
-struct PKCS8_PRIV_KEY_INFO_Delete {
-    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
-};
+bool Key::rescopable() const {
+    size_t rescope_tag_count = authorizations_.GetTagCount(TAG_RESCOPING_ADD) +
+                               authorizations_.GetTagCount(TAG_RESCOPING_DEL);
+    return rescope_tag_count > 0;
+}
 
 }  // namespace keymaster

@@ -147,4 +147,13 @@ bool KeyBlob::ExtractKeyCharacteristics() {
     return true;
 }
 
+keymaster_key_origin_t KeyBlob::origin() const {
+    keymaster_key_origin_t origin = KM_ORIGIN_SOFTWARE;
+    if (!enforced_.GetTagValue(TAG_ORIGIN, &origin) &&
+        !unenforced_.GetTagValue(TAG_ORIGIN, &origin))
+        // This should be impossible.
+        assert(false);
+    return origin;
+}
+
 }  // namespace keymaster
