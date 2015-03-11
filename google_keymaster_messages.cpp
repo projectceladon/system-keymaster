@@ -19,6 +19,37 @@
 
 namespace keymaster {
 
+/*
+ * Helper functions for working with key blobs.
+ */
+
+static void set_key_blob(keymaster_key_blob_t* key_blob, const void* key_material, size_t length) {
+    delete[] key_blob->key_material;
+    key_blob->key_material = dup_buffer(key_material, length);
+    key_blob->key_material_size = length;
+}
+
+static size_t key_blob_size(const keymaster_key_blob_t& key_blob) {
+    return sizeof(uint32_t) /* key size */ + key_blob.key_material_size;
+}
+
+static uint8_t* serialize_key_blob(const keymaster_key_blob_t& key_blob, uint8_t* buf,
+                                   const uint8_t* end) {
+    return append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+}
+
+static bool deserialize_key_blob(keymaster_key_blob_t* key_blob, const uint8_t** buf_ptr,
+                                 const uint8_t* end) {
+    delete[] key_blob->key_material;
+    key_blob->key_material = 0;
+    UniquePtr<uint8_t[]> deserialized_key_material;
+    if (!copy_size_and_data_from_buf(buf_ptr, end, &key_blob->key_material_size,
+                                     &deserialized_key_material))
+        return false;
+    key_blob->key_material = deserialized_key_material.release();
+    return true;
+}
+
 size_t KeymasterResponse::SerializedSize() const {
     if (error != KM_ERROR_OK)
         return sizeof(int32_t);
@@ -64,26 +95,18 @@ GenerateKeyResponse::~GenerateKeyResponse() {
 }
 
 size_t GenerateKeyResponse::NonErrorSerializedSize() const {
-    return sizeof(uint32_t) /* key size */ + key_blob.key_material_size +
-           enforced.SerializedSize() + unenforced.SerializedSize();
+    return key_blob_size(key_blob) + enforced.SerializedSize() + unenforced.SerializedSize();
 }
 
 uint8_t* GenerateKeyResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    buf = append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+    buf = serialize_key_blob(key_blob, buf, end);
     buf = enforced.Serialize(buf, end);
     return unenforced.Serialize(buf, end);
 }
 
 bool GenerateKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = NULL;
-    UniquePtr<uint8_t[]> deserialized_key_material;
-    if (!copy_size_and_data_from_buf(buf_ptr, end, &key_blob.key_material_size,
-                                     &deserialized_key_material) ||
-        !enforced.Deserialize(buf_ptr, end) || !unenforced.Deserialize(buf_ptr, end))
-        return false;
-    key_blob.key_material = deserialized_key_material.release();
-    return true;
+    return deserialize_key_blob(&key_blob, buf_ptr, end) && enforced.Deserialize(buf_ptr, end) &&
+           unenforced.Deserialize(buf_ptr, end);
 }
 
 GetKeyCharacteristicsRequest::~GetKeyCharacteristicsRequest() {
@@ -91,31 +114,21 @@ GetKeyCharacteristicsRequest::~GetKeyCharacteristicsRequest() {
 }
 
 void GetKeyCharacteristicsRequest::SetKeyMaterial(const void* key_material, size_t length) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = dup_buffer(key_material, length);
-    key_blob.key_material_size = length;
+    set_key_blob(&key_blob, key_material, length);
 }
 
 size_t GetKeyCharacteristicsRequest::SerializedSize() const {
-    return sizeof(uint32_t) /* key blob size */ + key_blob.key_material_size +
-           additional_params.SerializedSize();
+    return key_blob_size(key_blob) + additional_params.SerializedSize();
 }
 
 uint8_t* GetKeyCharacteristicsRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
-    buf = append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+    buf = serialize_key_blob(key_blob, buf, end);
     return additional_params.Serialize(buf, end);
 }
 
 bool GetKeyCharacteristicsRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = NULL;
-    UniquePtr<uint8_t[]> deserialized_key_material;
-    if (!copy_size_and_data_from_buf(buf_ptr, end, &key_blob.key_material_size,
-                                     &deserialized_key_material) ||
-        !additional_params.Deserialize(buf_ptr, end))
-        return false;
-    key_blob.key_material = deserialized_key_material.release();
-    return true;
+    return deserialize_key_blob(&key_blob, buf_ptr, end) &&
+           additional_params.Deserialize(buf_ptr, end);
 }
 
 size_t GetKeyCharacteristicsResponse::NonErrorSerializedSize() const {
@@ -133,33 +146,24 @@ bool GetKeyCharacteristicsResponse::NonErrorDeserialize(const uint8_t** buf_ptr,
 }
 
 void BeginOperationRequest::SetKeyMaterial(const void* key_material, size_t length) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = dup_buffer(key_material, length);
-    key_blob.key_material_size = length;
+    set_key_blob(&key_blob, key_material, length);
 }
 
 size_t BeginOperationRequest::SerializedSize() const {
-    return sizeof(uint32_t) /* purpose */ + sizeof(uint32_t) /* key length */ +
-           key_blob.key_material_size + additional_params.SerializedSize();
+    return sizeof(uint32_t) /* purpose */ + key_blob_size(key_blob) +
+           additional_params.SerializedSize();
 }
 
 uint8_t* BeginOperationRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
     buf = append_uint32_to_buf(buf, end, purpose);
-    buf = append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+    buf = serialize_key_blob(key_blob, buf, end);
     return additional_params.Serialize(buf, end);
 }
 
 bool BeginOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = 0;
-    UniquePtr<uint8_t[]> deserialized_key_material;
-    if (!copy_uint32_from_buf(buf_ptr, end, &purpose) ||
-        !copy_size_and_data_from_buf(buf_ptr, end, &key_blob.key_material_size,
-                                     &deserialized_key_material) ||
-        !additional_params.Deserialize(buf_ptr, end))
-        return false;
-    key_blob.key_material = deserialized_key_material.release();
-    return true;
+    return copy_uint32_from_buf(buf_ptr, end, &purpose) &&
+           deserialize_key_blob(&key_blob, buf_ptr, end) &&
+           additional_params.Deserialize(buf_ptr, end);
 }
 
 size_t BeginOperationResponse::NonErrorSerializedSize() const {
@@ -303,62 +307,43 @@ bool ImportKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) 
 }
 
 void ImportKeyResponse::SetKeyMaterial(const void* key_material, size_t length) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = dup_buffer(key_material, length);
-    key_blob.key_material_size = length;
+    set_key_blob(&key_blob, key_material, length);
 }
 
 size_t ImportKeyResponse::NonErrorSerializedSize() const {
-    return sizeof(uint32_t) /* key_material length */ + key_blob.key_material_size +
-           enforced.SerializedSize() + unenforced.SerializedSize();
+    return key_blob_size(key_blob) + enforced.SerializedSize() + unenforced.SerializedSize();
 }
 
 uint8_t* ImportKeyResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    buf = append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+    buf = serialize_key_blob(key_blob, buf, end);
     buf = enforced.Serialize(buf, end);
     return unenforced.Serialize(buf, end);
 }
 
 bool ImportKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = NULL;
-    UniquePtr<uint8_t[]> deserialized_key_material;
-    if (!copy_size_and_data_from_buf(buf_ptr, end, &key_blob.key_material_size,
-                                     &deserialized_key_material) ||
-        !enforced.Deserialize(buf_ptr, end) || !unenforced.Deserialize(buf_ptr, end))
-        return false;
-    key_blob.key_material = deserialized_key_material.release();
-    return true;
+    return deserialize_key_blob(&key_blob, buf_ptr, end) && enforced.Deserialize(buf_ptr, end) &&
+           unenforced.Deserialize(buf_ptr, end);
 }
 
 void ExportKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = dup_buffer(key_material, length);
-    key_blob.key_material_size = length;
+    set_key_blob(&key_blob, key_material, length);
 }
 
 size_t ExportKeyRequest::SerializedSize() const {
     return additional_params.SerializedSize() + sizeof(uint32_t) /* key_format */ +
-           sizeof(uint32_t) /* key_material_size */ + key_blob.key_material_size;
+           key_blob_size(key_blob);
 }
 
 uint8_t* ExportKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
     buf = additional_params.Serialize(buf, end);
     buf = append_uint32_to_buf(buf, end, key_format);
-    return append_size_and_data_to_buf(buf, end, key_blob.key_material, key_blob.key_material_size);
+    return serialize_key_blob(key_blob, buf, end);
 }
 
 bool ExportKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] key_blob.key_material;
-    key_blob.key_material = NULL;
-    UniquePtr<uint8_t[]> deserialized_key_material;
-    if (!additional_params.Deserialize(buf_ptr, end) ||
-        !copy_uint32_from_buf(buf_ptr, end, &key_format) ||
-        !copy_size_and_data_from_buf(buf_ptr, end, &key_blob.key_material_size,
-                                     &deserialized_key_material))
-        return false;
-    key_blob.key_material = deserialized_key_material.release();
-    return true;
+    return additional_params.Deserialize(buf_ptr, end) &&
+           copy_uint32_from_buf(buf_ptr, end, &key_format) &&
+           deserialize_key_blob(&key_blob, buf_ptr, end);
 }
 
 void ExportKeyResponse::SetKeyMaterial(const void* key_material, size_t length) {
