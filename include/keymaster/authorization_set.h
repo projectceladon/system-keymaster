@@ -201,6 +201,14 @@ class AuthorizationSet : public Serializable {
     }
 
     /**
+     * Returns true if the specified tag is present, and therefore has the value 'true'.
+     */
+    template <keymaster_tag_t Tag>
+    bool GetTagValue(TypedTag<KM_BOOL, Tag> tag) const {
+        return GetTagValueBool(tag);
+    }
+
+    /**
      * If the specified \p tag exists, places its value in \p val and returns true.  If \p tag is
      * not present, leaves \p val unmodified and returns false.
      */
@@ -305,6 +313,7 @@ class AuthorizationSet : public Serializable {
     bool GetTagValueLong(keymaster_tag_t tag, uint64_t* val) const;
     bool GetTagValueDate(keymaster_tag_t tag, uint64_t* val) const;
     bool GetTagValueBlob(keymaster_tag_t tag, keymaster_blob_t* val) const;
+    bool GetTagValueBool(keymaster_tag_t tag) const;
 
     keymaster_key_param_t* elems_;
     size_t elems_size_;

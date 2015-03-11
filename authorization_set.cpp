@@ -487,4 +487,13 @@ bool AuthorizationSet::GetTagValueBlob(keymaster_tag_t tag, keymaster_blob_t* va
     return true;
 }
 
+bool AuthorizationSet::GetTagValueBool(keymaster_tag_t tag) const {
+    int pos = find(tag);
+    if (pos == -1) {
+        return false;
+    }
+    assert(elems_[pos].boolean);
+    return elems_[pos].boolean;
+}
+
 }  // namespace keymaster

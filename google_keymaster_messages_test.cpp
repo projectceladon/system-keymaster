@@ -441,6 +441,17 @@ TEST(RoundTrip, GetVersionResponse) {
     EXPECT_EQ(38, msg.subminor_ver);
 }
 
+TEST(RoundTrip, AddEntropyRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AddEntropyRequest msg(ver);
+        msg.random_data.Reinitialize("foo", 3);
+
+        UniquePtr<AddEntropyRequest> deserialized(round_trip(ver, msg, 7));
+        EXPECT_EQ(3U, deserialized->random_data.available_read());
+        EXPECT_EQ(0, memcmp("foo", deserialized->random_data.peek_read(), 3));
+    }
+}
+
 uint8_t msgbuf[] = {
     220, 88,  183, 255, 71,  1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   173, 0,   0,   0,   228, 174, 98,  187, 191, 135, 253, 200, 51,  230, 114, 247, 151, 109,
@@ -500,7 +511,7 @@ GARBAGE_TEST(UpdateOperationRequest);
 GARBAGE_TEST(UpdateOperationResponse);
 GARBAGE_TEST(FinishOperationRequest);
 GARBAGE_TEST(FinishOperationResponse);
-// GARBAGE_TEST(AddEntropyRequest);
+GARBAGE_TEST(AddEntropyRequest);
 GARBAGE_TEST(ImportKeyRequest);
 GARBAGE_TEST(ImportKeyResponse);
 GARBAGE_TEST(ExportKeyRequest);

@@ -49,6 +49,8 @@ CPPSRCS=\
 	key.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
+	keymaster_enforcement.cpp \
+	keymaster_enforcement_test.cpp \
 	logger.cpp \
 	openssl_err.cpp \
 	operation.cpp \
@@ -71,7 +73,8 @@ BINARIES = abstract_factory_registry_test \
 	authorization_set_test \
 	google_keymaster_test \
 	google_keymaster_messages_test \
-	key_blob_test
+	key_blob_test \
+	keymaster_enforcement_test
 
 .PHONY: coverage memcheck massif clean run
 
@@ -170,6 +173,15 @@ google_keymaster_test: google_keymaster_test.o \
 	$(GTEST)/src/gtest-all.o
 
 abstract_factory_registry_test: abstract_factory_registry_test.o \
+	$(GTEST)/src/gtest-all.o
+
+keymaster_enforcement_test: keymaster_enforcement_test.o \
+	keymaster_enforcement.o \
+	authorization_set.o \
+	google_keymaster_utils.o \
+	google_keymaster_messages.o \
+	google_keymaster_test_utils.o \
+	serializable.o \
 	$(GTEST)/src/gtest-all.o
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))

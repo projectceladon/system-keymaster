@@ -30,9 +30,9 @@ class AesOcbOperation : public AeadModeOperation {
     static const size_t NONCE_LENGTH = 12;
 
     AesOcbOperation(keymaster_purpose_t purpose, const uint8_t* key, size_t key_size,
-                    size_t chunk_length, size_t tag_length, keymaster_blob_t additional_data)
+                    size_t chunk_length, size_t tag_length, bool caller_nonce)
         : AeadModeOperation(purpose, key, key_size, chunk_length, tag_length, NONCE_LENGTH,
-                            additional_data) {}
+                            caller_nonce) {}
 
     virtual keymaster_error_t Abort() {
         /* All cleanup is in the dtor */
@@ -67,7 +67,7 @@ class AesEvpOperation : public Operation {
     virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
                                      Buffer* output, size_t* input_consumed);
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& /* signature */, Buffer* output);
+                                     const Buffer& signature, Buffer* output);
     virtual keymaster_error_t Abort();
 
     virtual int evp_encrypt_mode() = 0;

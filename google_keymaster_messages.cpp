@@ -261,6 +261,18 @@ bool FinishOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const
     return output.Deserialize(buf_ptr, end);
 }
 
+size_t AddEntropyRequest::SerializedSize() const {
+    return random_data.SerializedSize();
+}
+
+uint8_t* AddEntropyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
+    return random_data.Serialize(buf, end);
+}
+
+bool AddEntropyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    return random_data.Deserialize(buf_ptr, end);
+}
+
 void ImportKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
     delete[] key_data;
     key_data = dup_buffer(key_material, length);

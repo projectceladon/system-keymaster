@@ -94,7 +94,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS = -Wall -Werror
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
-LOCAL_SHARED_LIBRARIES := libkeymaster1 liblog
+LOCAL_SHARED_LIBRARIES := libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
