@@ -283,8 +283,6 @@ keymaster_error_t
 KeymasterEnforcement::AuthorizeRescope(const AuthorizationSet& old_auth_set,
                                        const AuthorizationSet& new_auth_set) const {
     keymaster_error_t return_error = KM_ERROR_OK;
-    time_t current_time = get_current_time();
-
     /* TODO(swillden): Require authentication. */
 
     /*

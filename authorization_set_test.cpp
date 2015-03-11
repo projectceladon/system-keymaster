@@ -334,9 +334,6 @@ TEST(Deserialization, MalformedIndirectData) {
 }
 
 TEST(Growable, SuccessfulRoundTrip) {
-    keymaster_key_param_t elems_buf[20];
-    uint8_t data_buf[200];
-
     AuthorizationSet growable;
     EXPECT_TRUE(growable.push_back(Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)));
     EXPECT_EQ(1U, growable.size());
@@ -363,9 +360,6 @@ TEST(Growable, SuccessfulRoundTrip) {
 }
 
 TEST(Growable, InsufficientElemBuf) {
-    keymaster_key_param_t elems_buf[1];
-    uint8_t data_buf[200];
-
     AuthorizationSet growable;
     EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
@@ -380,9 +374,6 @@ TEST(Growable, InsufficientElemBuf) {
 }
 
 TEST(Growable, InsufficientIndirectBuf) {
-    keymaster_key_param_t elems_buf[3];
-    uint8_t data_buf[10];
-
     AuthorizationSet growable;
     EXPECT_EQ(AuthorizationSet::OK, growable.is_valid());
 
