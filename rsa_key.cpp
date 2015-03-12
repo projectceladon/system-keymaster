@@ -42,6 +42,8 @@ class RsaKeyFactory : public AsymmetricKeyFactory {
     virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
         return new RsaKey(blob, error);
     }
+    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
+                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
 };
 static KeyFactoryRegistry::Registration<RsaKeyFactory> registration;
 
@@ -145,6 +147,21 @@ Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
     // implemented).
     *error = KM_ERROR_OK;
     return new RsaKey(rsa_key.release(), authorizations);
+}
+
+Key* RsaKeyFactory::RescopeKey(const UnencryptedKeyBlob& blob,
+                               const AuthorizationSet& new_authorizations,
+                               keymaster_error_t* error) {
+    if (!error)
+        return NULL;
+
+    RsaKey original_key(blob, error);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    RsaKey* new_key = new RsaKey(original_key.rsa_key_.release(), new_authorizations);
+    *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return new_key;
 }
 
 RsaKey::RsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
