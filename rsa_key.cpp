@@ -123,7 +123,7 @@ Key* RsaKeyFactory::ImportKey(const AuthorizationSet& key_description,
     uint32_t key_size;
     if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
         // key_size specified, make sure it matches the key.
-        if (RSA_size(rsa_key.get()) != (openssl_size_t)key_size) {
+        if (RSA_size(rsa_key.get()) * 8 != (openssl_size_t)key_size) {
             *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
             return NULL;
         }

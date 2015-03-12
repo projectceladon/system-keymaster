@@ -25,6 +25,8 @@
 
 namespace keymaster {
 
+class AuthorizationSetBuilder;
+
 /**
  * A container that manages a set of keymaster_key_param_t objects, providing serialization,
  * de-serialization and accessors.
@@ -61,6 +63,12 @@ class AuthorizationSet : public Serializable {
         : elems_(NULL), indirect_data_(NULL) {
         Deserialize(&serialized_set, serialized_set + serialized_size);
     }
+
+    /**
+     * Construct an AuthorizationSet from the provided builder.  This extracts the data from the
+     * builder, rather than copying it, so after this call the builder is empty.
+     */
+    AuthorizationSet(/* NOT const */ AuthorizationSetBuilder& builder);
 
     // Copy constructor.
     AuthorizationSet(const AuthorizationSet&);
@@ -106,6 +114,12 @@ class AuthorizationSet : public Serializable {
      * Returns the data in the set, directly. Be careful with this.
      */
     const keymaster_key_param_t* data() const { return elems_; }
+
+    /**
+     * Sorts the set and removes duplicates (inadvertently duplicating tags is easy to do with the
+     * AuthorizationSetBuilder).
+     */
+    void Deduplicate();
 
     /**
      * Returns the data in a keymaster_key_param_set_t, suitable for returning to C code.  For C
@@ -208,8 +222,7 @@ class AuthorizationSet : public Serializable {
     /**
      * Returns true if the specified tag is present, and therefore has the value 'true'.
      */
-    template <keymaster_tag_t Tag>
-    bool GetTagValue(TypedTag<KM_BOOL, Tag> tag) const {
+    template <keymaster_tag_t Tag> bool GetTagValue(TypedTag<KM_BOOL, Tag> tag) const {
         return GetTagValueBool(tag);
     }
 
@@ -328,6 +341,150 @@ class AuthorizationSet : public Serializable {
     size_t indirect_data_capacity_;
     Error error_;
 };
+
+class AuthorizationSetBuilder {
+  public:
+    template <typename TagType, typename ValueType>
+    AuthorizationSetBuilder& Authorization(TagType tag, ValueType value) {
+        set.push_back(tag, value);
+        return *this;
+    }
+
+    template <keymaster_tag_t Tag>
+    AuthorizationSetBuilder& Authorization(TypedTag<KM_BOOL, Tag> tag) {
+        set.push_back(tag);
+        return *this;
+    }
+
+    template <keymaster_tag_t Tag>
+    AuthorizationSetBuilder& Authorization(TypedTag<KM_INVALID, Tag> tag) {
+        keymaster_key_param_t param;
+        param.tag = tag;
+        set.push_back(param);
+        return *this;
+    }
+
+    template <keymaster_tag_t Tag>
+    AuthorizationSetBuilder& Authorization(TypedTag<KM_BYTES, Tag> tag, const uint8_t* data,
+                                           size_t data_length) {
+        set.push_back(tag, data, data_length);
+        return *this;
+    }
+
+    template <keymaster_tag_t Tag>
+    AuthorizationSetBuilder& Authorization(TypedTag<KM_BYTES, Tag> tag, const char* data,
+                                           size_t data_length) {
+        return Authorization(tag, reinterpret_cast<const uint8_t*>(data), data_length);
+    }
+
+    AuthorizationSetBuilder& RsaKey(uint32_t key_size, uint64_t public_exponent);
+    AuthorizationSetBuilder& EcdsaKey(uint32_t key_size);
+    AuthorizationSetBuilder& AesKey(uint32_t key_size);
+    AuthorizationSetBuilder& HmacKey(uint32_t key_size, keymaster_digest_t digest,
+                                     uint32_t mac_length);
+
+    AuthorizationSetBuilder& RsaSigningKey(uint32_t key_size, uint64_t public_exponent,
+                                           keymaster_digest_t digest, keymaster_padding_t padding);
+
+    AuthorizationSetBuilder& RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent,
+                                              keymaster_padding_t padding);
+
+    AuthorizationSetBuilder& EcdsaSigningKey(uint32_t key_size);
+    AuthorizationSetBuilder& AesEncryptionKey(uint32_t key_size);
+    AuthorizationSetBuilder& SigningKey();
+    AuthorizationSetBuilder& EncryptionKey();
+    AuthorizationSetBuilder& NoDigestOrPadding();
+    AuthorizationSetBuilder& OcbMode(uint32_t chunk_length, uint32_t mac_length);
+
+    AuthorizationSetBuilder& Deduplicate() {
+        set.Deduplicate();
+        return *this;
+    }
+
+    AuthorizationSet build() const { return set; }
+
+  private:
+    friend AuthorizationSet;
+    AuthorizationSet set;
+};
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::RsaKey(uint32_t key_size,
+                                                                uint64_t public_exponent) {
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+    Authorization(TAG_KEY_SIZE, key_size);
+    Authorization(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
+    return *this;
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcdsaKey(uint32_t key_size) {
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_ECDSA);
+    Authorization(TAG_KEY_SIZE, key_size);
+    return *this;
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::AesKey(uint32_t key_size) {
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES);
+    return Authorization(TAG_KEY_SIZE, key_size);
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::HmacKey(uint32_t key_size,
+                                                                 keymaster_digest_t digest,
+                                                                 uint32_t mac_length) {
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC);
+    Authorization(TAG_KEY_SIZE, key_size);
+    SigningKey();
+    Authorization(TAG_DIGEST, digest);
+    return Authorization(TAG_MAC_LENGTH, mac_length);
+}
+
+inline AuthorizationSetBuilder&
+AuthorizationSetBuilder::RsaSigningKey(uint32_t key_size, uint64_t public_exponent,
+                                       keymaster_digest_t digest, keymaster_padding_t padding) {
+    RsaKey(key_size, public_exponent);
+    SigningKey();
+    Authorization(TAG_DIGEST, digest);
+    return Authorization(TAG_PADDING, padding);
+}
+
+inline AuthorizationSetBuilder&
+AuthorizationSetBuilder::RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent,
+                                          keymaster_padding_t padding) {
+    RsaKey(key_size, public_exponent);
+    EncryptionKey();
+    return Authorization(TAG_PADDING, padding);
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcdsaSigningKey(uint32_t key_size) {
+    EcdsaKey(key_size);
+    return SigningKey();
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::AesEncryptionKey(uint32_t key_size) {
+    AesKey(key_size);
+    return EncryptionKey();
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::SigningKey() {
+    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN);
+    return Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY);
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::EncryptionKey() {
+    Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT);
+    return Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT);
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::NoDigestOrPadding() {
+    Authorization(TAG_DIGEST, KM_DIGEST_NONE);
+    return Authorization(TAG_PADDING, KM_PAD_NONE);
+}
+
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::OcbMode(uint32_t chunk_length,
+                                                                 uint32_t mac_length) {
+    Authorization(TAG_BLOCK_MODE, KM_MODE_OCB);
+    Authorization(TAG_CHUNK_LENGTH, chunk_length);
+    return Authorization(TAG_MAC_LENGTH, mac_length);
+}
 
 }  // namespace keymaster
 

@@ -35,6 +35,7 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b);
 namespace keymaster {
 
 bool operator==(const AuthorizationSet& a, const AuthorizationSet& b);
+bool operator!=(const AuthorizationSet& a, const AuthorizationSet& b);
 
 std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set);
 
