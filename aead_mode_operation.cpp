@@ -137,8 +137,7 @@ keymaster_error_t AeadModeOperation::HandleNonce(const AuthorizationSet& input_p
             error = ExtractNonce(input_params);
         else {
             if (input_params.find(TAG_NONCE) != -1)
-                /* TODO(swillden): Create and return a better error code */
-                return KM_ERROR_INVALID_ARGUMENT;
+                return KM_ERROR_INVALID_NONCE;
             error = GenerateNonce();
         }
 
@@ -169,12 +168,12 @@ keymaster_error_t AeadModeOperation::GenerateNonce() {
 keymaster_error_t AeadModeOperation::ExtractNonce(const AuthorizationSet& input_params) {
     keymaster_blob_t nonce_blob;
     if (!input_params.GetTagValue(TAG_NONCE, &nonce_blob))
-        /* TODO(swillden): Add a better error return code for this case. */
-        return KM_ERROR_INVALID_ARGUMENT;
+        return KM_ERROR_MISSING_NONCE;
 
-    if (nonce_blob.data_length != nonce_length_)
-        /* TODO(swillden): Add a better error return code for this case. */
-        return KM_ERROR_INVALID_ARGUMENT;
+    if (nonce_blob.data_length != nonce_length_) {
+        LOG_E("Expected %d-byte nonce, got %d bytes", nonce_length_, nonce_blob.data_length);
+        return KM_ERROR_INVALID_NONCE;
+    }
 
     memcpy(nonce_, nonce_blob.data, nonce_length_);
     return KM_ERROR_OK;

@@ -90,6 +90,7 @@ void UnencryptedKeyBlob::EncryptKey(const uint8_t* master_key, size_t master_key
                    NULL /* additional data */, 0 /* additional data length */,
                    encrypted_key_material.get(), tag.get(), 1 /* final */);
     if (ae_err < 0) {
+        LOG_E("Error %d while encrypting key", ae_err);
         error_ = KM_ERROR_UNKNOWN_ERROR;
         return;
     }
@@ -113,9 +114,11 @@ void UnencryptedKeyBlob::DecryptKey(const uint8_t* master_key, size_t master_key
         // Authentication failed!  Decryption probably succeeded(ish), but we don't want to return
         // any data when the authentication fails, so clear it.
         memset_s(unencrypted_key_material_.get(), 0, unencrypted_key_material_length());
+        LOG_E("Failed to validate authentication tag during key decryption", 0);
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return;
     } else if (ae_err < 0) {
+        LOG_E("Failed to decrypt key, error: %d", ae_err);
         error_ = KM_ERROR_UNKNOWN_ERROR;
         return;
     }

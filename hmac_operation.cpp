@@ -60,11 +60,6 @@ Operation* HmacOperationFactory::CreateOperation(const Key& key, keymaster_error
         return NULL;
 
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
-    if (!symmetric_key) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
-        return NULL;
-    }
-
     Operation* op = new HmacOperation(purpose(), symmetric_key->key_data(),
                                       symmetric_key->key_data_size(), digest, tag_length);
     if (!op)

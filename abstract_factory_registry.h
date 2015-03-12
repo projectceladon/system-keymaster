@@ -23,6 +23,7 @@
 #include <UniquePtr.h>
 
 #include <keymaster/google_keymaster_utils.h>
+#include <keymaster/logger.h>
 
 namespace keymaster {
 
@@ -182,7 +183,7 @@ void AbstractFactoryRegistry<AbstractFactoryType>::Register(AbstractFactoryType*
         size_t new_capacity = capacity_ * 2;
         UniquePtr<AbstractFactoryType* []> new_entries(new AbstractFactoryType* [new_capacity]);
         if (!new_entries.get()) {
-            // TODO(swillden): Log an error here.
+            LOG_S("Tried to register multiple abstract factories for the same type", 0);
             return;
         }
         memcpy(new_entries.get(), entries_.get(), sizeof(AbstractFactoryType*) * size_);

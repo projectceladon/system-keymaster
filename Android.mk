@@ -25,6 +25,7 @@ LOCAL_SRC_FILES:= \
 		google_keymaster_messages.cpp \
 		google_keymaster_utils.cpp \
 		key_blob.cpp \
+		logger.cpp \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include

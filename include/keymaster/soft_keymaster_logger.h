@@ -24,10 +24,7 @@ namespace keymaster {
 class SoftKeymasterLogger : public Logger
 {
 public:
-    virtual int debug(const char* fmt, ...) const;
-    virtual int info(const char* fmt, ...) const;
-    virtual int error(const char* fmt, ...) const;
-    virtual int severe(const char* fmt, ...) const;
+    virtual int log_msg(LogLevel level, const char* fmt, va_list args) const;
 };
 
 } // namespace keymaster

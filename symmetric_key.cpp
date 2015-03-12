@@ -60,6 +60,8 @@ Key* SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_description,
     }
 
     if (key->key_data_size_ != key_material_length) {
+        LOG_E("Expected %d byte key data but got %d bytes", key->key_data_size_,
+              key_material_length);
         *error = KM_ERROR_INVALID_KEY_BLOB;
         return NULL;
     }
@@ -92,6 +94,7 @@ SymmetricKey* SymmetricKeyFactory::CreateKeyAndValidateSize(const AuthorizationS
     *error = key->set_size(key_size_bits / 8);
     if (*error != KM_ERROR_OK)
         return NULL;
+
     return key.release();
 }
 

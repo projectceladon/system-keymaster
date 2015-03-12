@@ -41,15 +41,15 @@
 struct keystore_module soft_keymaster_device_module = {
     .common =
         {
-         .tag = HARDWARE_MODULE_TAG,
-         .module_api_version = KEYMASTER_MODULE_API_VERSION_1_0,
-         .hal_api_version = HARDWARE_HAL_API_VERSION,
-         .id = KEYSTORE_HARDWARE_MODULE_ID,
-         .name = "Keymaster OpenSSL HAL",
-         .author = "The Android Open Source Project",
-         .methods = NULL,
-         .dso = 0,
-         .reserved = {},
+            .tag = HARDWARE_MODULE_TAG,
+            .module_api_version = KEYMASTER_MODULE_API_VERSION_1_0,
+            .hal_api_version = HARDWARE_HAL_API_VERSION,
+            .id = KEYSTORE_HARDWARE_MODULE_ID,
+            .name = "Keymaster OpenSSL HAL",
+            .author = "The Android Open Source Project",
+            .methods = NULL,
+            .dso = 0,
+            .reserved = {},
         },
 };
 
@@ -160,6 +160,11 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
                                           const void* key_params, uint8_t** key_blob,
                                           size_t* key_blob_length) {
     LOG_D("%s", "Device received generate_keypair");
+    if (!dev || !key_params)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    if (!key_blob || !key_blob_length)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     GenerateKeyRequest req;
     StoreDefaultNewKeyParams(&req.key_description);
@@ -215,6 +220,12 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
                                         size_t* key_blob_length) {
     LOG_D("Device received import_keypair");
 
+    if (!dev || !key)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    if (!key_blob || !key_blob_length)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
     ImportKeyRequest request;
     StoreDefaultNewKeyParams(&request.key_description);
     request.SetKeyMaterial(key, key_length);
@@ -245,6 +256,12 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
                                             uint8_t** x509_data, size_t* x509_data_length) {
     LOG_D("Device received get_keypair_public");
 
+    if (!dev || !key_blob)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    if (!x509_data || !x509_data_length)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
     ExportKeyRequest req;
     req.SetKeyMaterial(key_blob, key_blob_length);
     req.key_format = KM_KEY_FORMAT_X509;
@@ -272,6 +289,12 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
                                    const uint8_t* data, const size_t data_length,
                                    uint8_t** signed_data, size_t* signed_data_length) {
     LOG_D("Device received sign_data");
+
+    if (!dev || !params || !key_blob)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    if (!signed_data || !signed_data_length)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     *signed_data_length = 0;
 
@@ -325,6 +348,9 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
                                      const uint8_t* signature, const size_t signature_length) {
     LOG_D("Device received verify_data");
 
+    if (!dev || !params || !key_blob || !signed_data || !signature)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_VERIFY;
     begin_request.SetKeyMaterial(key_blob, key_blob_length);
@@ -368,6 +394,9 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
 keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const keymaster1_device_t* dev,
                                                                 keymaster_algorithm_t** algorithms,
                                                                 size_t* algorithms_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!algorithms || !algorithms_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -394,6 +423,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const keymaster
                                                                  keymaster_purpose_t purpose,
                                                                  keymaster_block_mode_t** modes,
                                                                  size_t* modes_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!modes || !modes_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -420,6 +452,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(const keymast
                                                                    keymaster_purpose_t purpose,
                                                                    keymaster_padding_t** modes,
                                                                    size_t* modes_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!modes || !modes_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -445,6 +480,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_digests(const keymaster1_de
                                                              keymaster_purpose_t purpose,
                                                              keymaster_digest_t** digests,
                                                              size_t* digests_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!digests || !digests_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -468,6 +506,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_digests(const keymaster1_de
 keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
     const keymaster1_device_t* dev, keymaster_algorithm_t algorithm,
     keymaster_key_format_t** formats, size_t* formats_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -492,6 +533,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
 keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
     const keymaster1_device_t* dev, keymaster_algorithm_t algorithm,
     keymaster_key_format_t** formats, size_t* formats_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -515,6 +559,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
 /* static */
 keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t* dev,
                                                        const uint8_t* data, size_t data_length) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
     AddEntropyRequest request;
     request.random_data.Reinitialize(data, data_length);
     return convert_device(dev)->impl_->AddRngEntropy(request);
@@ -524,6 +571,8 @@ keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t
 keymaster_error_t SoftKeymasterDevice::generate_key(
     const keymaster1_device_t* dev, const keymaster_key_param_t* params, size_t params_count,
     keymaster_key_blob_t* key_blob, keymaster_key_characteristics_t** characteristics) {
+    if (!dev || !params)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     if (!key_blob)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
@@ -557,8 +606,8 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
     const keymaster1_device_t* dev, const keymaster_key_blob_t* key_blob,
     const keymaster_blob_t* client_id, const keymaster_blob_t* app_data,
     keymaster_key_characteristics_t** characteristics) {
-    if (!key_blob)
-        return KM_ERROR_INVALID_KEY_BLOB;
+    if (!dev || !key_blob || !key_blob->key_material)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     if (!characteristics)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
@@ -584,10 +633,7 @@ keymaster_error_t SoftKeymasterDevice::rescope(
     size_t new_params_count, const keymaster_key_blob_t* key_blob,
     const keymaster_blob_t* client_id, const keymaster_blob_t* app_data,
     keymaster_key_blob_t* rescoped_key_blob, keymaster_key_characteristics_t** characteristics) {
-    if (!key_blob)
-        return KM_ERROR_INVALID_KEY_BLOB;
-
-    if (!new_params)
+    if (!key_blob || !key_blob->key_material || !new_params)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     if (!rescoped_key_blob)
@@ -658,7 +704,7 @@ keymaster_error_t SoftKeymasterDevice::export_key(
     const keymaster_key_blob_t* key_to_export, const keymaster_blob_t* client_id,
     const keymaster_blob_t* app_data, uint8_t** export_data, size_t* export_data_length) {
     if (!key_to_export || !key_to_export->key_material)
-        return KM_ERROR_INVALID_KEY_BLOB;
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     if (!export_data || !export_data_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
@@ -690,7 +736,7 @@ keymaster_error_t SoftKeymasterDevice::begin(
     const keymaster_key_param_t* params, size_t params_count, keymaster_key_param_t** out_params,
     size_t* out_params_count, keymaster_operation_handle_t* operation_handle) {
     if (!key || !key->key_material)
-        return KM_ERROR_INVALID_KEY_BLOB;
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     if (!operation_handle || !out_params || !out_params_count)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
