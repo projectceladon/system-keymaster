@@ -35,10 +35,10 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_SHARED_LIBRARY)
 
 ###
-# libkeymaster contains almost everything needed for a keymaster implementation,
-# lacking only a subclass of the (abstract) GoogleKeymaster class to provide
-# environment-specific services and a wrapper to translate from the
-# function-based keymaster HAL API to the message-based GoogleKeymaster API.
+# libkeymaster1 contains almost everything needed for a keymaster1
+# implementation, lacking only a subclass of the (abstract) GoogleKeymaster
+# class to provide environment-specific services and a wrapper to translate from
+# the function-based keymaster HAL API to the message-based GoogleKeymaster API.
 ###
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster1
