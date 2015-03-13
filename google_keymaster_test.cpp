@@ -467,6 +467,14 @@ class KeymasterTest : public testing::Test {
         return response.error;
     }
 
+    keymaster_error_t Rescope(const AuthorizationSet& new_params,
+                              keymaster_key_blob_t* rescoped_blob,
+                              keymaster_key_characteristics_t** rescoped_characteristics) {
+        return device()->rescope(device(), new_params.data(), new_params.size(), &blob_,
+                                 &client_id_, NULL /* app data */, rescoped_blob,
+                                 rescoped_characteristics);
+    }
+
     void CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
                              string expected_mac) {
         ASSERT_EQ(KM_ERROR_OK,
@@ -2367,6 +2375,76 @@ TEST_F(AddEntropyTest, AddEntropy) {
     EXPECT_EQ(KM_ERROR_OK,
               device()->add_rng_entropy(device(), reinterpret_cast<const uint8_t*>("foo"), 3));
 }
+
+typedef KeymasterTest RescopingTest;
+TEST_F(RescopingTest, KeyWithRescopingNotUsable) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 16).Option(
+                  TAG_RESCOPING_ADD, KM_TAG_MAC_LENGTH)));
+    // TODO(swillden): Add a better error code for this.
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT));
+}
+
+TEST_F(RescopingTest, RescopeSymmetric) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder()
+                                           .AesEncryptionKey(128)
+                                           .OcbMode(4096, 16)
+                                           .Option(TAG_RESCOPING_ADD, KM_TAG_MAC_LENGTH)
+                                           .Option(TAG_RESCOPING_DEL, KM_TAG_MAC_LENGTH)));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_MAC_LENGTH, 15));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_MAC_LENGTH, 16));
+
+    keymaster_key_blob_t rescoped_blob;
+    keymaster_key_characteristics_t* rescoped_characteristics;
+    AuthorizationSet new_params =
+        ParamBuilder().AesEncryptionKey(128).OcbMode(4096, 15 /* note changed */).build();
+
+    ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));
+    ASSERT_TRUE(rescoped_characteristics != NULL);
+
+    EXPECT_EQ(0, rescoped_characteristics->hw_enforced.length);
+    AuthorizationSet auths(rescoped_characteristics->sw_enforced);
+    keymaster_free_characteristics(rescoped_characteristics);
+    free(rescoped_characteristics);
+    free(const_cast<uint8_t*>(rescoped_blob.key_material));
+
+    EXPECT_TRUE(contains(auths, TAG_ALGORITHM, KM_ALGORITHM_AES));
+    EXPECT_TRUE(contains(auths, TAG_MAC_LENGTH, 15));
+    EXPECT_FALSE(contains(auths, TAG_MAC_LENGTH, 16));
+}
+
+TEST_F(RescopingTest, RescopeRsa) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(ParamBuilder()
+                                           .RsaEncryptionKey(256)
+                                           .Option(TAG_RESCOPING_ADD, KM_TAG_PURPOSE)
+                                           .Option(TAG_RESCOPING_DEL, KM_TAG_PURPOSE)));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_VERIFY));
+
+    keymaster_key_blob_t rescoped_blob;
+    keymaster_key_characteristics_t* rescoped_characteristics;
+    AuthorizationSet new_params = ParamBuilder().RsaSigningKey(256).build();
+
+    ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));
+    ASSERT_TRUE(rescoped_characteristics != NULL);
+
+    EXPECT_EQ(0, rescoped_characteristics->hw_enforced.length);
+    AuthorizationSet auths(rescoped_characteristics->sw_enforced);
+    keymaster_free_characteristics(rescoped_characteristics);
+    free(rescoped_characteristics);
+    free(const_cast<uint8_t*>(rescoped_blob.key_material));
+
+    EXPECT_FALSE(contains(auths, TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
+    EXPECT_FALSE(contains(auths, TAG_PURPOSE, KM_PURPOSE_DECRYPT));
+    EXPECT_TRUE(contains(auths, TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_TRUE(contains(auths, TAG_PURPOSE, KM_PURPOSE_VERIFY));
+}
+
+// TODO(swillden): When adding rescoping enforcement, include tests that verify that tags
+// corresponding to intrinsic attributes of keys, like RSA public exponent, or symmetric key size,
+// may not be changed.
 
 }  // namespace test
 }  // namespace keymaster

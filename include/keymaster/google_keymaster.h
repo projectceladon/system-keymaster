@@ -62,10 +62,7 @@ class GoogleKeymaster {
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
-    void Rescope(const RescopeRequest& /* request */, RescopeResponse* response) {
-        // Not going to implement until post-L.
-        response->error = KM_ERROR_UNIMPLEMENTED;
-    }
+    void Rescope(const RescopeRequest& request, RescopeResponse* response);
     void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
     void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
     void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);

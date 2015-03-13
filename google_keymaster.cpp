@@ -228,6 +228,12 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (key.get() == NULL)
         return;
 
+    if (key->rescopable()) {
+        // TODO(swillden): Create a better error code for this.
+        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        return;
+    }
+
     OperationFactory::KeyType op_type(algorithm, request.purpose);
     OperationFactory* factory = OperationFactoryRegistry::Get(op_type);
     if (!factory) {
@@ -312,6 +318,29 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
     }
 }
 
+void GoogleKeymaster::Rescope(const RescopeRequest& request, RescopeResponse* response) {
+    if (response == NULL)
+        return;
+
+    UniquePtr<UnencryptedKeyBlob> blob(
+        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
+    if (response->error != KM_ERROR_OK)
+        return;
+
+    KeyFactory* factory = KeyFactoryRegistry::Get(blob->algorithm());
+    if (!factory) {
+        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return;
+    }
+
+    UniquePtr<Key> key;
+    key.reset(factory->RescopeKey(*blob, request.new_authorizations, &response->error));
+    if (response->error != KM_ERROR_OK)
+        return;
+
+    response->error = SerializeKey(key.get(), blob->origin(), &response->key_blob,
+                                   &response->enforced, &response->unenforced);
+}
 void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
     if (response == NULL)
         return;
