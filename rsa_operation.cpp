@@ -351,7 +351,8 @@ keymaster_error_t RsaSignOperation::SignDigested(Buffer* output) {
     case KM_PAD_RSA_PSS:
         // OpenSSL doesn't verify that the key is large enough for the digest size.  This can cause
         // a segfault in some cases, and in others can result in a unsafely-small salt.
-        if ((unsigned) RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + digest_size)
+        if ((unsigned)RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + digest_size)
+            // TODO(swillden): Add a better return code for this.
             return KM_ERROR_INCOMPATIBLE_DIGEST;
 
         if ((error = PssPadDigest(&padded_digest)) != KM_ERROR_OK)

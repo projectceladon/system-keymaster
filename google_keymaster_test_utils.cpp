@@ -96,6 +96,10 @@ bool operator==(const AuthorizationSet& a, const AuthorizationSet& b) {
     return true;
 }
 
+bool operator!=(const AuthorizationSet& a, const AuthorizationSet& b) {
+    return !(a == b);
+}
+
 std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set) {
     if (set.size() == 0)
         os << "(Empty)" << std::endl;
