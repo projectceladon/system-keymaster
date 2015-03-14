@@ -369,6 +369,8 @@ keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
         return KM_ERROR_INVALID_ARGUMENT;
     }
     iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
+    if (!iv_.get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return KM_ERROR_OK;
 }
 
