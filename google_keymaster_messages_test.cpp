@@ -118,8 +118,8 @@ TEST(RoundTrip, SupportedResponse) {
 static keymaster_key_param_t params[] = {
     Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
     Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_USER_ID, 7),
-    Authorization(TAG_USER_AUTH_ID, 8), Authorization(TAG_APPLICATION_ID, "app_id", 6),
-    Authorization(TAG_AUTH_TIMEOUT, 300),
+    Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD),
+    Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
 };
 uint8_t TEST_DATA[] = "a key blob";
 
@@ -257,7 +257,7 @@ TEST(RoundTrip, UpdateOperationRequest) {
         msg.input.Reinitialize("foo", 3);
 
         UniquePtr<UpdateOperationRequest> deserialized;
-        switch(ver) {
+        switch (ver) {
         case 0:
             deserialized.reset(round_trip(ver, msg, 15));
             break;
@@ -314,7 +314,7 @@ TEST(RoundTrip, FinishOperationRequest) {
         msg.signature.Reinitialize("bar", 3);
 
         UniquePtr<FinishOperationRequest> deserialized;
-        switch(ver) {
+        switch (ver) {
         case 0:
             deserialized.reset(round_trip(ver, msg, 15));
             break;

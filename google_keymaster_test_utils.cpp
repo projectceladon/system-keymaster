@@ -46,6 +46,9 @@ std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
     case KM_ENUM:
         os << " Enum: " << param.enumerated;
         break;
+    case KM_LONG_REP:
+        os << " (Rep)";
+    /* Falls through */
     case KM_LONG:
         os << " Long: " << param.long_integer;
         break;
@@ -168,7 +171,7 @@ keymaster_error_t Keymaster1Test::ImportKey(const AuthorizationSetBuilder& build
 AuthorizationSet Keymaster1Test::UserAuthParams() {
     AuthorizationSet set;
     set.push_back(TAG_USER_ID, 7);
-    set.push_back(TAG_USER_AUTH_ID, 8);
+    set.push_back(TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD);
     set.push_back(TAG_AUTH_TIMEOUT, 300);
     return set;
 }
