@@ -67,7 +67,7 @@ SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new GoogleSoftKeymaster(16)) 
     assert(reinterpret_cast<keymaster_device*>(this) == &device_);
     assert(reinterpret_cast<hw_device_t*>(this) == &(device_.common));
 #endif
-    LOG_I("Creating device");
+    LOG_I("Creating device", 0);
     LOG_D("Device address: %p", this);
 
     memset(&device_, 0, sizeof(device_));
@@ -218,7 +218,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
 int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const uint8_t* key,
                                         const size_t key_length, uint8_t** key_blob,
                                         size_t* key_blob_length) {
-    LOG_D("Device received import_keypair");
+    LOG_D("Device received import_keypair", 0);
 
     if (!dev || !key)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -254,7 +254,7 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
 int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
                                             const uint8_t* key_blob, const size_t key_blob_length,
                                             uint8_t** x509_data, size_t* x509_data_length) {
-    LOG_D("Device received get_keypair_public");
+    LOG_D("Device received get_keypair_public", 0);
 
     if (!dev || !key_blob)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -288,7 +288,7 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
                                    const uint8_t* key_blob, const size_t key_blob_length,
                                    const uint8_t* data, const size_t data_length,
                                    uint8_t** signed_data, size_t* signed_data_length) {
-    LOG_D("Device received sign_data");
+    LOG_D("Device received sign_data", 0);
 
     if (!dev || !params || !key_blob)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -346,7 +346,7 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
                                      const uint8_t* key_blob, const size_t key_blob_length,
                                      const uint8_t* signed_data, const size_t signed_data_length,
                                      const uint8_t* signature, const size_t signature_length) {
-    LOG_D("Device received verify_data");
+    LOG_D("Device received verify_data", 0);
 
     if (!dev || !params || !key_blob || !signed_data || !signature)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;

@@ -228,7 +228,7 @@ TEST(RoundTrip, BeginOperationResponse) {
 
         switch (ver) {
         case 0:
-            EXPECT_EQ(0, deserialized->output_params.size());
+            EXPECT_EQ(0U, deserialized->output_params.size());
             break;
         case 1:
             EXPECT_EQ(msg.output_params, deserialized->output_params);
@@ -296,10 +296,10 @@ TEST(RoundTrip, UpdateOperationResponse) {
 
         switch (ver) {
         case 0:
-            EXPECT_EQ(0, deserialized->input_consumed);
+            EXPECT_EQ(0U, deserialized->input_consumed);
             break;
         case 1:
-            EXPECT_EQ(99, deserialized->input_consumed);
+            EXPECT_EQ(99U, deserialized->input_consumed);
             break;
         default:
             FAIL();
@@ -408,7 +408,7 @@ TEST(RoundTrip, GetVersionRequest) {
     GetVersionRequest msg;
 
     size_t size = msg.SerializedSize();
-    ASSERT_EQ(0, size);
+    ASSERT_EQ(0U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
     EXPECT_EQ(buf.get() + size, msg.Serialize(buf.get(), buf.get() + size));
@@ -427,7 +427,7 @@ TEST(RoundTrip, GetVersionResponse) {
     msg.subminor_ver = 38;
 
     size_t size = msg.SerializedSize();
-    ASSERT_EQ(7, size);
+    ASSERT_EQ(7U, size);
 
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
     EXPECT_EQ(buf.get() + size, msg.Serialize(buf.get(), buf.get() + size));
@@ -436,9 +436,9 @@ TEST(RoundTrip, GetVersionResponse) {
     const uint8_t* p = buf.get();
     EXPECT_TRUE(deserialized.Deserialize(&p, p + size));
     EXPECT_EQ((ptrdiff_t)size, p - buf.get());
-    EXPECT_EQ(9, msg.major_ver);
-    EXPECT_EQ(98, msg.minor_ver);
-    EXPECT_EQ(38, msg.subminor_ver);
+    EXPECT_EQ(9U, msg.major_ver);
+    EXPECT_EQ(98U, msg.minor_ver);
+    EXPECT_EQ(38U, msg.subminor_ver);
 }
 
 TEST(RoundTrip, AddEntropyRequest) {
