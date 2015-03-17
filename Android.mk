@@ -48,17 +48,12 @@ LOCAL_SRC_FILES:= \
 		aes_key.cpp \
 		aes_operation.cpp \
 		asymmetric_key.cpp \
-		authorization_set.cpp \
 		ec_key.cpp \
 		ecdsa_operation.cpp \
 		google_keymaster.cpp \
-		google_keymaster_messages.cpp \
-		google_keymaster_utils.cpp \
 		hmac_key.cpp \
 		hmac_operation.cpp \
 		key.cpp \
-		key_blob.cpp \
-		logger.cpp \
 		ocb.c \
 		openssl_err.cpp \
 		openssl_utils.cpp \
@@ -66,12 +61,11 @@ LOCAL_SRC_FILES:= \
 		operation_table.cpp \
 		rsa_key.cpp \
 		rsa_operation.cpp \
-		serializable.cpp \
 		symmetric_key.cpp \
 		unencrypted_key_blob.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
-LOCAL_SHARED_LIBRARIES := libcrypto
+LOCAL_SHARED_LIBRARIES := libcrypto libkeymaster_messages
 LOCAL_CFLAGS = -Wall -Werror
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
@@ -97,7 +91,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS = -Wall -Werror
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
-LOCAL_SHARED_LIBRARIES := libkeymaster1 liblog libcrypto
+LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
