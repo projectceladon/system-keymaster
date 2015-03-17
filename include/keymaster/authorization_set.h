@@ -135,6 +135,16 @@ class AuthorizationSet : public Serializable {
     int find(keymaster_tag_t tag, int begin = -1) const;
 
     /**
+     * Returns iterator (pointer) to beginning of elems array, to enable STL-style iteration
+     */
+    const keymaster_key_param_t* begin() const { return elems_; }
+
+    /**
+     * Returns iterator (pointer) one past end of elems array, to enable STL-style iteration
+     */
+    const keymaster_key_param_t* end() const { return elems_ + elems_size_; }
+
+    /**
      * Returns the nth element of the set.
      */
     keymaster_key_param_t operator[](int n) const;
