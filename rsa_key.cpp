@@ -29,20 +29,11 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
-class RsaKeyFactory : public AsymmetricKeyFactory {
-  public:
-    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_RSA; }
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
-    virtual Key* ImportKey(const AuthorizationSet& key_description,
-                           keymaster_key_format_t key_format, const uint8_t* key_data,
-                           size_t key_data_length, keymaster_error_t* error);
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
-        return new RsaKey(blob, error);
-    }
-    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
-                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
-};
 static KeyFactoryRegistry::Registration<RsaKeyFactory> registration;
+
+Key* RsaKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+    return new RsaKey(blob, error);
+}
 
 Key* RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) {
     if (!error)
