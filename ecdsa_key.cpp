@@ -22,8 +22,6 @@
 
 namespace keymaster {
 
-const uint32_t ECDSA_DEFAULT_KEY_SIZE = 224;
-
 class EcdsaKeyFactory : public AsymmetricKeyFactory {
   public:
     virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_ECDSA; }
@@ -55,9 +53,11 @@ Key* EcdsaKeyFactory::GenerateKey(const AuthorizationSet& key_description,
 
     AuthorizationSet authorizations(key_description);
 
-    uint32_t key_size = ECDSA_DEFAULT_KEY_SIZE;
-    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size))
-        authorizations.push_back(Authorization(TAG_KEY_SIZE, key_size));
+    uint32_t key_size;
+    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
+        LOG_E("%s", "No key size specified for ECDSA key generation");
+        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
+    }
 
     UniquePtr<EC_KEY, EcdsaKey::ECDSA_Delete> ecdsa_key(EC_KEY_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
