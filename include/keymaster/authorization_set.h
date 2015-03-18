@@ -123,8 +123,8 @@ class AuthorizationSet : public Serializable {
 
     /**
      * Returns the data in a keymaster_key_param_set_t, suitable for returning to C code.  For C
-     * compatibility, the allocated struct and its contents are malloced, not new'ed, and so must be
-     * freed with free(), not delete.  The caller takes ownership.
+     * compatibility, the contents are malloced, not new'ed, and so must be freed with free(), or
+     * better yet with keymaster_free_param_set, not delete.  The caller takes ownership.
      */
     void CopyToParamSet(keymaster_key_param_set_t* set) const;
 
