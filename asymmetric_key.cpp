@@ -20,7 +20,7 @@
 
 #include <hardware/keymaster_defs.h>
 
-#include "ecdsa_key.h"
+#include "ec_key.h"
 #include "openssl_err.h"
 #include "openssl_utils.h"
 #include "rsa_key.h"

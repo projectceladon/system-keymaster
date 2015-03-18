@@ -16,7 +16,7 @@
 
 #include <openssl/ecdsa.h>
 
-#include "ecdsa_key.h"
+#include "ec_key.h"
 #include "ecdsa_operation.h"
 #include "openssl_err.h"
 #include "openssl_utils.h"
@@ -30,7 +30,7 @@ class EcdsaSignOperationFactory : public OperationFactory {
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN); }
 
     virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
-        const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
+        const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
             return NULL;
@@ -60,7 +60,7 @@ class EcdsaVerifyOperationFactory : public OperationFactory {
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_VERIFY); }
 
     virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
-        const EcdsaKey* ecdsa_key = static_cast<const EcdsaKey*>(&key);
+        const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
             return NULL;

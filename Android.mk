@@ -48,7 +48,7 @@ LOCAL_SRC_FILES:= \
 		aes_operation.cpp \
 		asymmetric_key.cpp \
 		authorization_set.cpp \
-		ecdsa_key.cpp \
+		ec_key.cpp \
 		ecdsa_operation.cpp \
 		google_keymaster.cpp \
 		google_keymaster_messages.cpp \
