@@ -83,7 +83,7 @@ class AesEvpOperation : public Operation {
     const keymaster_block_mode_t block_mode_;
     const keymaster_padding_t padding_;
     const bool caller_iv_;
-    UniquePtr<uint8_t> iv_;
+    UniquePtr<uint8_t[]> iv_;
     uint8_t key_[SymmetricKey::MAX_KEY_SIZE];
 };
 
