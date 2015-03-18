@@ -23,7 +23,27 @@
 
 namespace keymaster {
 
-class EcdsaKeyFactory;
+class EcdsaKeyFactory : public AsymmetricKeyFactory {
+  public:
+    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_ECDSA; }
+
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
+    virtual Key* ImportKey(const AuthorizationSet& key_description,
+                           keymaster_key_format_t key_format, const uint8_t* key_data,
+                           size_t key_data_length, keymaster_error_t* error);
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
+    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
+                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
+
+  private:
+    static EC_GROUP* choose_group(size_t key_size_bits);
+    static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
+
+    struct EC_GROUP_Delete {
+        void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
+    };
+};
+
 class EcdsaSignOperationFactory;
 class EcdsaVerifyOperationFactory;
 
