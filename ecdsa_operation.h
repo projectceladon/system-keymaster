@@ -29,12 +29,14 @@ namespace keymaster {
 
 class EcdsaOperation : public Operation {
   public:
-    EcdsaOperation(keymaster_purpose_t purpose, EC_KEY* key)
-        : Operation(purpose), ecdsa_key_(key) {}
+    EcdsaOperation(keymaster_purpose_t purpose, keymaster_digest_t digest, EC_KEY* key)
+        : Operation(purpose), digest_(digest), ecdsa_key_(key) {}
     ~EcdsaOperation();
 
     virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
                                     AuthorizationSet* /* output_params */) {
+        if (digest_ != KM_DIGEST_NONE)
+            return KM_ERROR_UNSUPPORTED_DIGEST;
         return KM_ERROR_OK;
     }
     virtual keymaster_error_t Update(const AuthorizationSet& /* additional_params */,
@@ -44,20 +46,23 @@ class EcdsaOperation : public Operation {
   protected:
     keymaster_error_t StoreData(const Buffer& input, size_t* input_consumed);
 
+    keymaster_digest_t digest_;
     EC_KEY* ecdsa_key_;
     Buffer data_;
 };
 
 class EcdsaSignOperation : public EcdsaOperation {
   public:
-    EcdsaSignOperation(keymaster_purpose_t purpose, EC_KEY* key) : EcdsaOperation(purpose, key) {}
+    EcdsaSignOperation(keymaster_purpose_t purpose, keymaster_digest_t digest, EC_KEY* key)
+        : EcdsaOperation(purpose, digest, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };
 
 class EcdsaVerifyOperation : public EcdsaOperation {
   public:
-    EcdsaVerifyOperation(keymaster_purpose_t purpose, EC_KEY* key) : EcdsaOperation(purpose, key) {}
+    EcdsaVerifyOperation(keymaster_purpose_t purpose, keymaster_digest_t digest, EC_KEY* key)
+        : EcdsaOperation(purpose, digest, key) {}
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 };

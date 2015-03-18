@@ -23,6 +23,8 @@
 
 namespace keymaster {
 
+static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
+
 class EcdsaSignOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN); }
@@ -34,10 +36,21 @@ class EcdsaSignOperationFactory : public OperationFactory {
             return NULL;
         }
 
-        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, ecdsa_key->key());
+        keymaster_digest_t digest;
+        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest)) {
+            *error = KM_ERROR_UNSUPPORTED_DIGEST;
+            return NULL;
+        }
+
+        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, digest, ecdsa_key->key());
         if (!op)
             *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return op;
+    }
+
+    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
+        *digest_count = array_length(supported_digests);
+        return supported_digests;
     }
 };
 static OperationFactoryRegistry::Registration<EcdsaSignOperationFactory> sign_registration;
@@ -53,26 +66,21 @@ class EcdsaVerifyOperationFactory : public OperationFactory {
             return NULL;
         }
 
-        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, ecdsa_key->key());
+        keymaster_digest_t digest;
+        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest)) {
+            *error = KM_ERROR_UNSUPPORTED_DIGEST;
+            return NULL;
+        }
+
+        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, ecdsa_key->key());
         if (!op)
             *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return op;
     }
 
-    // Informational methods
-    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_count) const {
-        *padding_count = 0;
-        return NULL;
-    }
-
-    virtual const keymaster_block_mode_t* SupportedBlockModes(size_t* block_mode_count) const {
-        *block_mode_count = 0;
-        return NULL;
-    }
-
     virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
-        *digest_count = 0;
-        return NULL;
+        *digest_count = array_length(supported_digests);
+        return supported_digests;
     }
 };
 static OperationFactoryRegistry::Registration<EcdsaVerifyOperationFactory> verify_registration;
