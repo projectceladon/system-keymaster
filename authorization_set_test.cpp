@@ -54,6 +54,20 @@ TEST(Construction, Copy) {
     EXPECT_EQ(set, set2);
 }
 
+TEST(Construction, NullProvided) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+    };
+
+    AuthorizationSet set1(params, 0);
+    EXPECT_EQ(0, set1.size());
+    EXPECT_EQ(AuthorizationSet::OK, set1.is_valid());
+
+    AuthorizationSet set2(reinterpret_cast<keymaster_key_param_t*>(NULL), array_length(params));
+    EXPECT_EQ(0, set2.size());
+    EXPECT_EQ(AuthorizationSet::OK, set2.is_valid());
+}
+
 TEST(Lookup, NonRepeated) {
     AuthorizationSet set(AuthorizationSetBuilder()
                              .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
