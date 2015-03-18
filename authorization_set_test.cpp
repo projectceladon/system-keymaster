@@ -21,12 +21,6 @@
 
 #include "google_keymaster_test_utils.h"
 
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    int result = RUN_ALL_TESTS();
-    return result;
-}
-
 namespace keymaster {
 
 namespace test {
@@ -62,11 +56,11 @@ TEST(Construction, NullProvided) {
     };
 
     AuthorizationSet set1(params, 0);
-    EXPECT_EQ(0, set1.size());
+    EXPECT_EQ(0U, set1.size());
     EXPECT_EQ(AuthorizationSet::OK, set1.is_valid());
 
     AuthorizationSet set2(reinterpret_cast<keymaster_key_param_t*>(NULL), array_length(params));
-    EXPECT_EQ(0, set2.size());
+    EXPECT_EQ(0U, set2.size());
     EXPECT_EQ(AuthorizationSet::OK, set2.is_valid());
 }
 

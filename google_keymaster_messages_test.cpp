@@ -24,12 +24,6 @@
 #include "google_keymaster_test_utils.h"
 #include "google_softkeymaster.h"
 
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    int result = RUN_ALL_TESTS();
-    return result;
-}
-
 namespace keymaster {
 namespace test {
 

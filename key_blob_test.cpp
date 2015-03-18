@@ -27,15 +27,6 @@
 
 #include "unencrypted_key_blob.h"
 
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    int result = RUN_ALL_TESTS();
-    // Clean up stuff OpenSSL leaves around, so Valgrind doesn't complain.
-    CRYPTO_cleanup_all_ex_data();
-    ERR_free_strings();
-    return result;
-}
-
 namespace keymaster {
 
 namespace test {

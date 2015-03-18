@@ -212,7 +212,7 @@ keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose) {
     keymaster_error_t error =
         device()->begin(device(), purpose, &blob_, client_params_, array_length(client_params_),
                         &out_params, &out_params_count, &op_handle_);
-    EXPECT_EQ(0, out_params_count);
+    EXPECT_EQ(0U, out_params_count);
     EXPECT_TRUE(out_params == NULL);
     return error;
 }
@@ -235,7 +235,7 @@ keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose,
         if (output_set) {
             output_set->Reinitialize(out_params, out_params_count);
         } else {
-            EXPECT_EQ(0, out_params_count);
+            EXPECT_EQ(0U, out_params_count);
             EXPECT_TRUE(out_params == NULL);
         }
         keymaster_free_param_values(out_params, out_params_count);
@@ -347,7 +347,7 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 void Keymaster1Test::SignMessage(const string& message, string* signature, bool use_client_params) {
     SCOPED_TRACE("SignMessage");
     *signature = ProcessMessage(KM_PURPOSE_SIGN, message, use_client_params);
-    EXPECT_GT(signature->size(), 0);
+    EXPECT_GT(signature->size(), 0U);
 }
 
 void Keymaster1Test::VerifyMessage(const string& message, const string& signature,
@@ -440,7 +440,7 @@ void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_d
                                      KM_KEY_FORMAT_RAW, key));
     string signature;
     SignMessage(message, &signature);
-    EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << digest;
+    EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << (int)digest;
 }
 
 void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonce,
