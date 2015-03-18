@@ -28,38 +28,18 @@
 
 namespace keymaster {
 
-struct PKCS8_PRIV_KEY_INFO_Delete {
-    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
-};
-
 EVP_PKEY* AsymmetricKeyFactory::ExtractEvpKey(keymaster_key_format_t key_format,
                                               keymaster_algorithm_t expected_algorithm,
                                               const uint8_t* key_data, size_t key_data_length,
                                               keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
-
-    if (key_data == NULL || key_data_length <= 0) {
-        *error = KM_ERROR_INVALID_KEY_BLOB;
+    *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+    if (key_format != KM_KEY_FORMAT_PKCS8)
         return NULL;
-    }
 
-    if (key_format != KM_KEY_FORMAT_PKCS8) {
-        *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
+    *error = convert_pkcs8_blob_to_evp(key_data, key_data_length, expected_algorithm, &pkey);
+    if (*error != KM_ERROR_OK)
         return NULL;
-    }
-
-    UniquePtr<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_Delete> pkcs8(
-        d2i_PKCS8_PRIV_KEY_INFO(NULL, &key_data, key_data_length));
-    if (pkcs8.get() == NULL) {
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return NULL;
-    }
-
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKCS82PKEY(pkcs8.get()));
-    if (pkey.get() == NULL || EVP_PKEY_type(pkey->type) != convert_to_evp(expected_algorithm)) {
-        *error = KM_ERROR_INVALID_KEY_BLOB;
-        return NULL;
-    }
 
     return pkey.release();
 }
@@ -74,18 +54,6 @@ static const keymaster_key_format_t supported_export_formats[] = {KM_KEY_FORMAT_
 const keymaster_key_format_t* AsymmetricKeyFactory::SupportedExportFormats(size_t* format_count) {
     *format_count = array_length(supported_export_formats);
     return supported_export_formats;
-}
-
-/* static */
-int AsymmetricKeyFactory::convert_to_evp(keymaster_algorithm_t algorithm) {
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-        return EVP_PKEY_RSA;
-    case KM_ALGORITHM_ECDSA:
-        return EVP_PKEY_EC;
-    default:
-        return -1;
-    };
 }
 
 keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
