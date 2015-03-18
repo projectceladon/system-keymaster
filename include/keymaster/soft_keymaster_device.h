@@ -43,6 +43,7 @@ class SoftKeymasterDevice {
     SoftKeymasterDevice();
 
     hw_device_t* hw_device();
+    keymaster1_device_t* keymaster_device();
 
     // Public only for testing
     void GetVersion(const GetVersionRequest& req, GetVersionResponse* rsp) {

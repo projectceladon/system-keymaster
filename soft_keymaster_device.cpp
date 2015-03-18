@@ -118,6 +118,10 @@ hw_device_t* SoftKeymasterDevice::hw_device() {
     return &device_.common;
 }
 
+keymaster1_device_t* SoftKeymasterDevice::keymaster_device() {
+    return &device_;
+}
+
 static keymaster_key_characteristics_t* BuildCharacteristics(const AuthorizationSet& hw_enforced,
                                                              const AuthorizationSet& sw_enforced) {
     keymaster_key_characteristics_t* characteristics =
