@@ -389,7 +389,7 @@ class AuthorizationSetBuilder {
     AuthorizationSetBuilder& RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent,
                                               keymaster_padding_t padding);
 
-    AuthorizationSetBuilder& EcdsaSigningKey(uint32_t key_size);
+    AuthorizationSetBuilder& EcdsaSigningKey(uint32_t key_size, keymaster_digest_t digest);
     AuthorizationSetBuilder& AesEncryptionKey(uint32_t key_size);
     AuthorizationSetBuilder& SigningKey();
     AuthorizationSetBuilder& EncryptionKey();
@@ -454,9 +454,11 @@ AuthorizationSetBuilder::RsaEncryptionKey(uint32_t key_size, uint64_t public_exp
     return Authorization(TAG_PADDING, padding);
 }
 
-inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcdsaSigningKey(uint32_t key_size) {
+inline AuthorizationSetBuilder&
+AuthorizationSetBuilder::EcdsaSigningKey(uint32_t key_size, keymaster_digest_t digest) {
     EcdsaKey(key_size);
-    return SigningKey();
+    SigningKey();
+    return Authorization(TAG_DIGEST, digest);
 }
 
 inline AuthorizationSetBuilder& AuthorizationSetBuilder::AesEncryptionKey(uint32_t key_size) {

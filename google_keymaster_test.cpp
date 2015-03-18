@@ -524,7 +524,7 @@ TEST_F(CheckSupported, SupportedDigests) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_ECDSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE}, digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
@@ -656,7 +656,8 @@ TEST_F(NewKeyGeneration, RsaDefaultSize) {
 }
 
 TEST_F(NewKeyGeneration, Ecdsa) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -665,7 +666,8 @@ TEST_F(NewKeyGeneration, Ecdsa) {
 }
 
 TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -677,13 +679,14 @@ TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
 
 TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190, KM_DIGEST_NONE)));
 }
 
 TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
     size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
-        EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size)))
+        EXPECT_EQ(KM_ERROR_OK,
+                  GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size, KM_DIGEST_NONE)))
             << "Failed to generate size: " << size;
     }
 }
@@ -774,7 +777,8 @@ TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
 }
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -1329,7 +1333,8 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
 }
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -1389,7 +1394,8 @@ TEST_F(ExportKeyTest, RsaSuccess) {
 }
 
 TEST_F(ExportKeyTest, EcdsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
     EXPECT_GT(export_data.length(), 0);
@@ -1474,7 +1480,7 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE),
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
@@ -1495,7 +1501,7 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE),
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
@@ -1516,8 +1522,10 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(224),  // Size does not match key
-                        KM_KEY_FORMAT_PKCS8, pk8_key));
+              ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(
+                            224, KM_DIGEST_NONE),  // Size does not match key
+                        KM_KEY_FORMAT_PKCS8,
+                        pk8_key));
 }
 
 TEST_F(ImportKeyTest, AesKeySuccess) {
