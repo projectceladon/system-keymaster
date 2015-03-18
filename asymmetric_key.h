@@ -31,9 +31,6 @@ class AsymmetricKeyFactory : public KeyFactory {
 
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count);
-
-  private:
-    static int convert_to_evp(keymaster_algorithm_t algorithm);
 };
 
 class AsymmetricKey : public Key {

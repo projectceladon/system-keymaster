@@ -19,10 +19,13 @@
 
 #include <openssl/evp.h>
 #include <openssl/bn.h>
+#include <openssl/x509.h>
 
 #include <UniquePtr.h>
 
 #include <hardware/keymaster_defs.h>
+
+namespace keymaster {
 
 struct EVP_PKEY_Delete {
     void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
@@ -30,6 +33,10 @@ struct EVP_PKEY_Delete {
 
 struct BIGNUM_Delete {
     void operator()(BIGNUM* p) const { BN_free(p); }
+};
+
+struct PKCS8_PRIV_KEY_INFO_Delete {
+    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
 };
 
 /**
@@ -42,10 +49,12 @@ inline void release_because_ownership_transferred(UniquePtr<T, Delete_T>& p) {
     T* val __attribute__((unused)) = p.release();
 }
 
-inline void convert_bn_to_blob(BIGNUM* bn, keymaster_blob_t* blob) {
-    blob->data_length = BN_num_bytes(bn);
-    blob->data = new uint8_t[blob->data_length];
-    BN_bn2bin(bn, const_cast<uint8_t*>(blob->data));
-}
+void convert_bn_to_blob(BIGNUM* bn, keymaster_blob_t* blob);
+
+keymaster_error_t convert_pkcs8_blob_to_evp(const uint8_t* key_data, size_t key_length,
+                                            keymaster_algorithm_t expected_algorithm,
+                                            UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey);
+
+}  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_OPENSSL_UTILS_H_
