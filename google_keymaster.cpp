@@ -32,7 +32,6 @@
 #include "key.h"
 #include "openssl_err.h"
 #include "operation.h"
-#include "operation_table.h"
 #include "unencrypted_key_blob.h"
 
 namespace keymaster {
@@ -42,10 +41,16 @@ const uint8_t MINOR_VER = 0;
 const uint8_t SUBMINOR_VER = 0;
 
 GoogleKeymaster::GoogleKeymaster(size_t operation_table_size)
-    : operation_table_(new OperationTable(operation_table_size)) {
+    : operation_table_(new OpTableEntry[operation_table_size]),
+      operation_table_size_(operation_table_size) {
+    if (operation_table_.get() == NULL)
+        operation_table_size_ = 0;
 }
 
 GoogleKeymaster::~GoogleKeymaster() {
+    for (size_t i = 0; i < operation_table_size_; ++i)
+        if (operation_table_[i].operation != NULL)
+            delete operation_table_[i].operation;
 }
 
 struct AE_CTX_Delete {
@@ -245,7 +250,7 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (response->error != KM_ERROR_OK)
         return;
 
-    response->error = operation_table_->Add(operation.release(), &response->op_handle);
+    response->error = AddOperation(operation.release(), &response->op_handle);
 }
 
 void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
@@ -253,16 +258,17 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
     if (response == NULL)
         return;
 
-    response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
-    Operation* operation = operation_table_->Find(request.op_handle);
-    if (operation == NULL)
+    OpTableEntry* entry = FindOperation(request.op_handle);
+    if (entry == NULL) {
+        response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
         return;
+    }
 
-    response->error = operation->Update(request.additional_params, request.input, &response->output,
-                                        &response->input_consumed);
+    response->error = entry->operation->Update(request.additional_params, request.input,
+                                               &response->output, &response->input_consumed);
     if (response->error != KM_ERROR_OK) {
         // Any error invalidates the operation.
-        operation_table_->Delete(request.op_handle);
+        DeleteOperation(entry);
     }
 }
 
@@ -271,23 +277,23 @@ void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
     if (response == NULL)
         return;
 
-    response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
-    Operation* operation = operation_table_->Find(request.op_handle);
-    if (operation == NULL)
+    OpTableEntry* entry = FindOperation(request.op_handle);
+    if (entry == NULL) {
+        response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
         return;
+    }
 
     response->error =
-        operation->Finish(request.additional_params, request.signature, &response->output);
-    operation_table_->Delete(request.op_handle);
+        entry->operation->Finish(request.additional_params, request.signature, &response->output);
+    DeleteOperation(entry);
 }
 
 keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_handle_t op_handle) {
-    Operation* operation = operation_table_->Find(op_handle);
-    if (operation == NULL)
+    OpTableEntry* entry = FindOperation(op_handle);
+    if (entry == NULL)
         return KM_ERROR_INVALID_OPERATION_HANDLE;
-
-    keymaster_error_t error = operation->Abort();
-    operation_table_->Delete(op_handle);
+    keymaster_error_t error = entry->operation->Abort();
+    DeleteOperation(entry);
     if (error != KM_ERROR_OK)
         return error;
     return KM_ERROR_OK;
@@ -505,6 +511,44 @@ void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
         enforced->push_back(auth);
     else
         unenforced->push_back(auth);
+}
+
+keymaster_error_t GoogleKeymaster::AddOperation(Operation* operation,
+                                                keymaster_operation_handle_t* op_handle) {
+    UniquePtr<Operation> op(operation);
+    if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) == 0)
+        return TranslateLastOpenSslError();
+    if (*op_handle == 0) {
+        // Statistically this is vanishingly unlikely, which means if it ever happens in practice,
+        // it indicates a broken RNG.
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    for (size_t i = 0; i < operation_table_size_; ++i) {
+        if (operation_table_[i].operation == NULL) {
+            operation_table_[i].operation = op.release();
+            operation_table_[i].handle = *op_handle;
+            return KM_ERROR_OK;
+        }
+    }
+    return KM_ERROR_TOO_MANY_OPERATIONS;
+}
+
+GoogleKeymaster::OpTableEntry*
+GoogleKeymaster::FindOperation(keymaster_operation_handle_t op_handle) {
+    if (op_handle == 0)
+        return NULL;
+
+    for (size_t i = 0; i < operation_table_size_; ++i) {
+        if (operation_table_[i].handle == op_handle)
+            return operation_table_.get() + i;
+    }
+    return NULL;
+}
+
+void GoogleKeymaster::DeleteOperation(OpTableEntry* entry) {
+    delete entry->operation;
+    entry->operation = NULL;
+    entry->handle = 0;
 }
 
 }  // namespace keymaster
