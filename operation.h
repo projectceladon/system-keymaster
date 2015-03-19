@@ -91,7 +91,7 @@ class Operation {
                                     AuthorizationSet* output_params) = 0;
     virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
                                      Buffer* output, size_t* input_consumed) = 0;
-    virtual keymaster_error_t Finish(const AuthorizationSet& /* additional_params */,
+    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output) = 0;
     virtual keymaster_error_t Abort() = 0;
 
