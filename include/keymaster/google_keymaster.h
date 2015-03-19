@@ -23,8 +23,8 @@
 namespace keymaster {
 
 class Key;
+class Operation;
 class UnencryptedKeyBlob;
-class OperationTable;
 
 /**
  * OpenSSL-based Keymaster backing implementation, for use as a pure software implmentation
@@ -96,7 +96,21 @@ class GoogleKeymaster {
     void AddAuthorization(const keymaster_key_param_t& auth, AuthorizationSet* enforced,
                           AuthorizationSet* unenforced);
 
-    UniquePtr<OperationTable> operation_table_;
+    struct OpTableEntry {
+        OpTableEntry() {
+            handle = 0;
+            operation = NULL;
+        }
+        keymaster_operation_handle_t handle;
+        Operation* operation;
+    };
+
+    keymaster_error_t AddOperation(Operation* operation, keymaster_operation_handle_t* op_handle);
+    OpTableEntry* FindOperation(keymaster_operation_handle_t op_handle);
+    void DeleteOperation(OpTableEntry* entry);
+
+    UniquePtr<OpTableEntry[]> operation_table_;
+    size_t operation_table_size_;
 };
 
 }  // namespace keymaster
