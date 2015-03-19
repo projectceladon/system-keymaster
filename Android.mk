@@ -62,6 +62,7 @@ LOCAL_SRC_FILES:= \
 		openssl_err.cpp \
 		openssl_utils.cpp \
 		operation.cpp \
+		operation_table.cpp \
 		rsa_key.cpp \
 		rsa_operation.cpp \
 		serializable.cpp \
