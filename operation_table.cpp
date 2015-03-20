@@ -76,8 +76,9 @@ bool OperationTable::Delete(keymaster_operation_handle_t op_handle) {
 
     for (size_t i = 0; i < table_size_; ++i) {
         if (table_[i].handle == op_handle) {
-            // Destructor does the right thing, call it.
-            table_[i].Entry::~Entry();
+            delete table_[i].operation;
+            table_[i].operation = NULL;
+            table_[i].handle = 0;
             return true;
         }
     }
