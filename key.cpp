@@ -18,10 +18,7 @@
 
 #include <openssl/x509.h>
 
-#include "ecdsa_key.h"
 #include "openssl_utils.h"
-#include "rsa_key.h"
-#include "symmetric_key.h"
 #include "unencrypted_key_blob.h"
 
 namespace keymaster {
