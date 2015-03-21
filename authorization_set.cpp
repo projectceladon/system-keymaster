@@ -277,6 +277,7 @@ static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, cons
         buf = append_uint32_to_buf(buf, end, param.integer);
         break;
     case KM_LONG:
+    case KM_LONG_REP:
         buf = append_uint64_to_buf(buf, end, param.long_integer);
         break;
     case KM_DATE:
@@ -526,6 +527,21 @@ bool AuthorizationSet::GetTagValueLong(keymaster_tag_t tag, uint64_t* val) const
     int pos = find(tag);
     if (pos == -1) {
         return false;
+    }
+    *val = elems_[pos].long_integer;
+    return true;
+}
+
+bool AuthorizationSet::GetTagValueLongRep(keymaster_tag_t tag, size_t instance,
+                                          uint64_t* val) const {
+    size_t count = 0;
+    int pos = -1;
+    while (count <= instance) {
+        pos = find(tag, pos);
+        if (pos == -1) {
+            return false;
+        }
+        ++count;
     }
     *val = elems_[pos].long_integer;
     return true;

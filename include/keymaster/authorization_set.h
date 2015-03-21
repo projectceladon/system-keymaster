@@ -173,6 +173,16 @@ class AuthorizationSet : public Serializable {
     }
 
     /**
+     * If the specified instance of the specified integer-typed \p tag exists, places its value
+     * in \p val and returns true.  If \p tag is not present, leaves \p val unmodified and returns
+     * false.
+     */
+    template <keymaster_tag_t Tag>
+    bool GetTagValue(TypedTag<KM_LONG_REP, Tag> tag, size_t instance, uint64_t* val) const {
+        return GetTagValueLongRep(tag, instance, val);
+    }
+
+    /**
      * If the specified enumeration-typed \p tag exists, places its value in \p val and returns
      * true.  If \p tag is not present, leaves \p val unmodified and returns false.
      */
@@ -329,6 +339,7 @@ class AuthorizationSet : public Serializable {
     bool GetTagValueInt(keymaster_tag_t tag, uint32_t* val) const;
     bool GetTagValueIntRep(keymaster_tag_t tag, size_t instance, uint32_t* val) const;
     bool GetTagValueLong(keymaster_tag_t tag, uint64_t* val) const;
+    bool GetTagValueLongRep(keymaster_tag_t tag, size_t instance, uint64_t* val) const;
     bool GetTagValueDate(keymaster_tag_t tag, uint64_t* val) const;
     bool GetTagValueBlob(keymaster_tag_t tag, keymaster_blob_t* val) const;
     bool GetTagValueBool(keymaster_tag_t tag) const;
