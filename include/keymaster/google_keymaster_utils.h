@@ -176,6 +176,36 @@ template <typename T> class ArrayWrapper {
     T* end_;
 };
 
+/**
+ * Convert any unsigned integer from network to host order.  We implement this here rather than
+ * using the functions from arpa/inet.h because the TEE doesn't have inet.h.  This isn't the most
+ * efficient implementation, but the compiler should unroll the loop and tighten it up.
+ */
+template <typename T> T ntoh(T t) {
+    const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&t);
+    T retval = 0;
+    for (size_t i = 0; i < sizeof(t); ++i) {
+        retval <<= 8;
+        retval |= byte_ptr[i];
+    }
+    return retval;
+}
+
+/**
+ * Convert any unsigned integer from host to network order.  We implement this here rather than
+ * using the functions from arpa/inet.h because the TEE doesn't have inet.h.  This isn't the most
+ * efficient implementation, but the compiler should unroll the loop and tighten it up.
+ */
+template <typename T> T hton(T t) {
+    T retval;
+    uint8_t* byte_ptr = reinterpret_cast<uint8_t*>(&retval);
+    for (size_t i = sizeof(t); i > 0; --i) {
+        byte_ptr[i - 1] = t & 0xFF;
+        t >>= 8;
+    }
+    return retval;
+}
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
