@@ -19,14 +19,14 @@ endif
 
 CPPFLAGS=$(INCLUDES) -g -O0 -MD
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
-	-Wmissing-declarations -ftest-coverage \
+	-Werror=sign-compare -Wmissing-declarations -ftest-coverage -fno-permissive \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
 	$(COMPILER_SPECIFIC_ARGS)
 
 # Uncomment to enable debug logging.
 # CXXFLAGS += -DDEBUG
 
-LDLIBS=-lcrypto -lpthread -lstdc++
+LDLIBS=-lcrypto -lpthread -lstdc++ -lgcov
 
 CPPSRCS=\
 	abstract_factory_registry_test.cpp \
@@ -67,8 +67,6 @@ CSRCS=ocb.c
 
 OBJS=$(CPPSRCS:.cpp=.o) $(CCSRCS:.cc=.o) $(CSRCS:.c=.o)
 DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
-
-LINK.o=$(LINK.cc)
 
 BINARIES = abstract_factory_registry_test \
 	authorization_set_test \
@@ -168,7 +166,7 @@ google_keymaster_test: google_keymaster_test.o \
 	openssl_err.o \
 	openssl_utils.o \
 	operation.o \
-	operation_table.cpp \
+	operation_table.o \
 	rsa_key.o \
 	rsa_operation.o \
 	serializable.o \
@@ -197,7 +195,7 @@ ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) \
 		$(BINARIES:=.run) $(BINARIES:=.memcheck) $(BINARIES:=.massif) \
-		*gcno *gcda coverage.info
+		*gcov *gcno *gcda coverage.info
 	rm -rf coverage
 
 -include $(CPPSRCS:.cpp=.d)
