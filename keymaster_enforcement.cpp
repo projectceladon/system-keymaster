@@ -83,6 +83,9 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
             tag_user_id_present = true;
             return_error = UserAuthenticated(param, uid);
             break;
+        case KM_TAG_USER_SECURE_ID:
+            // TODO(swillden): Handle this.
+            break;
         case KM_TAG_AUTH_TOKEN:
             // TODO(swillden): Handle this.
             break;
@@ -90,7 +93,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
             return_error = KM_ERROR_OK;
             tag_no_auth_required_present = true;
             break;
-        case KM_TAG_USER_AUTH_ID:
+        case KM_TAG_USER_AUTH_TYPE:
             tag_user_auth_id_present = true;
             return_error = KM_ERROR_OK;
             break;

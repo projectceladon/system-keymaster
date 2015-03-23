@@ -58,6 +58,7 @@
  * compilation units and not others.
  */
 
+#include <hardware/hw_auth_token.h>
 #include <hardware/keymaster_defs.h>
 
 namespace keymaster {
@@ -81,6 +82,7 @@ class Void {
  */
 template <keymaster_tag_type_t tag_type> struct TagValueType {};
 template <> struct TagValueType<KM_LONG> { typedef uint64_t value_type; };
+template <> struct TagValueType<KM_LONG_REP> { typedef uint64_t value_type; };
 template <> struct TagValueType<KM_DATE> { typedef uint64_t value_type; };
 template <> struct TagValueType<KM_INT> { typedef uint32_t value_type; };
 template <> struct TagValueType<KM_INT_REP> { typedef uint32_t value_type; };
@@ -167,8 +169,8 @@ DEFINE_KEYMASTER_TAG(KM_INT, TAG_MIN_SECONDS_BETWEEN_OPS);
 DEFINE_KEYMASTER_TAG(KM_INT, TAG_MAX_USES_PER_BOOT);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_USERS);
 DEFINE_KEYMASTER_TAG(KM_INT, TAG_USER_ID);
+DEFINE_KEYMASTER_TAG(KM_LONG_REP, TAG_USER_SECURE_ID);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_NO_AUTH_REQUIRED);
-DEFINE_KEYMASTER_TAG(KM_INT_REP, TAG_USER_AUTH_ID);
 DEFINE_KEYMASTER_TAG(KM_INT, TAG_AUTH_TIMEOUT);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_APPLICATIONS);
 DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_APPLICATION_ID);
@@ -198,6 +200,7 @@ DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_RESCOPING_DEL, keymaster_tag_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_BLOB_USAGE_REQUIREMENTS,
                           keymaster_key_blob_usage_requirements_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_ORIGIN, keymaster_key_origin_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_USER_AUTH_TYPE, hw_authenticator_type_t);
 
 //
 // Overloaded function "Authorization" to create keymaster_key_param_t objects for all of tags.
@@ -220,6 +223,11 @@ inline keymaster_key_param_t Authorization(TypedTag<KM_INT_REP, Tag> tag, uint32
 
 template <keymaster_tag_t Tag>
 inline keymaster_key_param_t Authorization(TypedTag<KM_LONG, Tag> tag, uint64_t value) {
+    return keymaster_param_long(tag, value);
+}
+
+template <keymaster_tag_t Tag>
+inline keymaster_key_param_t Authorization(TypedTag<KM_LONG_REP, Tag> tag, uint64_t value) {
     return keymaster_param_long(tag, value);
 }
 

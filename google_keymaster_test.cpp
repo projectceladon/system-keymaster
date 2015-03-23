@@ -241,7 +241,7 @@ class NewKeyGeneration : public KeymasterTest {
         EXPECT_TRUE(contains(auths, TAG_PURPOSE, KM_PURPOSE_SIGN));
         EXPECT_TRUE(contains(auths, TAG_PURPOSE, KM_PURPOSE_VERIFY));
         EXPECT_TRUE(contains(auths, TAG_USER_ID, 7));
-        EXPECT_TRUE(contains(auths, TAG_USER_AUTH_ID, 8));
+        EXPECT_TRUE(contains(auths, TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD));
         EXPECT_TRUE(contains(auths, TAG_AUTH_TIMEOUT, 300));
 
         // Verify that App ID, App data and ROT are NOT included.
