@@ -36,7 +36,7 @@ CPPSRCS=\
 	asymmetric_key.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
-	ecdsa_key.cpp \
+	ec_key.cpp \
 	ecdsa_operation.cpp \
 	google_keymaster.cpp \
 	google_keymaster_messages.cpp \
@@ -151,7 +151,7 @@ google_keymaster_test: google_keymaster_test.o \
 	aes_operation.o \
 	asymmetric_key.o \
 	authorization_set.o \
-	ecdsa_key.o \
+	ec_key.o \
 	ecdsa_operation.o \
 	google_keymaster.o \
 	google_keymaster_messages.o \
