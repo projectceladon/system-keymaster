@@ -53,12 +53,7 @@ class AesOperationFactory : public OperationFactory {
 
 Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
     *error = KM_ERROR_OK;
-
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
-    if (!symmetric_key) {
-        *error = KM_ERROR_UNKNOWN_ERROR;
-        return NULL;
-    }
 
     switch (symmetric_key->key_data_size()) {
     case 16:
@@ -105,14 +100,12 @@ Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key, bool
     uint32_t chunk_length;
     if (!key.authorizations().GetTagValue(TAG_CHUNK_LENGTH, &chunk_length) ||
         chunk_length > AeadModeOperation::MAX_CHUNK_LENGTH)
-        // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_ARGUMENT;
+        *error = KM_ERROR_UNSUPPORTED_CHUNK_LENGTH;
 
     uint32_t tag_length;
     if (!key.authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length) ||
         tag_length > AeadModeOperation::MAX_TAG_LENGTH)
-        // TODO(swillden): Create and use a better return code.
-        *error = KM_ERROR_INVALID_ARGUMENT;
+        *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
 
     keymaster_padding_t padding;
     if (key.authorizations().GetTagValue(TAG_PADDING, &padding) && padding != KM_PAD_NONE)
@@ -291,7 +284,7 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
         EVP_CipherInit_ex(&ctx_, cipher, NULL /* engine */, key_, iv_.get(), evp_encrypt_mode());
 
     if (!init_result)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return TranslateLastOpenSslError();
 
     switch (padding_) {
     case KM_PAD_NONE:

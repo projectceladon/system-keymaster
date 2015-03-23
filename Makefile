@@ -123,6 +123,7 @@ massif: $(BINARIES:=.massif)
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
 	google_keymaster_test_utils.o \
+	logger.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 
@@ -142,6 +143,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \
 	google_keymaster_utils.o \
+	logger.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 
@@ -176,6 +178,7 @@ google_keymaster_test: google_keymaster_test.o \
 	$(GTEST)/src/gtest-all.o
 
 abstract_factory_registry_test: abstract_factory_registry_test.o \
+	logger.o \
 	$(GTEST)/src/gtest-all.o
 
 keymaster_enforcement_test: keymaster_enforcement_test.o \
@@ -184,6 +187,7 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 	google_keymaster_utils.o \
 	google_keymaster_messages.o \
 	google_keymaster_test_utils.o \
+	logger.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 

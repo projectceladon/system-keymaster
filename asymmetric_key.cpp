@@ -64,9 +64,8 @@ keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
     EVP_PKEY* tmp_pkey = evp_key.get();
     const uint8_t* key_material = blob.unencrypted_key_material();
     if (d2i_PrivateKey(evp_key_type(), &tmp_pkey, &key_material, blob.key_material_length()) ==
-        NULL) {
-        return KM_ERROR_INVALID_KEY_BLOB;
-    }
+        NULL)
+        return TranslateLastOpenSslError();
     if (!EvpToInternal(evp_key.get()))
         return TranslateLastOpenSslError();
 

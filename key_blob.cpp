@@ -18,6 +18,7 @@
 
 #include <keymaster/google_keymaster_utils.h>
 #include <keymaster/key_blob.h>
+#include <keymaster/logger.h>
 
 namespace keymaster {
 
@@ -93,6 +94,7 @@ bool KeyBlob::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
         // Based on those two checks alone, the probability of interpreting an unversioned blob as a
         // version 0 blob is 1/2^40.  That's small enough to be negligible, but there are additional
         // checks which lower it further.
+        LOG_I("Failed to deserialize versioned key blob.  Assuming unversioned.");
         *buf_ptr = start;
         if (!DeserializeUnversionedBlob(buf_ptr, end))
             return false;
@@ -114,6 +116,7 @@ bool KeyBlob::DeserializeUnversionedBlob(const uint8_t** buf_ptr, const uint8_t*
         !copy_from_buf(buf_ptr, end, tag_.get(), TAG_LENGTH) ||
         !enforced_.Deserialize(buf_ptr, end) || !unenforced_.Deserialize(buf_ptr, end)) {
         encrypted_key_material_.reset();
+        LOG_E("Failed to deserialize unversioned blob", 0);
         error_ = KM_ERROR_INVALID_KEY_BLOB;
         return false;
     }

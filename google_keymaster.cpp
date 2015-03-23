@@ -199,7 +199,6 @@ void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& 
                                             GetKeyCharacteristicsResponse* response) {
     if (response == NULL)
         return;
-    response->error = KM_ERROR_UNKNOWN_ERROR;
 
     UniquePtr<KeyBlob> blob(
         LoadKeyBlob(request.key_blob, request.additional_params, &(response->error)));
@@ -208,7 +207,6 @@ void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& 
 
     response->enforced.Reinitialize(blob->enforced());
     response->unenforced.Reinitialize(blob->unenforced());
-    response->error = KM_ERROR_OK;
 }
 
 void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
@@ -224,8 +222,7 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
 
     if (key->rescopable()) {
-        // TODO(swillden): Create a better error code for this.
-        response->error = KM_ERROR_INVALID_KEY_BLOB;
+        response->error = KM_ERROR_RESCOPABLE_KEY_NOT_USABLE;
         return;
     }
 
@@ -459,10 +456,12 @@ keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key
         // These cannot be specified by the client.
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_ORIGIN:
+            LOG_E("Root of trust and origin tags may not be specified", 0);
             return KM_ERROR_INVALID_TAG;
 
         // These don't work.
         case KM_TAG_ROLLBACK_RESISTANT:
+            LOG_E("KM_TAG_ROLLBACK_RESISTANT not supported", 0);
             return KM_ERROR_UNSUPPORTED_TAG;
 
         // These are hidden.

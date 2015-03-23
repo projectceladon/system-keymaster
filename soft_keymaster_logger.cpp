@@ -24,36 +24,28 @@
 
 namespace keymaster {
 
-int SoftKeymasterLogger::debug(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int retval = LOG_PRI_VA(LOG_DEBUG, LOG_TAG, fmt, args);
-    va_end(args);
-    return retval;
-}
+int SoftKeymasterLogger::log_msg(LogLevel level, const char* fmt, va_list args) const {
 
-int SoftKeymasterLogger::info(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int retval = LOG_PRI_VA(LOG_INFO, LOG_TAG, fmt, args);
-    va_end(args);
-    return retval;
-}
+    int android_log_level = ANDROID_LOG_ERROR;
+    switch (level) {
+    case DEBUG_LVL:
+        android_log_level = ANDROID_LOG_DEBUG;
+        break;
+    case INFO_LVL:
+        android_log_level = ANDROID_LOG_INFO;
+        break;
+    case WARNING_LVL:
+        android_log_level = ANDROID_LOG_WARN;
+        break;
+    case ERROR_LVL:
+        android_log_level = ANDROID_LOG_ERROR;
+        break;
+    case SEVERE_LVL:
+        android_log_level = ANDROID_LOG_ERROR;
+        break;
+    }
 
-int SoftKeymasterLogger::error(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int retval = LOG_PRI_VA(LOG_ERR, LOG_TAG, fmt, args);
-    va_end(args);
-    return retval;
-}
-
-int SoftKeymasterLogger::severe(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int retval = LOG_PRI_VA(LOG_CRIT, LOG_TAG, fmt, args);
-    va_end(args);
-    return retval;
+    return LOG_PRI_VA(android_log_level, LOG_TAG, fmt, args);
 }
 
 }  // namespace keymaster

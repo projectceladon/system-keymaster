@@ -1378,7 +1378,7 @@ TEST_F(EncryptionOperationsTest, AesDecryptTooShortNonce) {
     string ciphertext(15, 'a');
     AuthorizationSet input_params;
     input_params.push_back(TAG_NONCE, "aaaaaaaaaaa", 11);
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_DECRYPT, input_params));
+    EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_DECRYPT, input_params));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
@@ -1469,7 +1469,7 @@ TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_OCB)
                                            .Authorization(TAG_MAC_LENGTH, 16)));
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_ENCRYPT));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_CHUNK_LENGTH, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
@@ -1483,7 +1483,7 @@ TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
 TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 17)));
-    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, BeginOperation(KM_PURPOSE_ENCRYPT));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 uint8_t rfc_7523_test_key_data[] = {
@@ -1940,7 +1940,7 @@ TEST_F(RescopingTest, KeyWithRescopingNotUsable) {
         GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16).Authorization(
             TAG_RESCOPING_ADD, KM_TAG_MAC_LENGTH)));
     // TODO(swillden): Add a better error code for this.
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT));
+    EXPECT_EQ(KM_ERROR_RESCOPABLE_KEY_NOT_USABLE, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 TEST_F(RescopingTest, RescopeSymmetric) {
