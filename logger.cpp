@@ -20,54 +20,6 @@ namespace keymaster {
 
 Logger* Logger::instance_ = 0;
 
-int Logger::log(LogLevel level, const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(level, fmt, args);
-    va_end(args);
-    return result;
-}
-
-int Logger::debug(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(DEBUG_LVL, fmt, args);
-    va_end(args);
-    return result;
-}
-
-int Logger::info(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(INFO_LVL, fmt, args);
-    va_end(args);
-    return result;
-}
-
-int Logger::warning(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(WARNING_LVL, fmt, args);
-    va_end(args);
-    return result;
-}
-
-int Logger::error(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(ERROR_LVL, fmt, args);
-    va_end(args);
-    return result;
-}
-
-int Logger::severe(const char* fmt, ...) const {
-    va_list args;
-    va_start(args, fmt);
-    int result = log_msg(SEVERE_LVL, fmt, args);
-    va_end(args);
-    return result;
-}
-
 /* static */
 int Logger::Log(LogLevel level, const char* fmt, va_list args) {
     if (!instance_)
