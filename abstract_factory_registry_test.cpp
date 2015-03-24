@@ -60,7 +60,7 @@ TEST(RegistryTest, RegisterAndDeregister) {
         EXPECT_FALSE(TestRegistry::instance_ptr == NULL);
 
         // Registry should contain instance.
-        EXPECT_EQ(1, TestRegistry::size());
+        EXPECT_EQ(1U, TestRegistry::size());
         ASSERT_TRUE(TestRegistry::Get(1) != NULL);
         EXPECT_EQ(1, TestRegistry::Get(1)->registry_key());
 
@@ -82,7 +82,7 @@ TEST(RegistryTest, RegisterAndDeregisterTwo) {
         EXPECT_FALSE(TestRegistry::instance_ptr == NULL);
 
         // Registry should contain instance.
-        EXPECT_EQ(1, TestRegistry::size());
+        EXPECT_EQ(1U, TestRegistry::size());
         ASSERT_TRUE(TestRegistry::Get(1) != NULL);
         EXPECT_EQ(1, TestRegistry::Get(1)->registry_key());
 
@@ -90,7 +90,7 @@ TEST(RegistryTest, RegisterAndDeregisterTwo) {
             REGISTER_FACTORY(2);
 
             // Registry should contain both.
-            EXPECT_EQ(2, TestRegistry::size());
+            EXPECT_EQ(2U, TestRegistry::size());
             ASSERT_TRUE(TestRegistry::Get(1) != NULL);
             ASSERT_TRUE(TestRegistry::Get(2) != NULL);
             EXPECT_EQ(1, TestRegistry::Get(1)->registry_key());
@@ -100,7 +100,7 @@ TEST(RegistryTest, RegisterAndDeregisterTwo) {
         }
 
         // Registry should contain first still.
-        EXPECT_EQ(1, TestRegistry::size());
+        EXPECT_EQ(1U, TestRegistry::size());
         ASSERT_TRUE(TestRegistry::Get(2) == NULL);
         ASSERT_TRUE(TestRegistry::Get(1) != NULL);
         EXPECT_EQ(1, TestRegistry::Get(1)->registry_key());
@@ -133,7 +133,7 @@ TEST(RegistryTest, RegisterAndDeregisterTen) {
         EXPECT_FALSE(TestRegistry::instance_ptr == NULL);
 
         // Registry should contain all 10.
-        EXPECT_EQ(10, TestRegistry::size());
+        EXPECT_EQ(10U, TestRegistry::size());
         for (int i = 1; i <= 10; ++i) {
             ASSERT_TRUE(TestRegistry::Get(i) != NULL);
             EXPECT_EQ(i, TestRegistry::Get(i)->registry_key());
@@ -156,7 +156,7 @@ TEST(RegistryTest, DoubleRegister) {
     EXPECT_FALSE(TestRegistry::instance_ptr == NULL);
 
     // Registry should contain instance.
-    EXPECT_EQ(1, TestRegistry::size());
+    EXPECT_EQ(1U, TestRegistry::size());
     ASSERT_TRUE(TestRegistry::Get(1) != NULL);
     EXPECT_EQ(1, TestRegistry::Get(1)->registry_key());
 

@@ -90,7 +90,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
     keymaster_block_mode_t* modes;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_EQ(0U, len);
     free(modes);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
@@ -131,7 +131,7 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_ECDSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_EQ(0U, len);
     free(modes);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
@@ -215,17 +215,17 @@ TEST_F(CheckSupported, SupportedExportFormats) {
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_EQ(0U, len);
     free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_EQ(0U, len);
     free(formats);
 
     EXPECT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_HMAC, &formats, &len));
-    EXPECT_EQ(0, len);
+    EXPECT_EQ(0U, len);
     free(formats);
 }
 
@@ -453,7 +453,7 @@ TEST_F(SigningOperationsTest, HmacSha1Success) {
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
-    ASSERT_EQ(20, signature.size());
+    ASSERT_EQ(20U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha224Success) {
@@ -462,7 +462,7 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
-    ASSERT_EQ(28, signature.size());
+    ASSERT_EQ(28U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha256Success) {
@@ -471,7 +471,7 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
-    ASSERT_EQ(32, signature.size());
+    ASSERT_EQ(32U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha384Success) {
@@ -480,7 +480,7 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
-    ASSERT_EQ(48, signature.size());
+    ASSERT_EQ(48U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha512Success) {
@@ -489,7 +489,7 @@ TEST_F(SigningOperationsTest, HmacSha512Success) {
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
-    ASSERT_EQ(64, signature.size());
+    ASSERT_EQ(64U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacRfc4231TestCase1) {
@@ -1013,7 +1013,7 @@ TEST_F(ExportKeyTest, RsaSuccess) {
                                256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
-    EXPECT_GT(export_data.length(), 0);
+    EXPECT_GT(export_data.length(), 0U);
 
     // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
@@ -1023,7 +1023,7 @@ TEST_F(ExportKeyTest, EcdsaSuccess) {
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
-    EXPECT_GT(export_data.length(), 0);
+    EXPECT_GT(export_data.length(), 0U);
 
     // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
@@ -1193,10 +1193,10 @@ TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
 
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext1.size());
+    EXPECT_EQ(512U / 8, ciphertext1.size());
 
     string ciphertext2 = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext2.size());
+    EXPECT_EQ(512U / 8, ciphertext2.size());
 
     // OAEP randomizes padding so every result should be different.
     EXPECT_NE(ciphertext1, ciphertext2);
@@ -1207,7 +1207,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
               GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext.size());
+    EXPECT_EQ(512U / 8, ciphertext.size());
 
     string plaintext = DecryptMessage(ciphertext);
     EXPECT_EQ(message, plaintext);
@@ -1223,7 +1223,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
-    EXPECT_EQ(0, result.size());
+    EXPECT_EQ(0U, result.size());
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
@@ -1231,7 +1231,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
               GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext.size());
+    EXPECT_EQ(512U / 8, ciphertext.size());
 
     // Corrupt the ciphertext
     ciphertext[512 / 8 / 2]++;
@@ -1241,7 +1241,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
-    EXPECT_EQ(0, result.size());
+    EXPECT_EQ(0U, result.size());
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
@@ -1249,10 +1249,10 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
                                512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext1.size());
+    EXPECT_EQ(512U / 8, ciphertext1.size());
 
     string ciphertext2 = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext2.size());
+    EXPECT_EQ(512U / 8, ciphertext2.size());
 
     // PKCS1 v1.5 randomizes padding so every result should be different.
     EXPECT_NE(ciphertext1, ciphertext2);
@@ -1263,7 +1263,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
                                512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext.size());
+    EXPECT_EQ(512U / 8, ciphertext.size());
 
     string plaintext = DecryptMessage(ciphertext);
     EXPECT_EQ(message, plaintext);
@@ -1279,7 +1279,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
-    EXPECT_EQ(0, result.size());
+    EXPECT_EQ(0U, result.size());
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
@@ -1287,7 +1287,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
                                512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
-    EXPECT_EQ(512 / 8, ciphertext.size());
+    EXPECT_EQ(512U / 8, ciphertext.size());
 
     // Corrupt the ciphertext
     ciphertext[512 / 8 / 2]++;
@@ -1297,7 +1297,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
-    EXPECT_EQ(0, result.size());
+    EXPECT_EQ(0U, result.size());
 }
 
 TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
@@ -1306,12 +1306,12 @@ TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
     string message = "Hello World!";
     string nonce1;
     string ciphertext1 = EncryptMessage(message, &nonce1);
-    EXPECT_EQ(12, nonce1.size());
+    EXPECT_EQ(12U, nonce1.size());
     EXPECT_EQ(message.size() + 16 /* tag */, ciphertext1.size());
 
     string nonce2;
     string ciphertext2 = EncryptMessage(message, &nonce2);
-    EXPECT_EQ(12, nonce2.size());
+    EXPECT_EQ(12U, nonce2.size());
     EXPECT_EQ(message.size() + 16 /* tag */, ciphertext2.size());
 
     // Nonces should be random
@@ -1327,7 +1327,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripSuccess) {
     string message = "Hello World!";
     string nonce;
     string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12, nonce.size());
+    EXPECT_EQ(12U, nonce.size());
     EXPECT_EQ(message.length() + 16 /* tag */, ciphertext.size());
 
     string plaintext = DecryptMessage(ciphertext, nonce);
@@ -1387,7 +1387,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
     string message = "";
     string nonce;
     string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12, nonce.size());
+    EXPECT_EQ(12U, nonce.size());
     EXPECT_EQ(message.size() + 16 /* tag */, ciphertext.size());
 
     string plaintext = DecryptMessage(ciphertext, nonce);
@@ -1400,7 +1400,7 @@ TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptyCorrupted) {
     string message = "";
     string nonce;
     string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12, nonce.size());
+    EXPECT_EQ(12U, nonce.size());
     EXPECT_EQ(message.size() + 16 /* tag */, ciphertext.size());
 
     ciphertext[ciphertext.size() / 2]++;
@@ -1454,7 +1454,7 @@ TEST_F(EncryptionOperationsTest, AesOcbAbort) {
 
     AuthorizationSet input_set, output_set;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_set, &output_set));
-    EXPECT_EQ(1, output_set.size());
+    EXPECT_EQ(1U, output_set.size());
     EXPECT_EQ(0, output_set.find(TAG_NONCE));
 
     string result;
@@ -1824,7 +1824,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7Padding) {
                                            .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
 
     // Try various message lengths; all should work.
-    for (int i = 0; i < 32; ++i) {
+    for (size_t i = 0; i < 32; ++i) {
         string message(i, 'a');
         string ciphertext = EncryptMessage(message);
         EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
@@ -1841,7 +1841,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
 
     string message = "a";
     string ciphertext = EncryptMessage(message);
-    EXPECT_EQ(16, ciphertext.size());
+    EXPECT_EQ(16U, ciphertext.size());
     EXPECT_NE(ciphertext, message);
     ++ciphertext[ciphertext.size() / 2];
 
@@ -1915,7 +1915,7 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
                                            .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
 
     // Try various message lengths; all should work.
-    for (int i = 0; i < 32; ++i) {
+    for (size_t i = 0; i < 32; ++i) {
         string message(i, 'a');
         string iv;
         string ciphertext = EncryptMessage(message, &iv);
@@ -1962,7 +1962,7 @@ TEST_F(RescopingTest, RescopeSymmetric) {
     ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));
     ASSERT_TRUE(rescoped_characteristics != NULL);
 
-    EXPECT_EQ(0, rescoped_characteristics->hw_enforced.length);
+    EXPECT_EQ(0U, rescoped_characteristics->hw_enforced.length);
     AuthorizationSet auths(rescoped_characteristics->sw_enforced);
     keymaster_free_characteristics(rescoped_characteristics);
     free(rescoped_characteristics);
@@ -1992,7 +1992,7 @@ TEST_F(RescopingTest, RescopeRsa) {
     ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));
     ASSERT_TRUE(rescoped_characteristics != NULL);
 
-    EXPECT_EQ(0, rescoped_characteristics->hw_enforced.length);
+    EXPECT_EQ(0U, rescoped_characteristics->hw_enforced.length);
     AuthorizationSet auths(rescoped_characteristics->sw_enforced);
     keymaster_free_characteristics(rescoped_characteristics);
     free(rescoped_characteristics);
