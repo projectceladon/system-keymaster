@@ -62,11 +62,12 @@ keymaster_error_t TranslateLastOpenSslError(bool log_message) {
         return TranslateX509v3Error(reason);
 #else
     case ERR_LIB_ASN1:
-        // TODO(swillden): Consider a better return code.
+        LOG_E("ASN.1 parsing error %d", reason);
         return KM_ERROR_INVALID_ARGUMENT;
 #endif
     }
 
+    LOG_E("Openssl error %d, %d", ERR_GET_LIB(error), reason);
     return KM_ERROR_UNKNOWN_ERROR;
 }
 

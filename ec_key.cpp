@@ -51,6 +51,7 @@ Key* EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
     UniquePtr<EC_GROUP, EC_GROUP_Delete> group(choose_group(key_size));
     if (group.get() == NULL) {
         // Technically, could also have been a memory allocation problem.
+        LOG_E("Unable to get EC group for key of size %d", key_size);
         *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
         return NULL;
     }
