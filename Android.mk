@@ -51,10 +51,6 @@ LOCAL_SRC_FILES:= \
 		ec_key.cpp \
 		ecdsa_operation.cpp \
 		google_keymaster.cpp \
-		google_keymaster_messages.cpp \
-		google_keymaster_utils.cpp \
-		hkdf.cpp \
-		hmac.cpp \
 		hmac_key.cpp \
 		hmac_operation.cpp \
 		key.cpp \

@@ -44,10 +44,6 @@ CPPSRCS=\
 	google_keymaster_test.cpp \
 	google_keymaster_test_utils.cpp \
 	google_keymaster_utils.cpp \
-	hkdf.cpp \
-	hkdf_test.cpp \
-	hmac.cpp \
-	hmac_test.cpp \
 	hmac_key.cpp \
 	hmac_operation.cpp \
 	key.cpp \
@@ -76,10 +72,8 @@ BINARIES = abstract_factory_registry_test \
 	authorization_set_test \
 	google_keymaster_test \
 	google_keymaster_messages_test \
-	hkdf_test \
-	hmac_test \
 	key_blob_test \
-	keymaster_enforcement_test \
+	keymaster_enforcement_test
 
 .PHONY: coverage memcheck massif clean run
 
@@ -123,21 +117,6 @@ MASSIF_OPTS=--tool=massif \
 memcheck: $(BINARIES:=.memcheck)
 
 massif: $(BINARIES:=.massif)
-
-hmac_test: hmac_test.o \
-	hmac.o \
-	authorization_set.o \
-	google_keymaster_test_utils.o \
-	serializable.o \
-	$(GTEST)/src/gtest-all.o
-
-hkdf_test: hkdf_test.o \
-	hkdf.o \
-	hmac.o \
-	authorization_set.o \
-	google_keymaster_test_utils.o \
-	serializable.o \
-	$(GTEST)/src/gtest-all.o
 
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
