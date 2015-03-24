@@ -36,14 +36,6 @@ class Logger {
 
     virtual int log_msg(LogLevel level, const char* fmt, va_list args) const = 0;
 
-    // These methods are deprecated.  Use the static methods or, better yet, the macros.
-    int log(LogLevel level, const char* fmt, ...) const;
-    int debug(const char* fmt, ...) const;
-    int info(const char* fmt, ...) const;
-    int warning(const char* fmt, ...) const;
-    int error(const char* fmt, ...) const;
-    int severe(const char* fmt, ...) const;
-
     static int Log(LogLevel level, const char* fmt, va_list args);
     static int Log(LogLevel level, const char* fmt, ...);
     static int Debug(const char* fmt, ...);
@@ -67,7 +59,7 @@ class Logger {
 
 #define STR(x) #x
 #define STRINGIFY(x) STR(x)
-#define FILE_LINE __FILE__ ":" STRINGIFY(__LINE__) ": "
+#define FILE_LINE __FILE__ ", Line " STRINGIFY(__LINE__) ": "
 
 #define LOG_D(fmt, ...) Logger::Debug(FILE_LINE fmt, __VA_ARGS__)
 #define LOG_I(fmt, ...) Logger::Info(FILE_LINE fmt, __VA_ARGS__)
