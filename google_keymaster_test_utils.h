@@ -37,7 +37,6 @@
 
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param);
 bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b);
-std::string hex2str(std::string);
 
 namespace keymaster {
 
