@@ -103,7 +103,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
-    EXPECT_TRUE(ResponseContains({KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC}, modes, len));
+    EXPECT_TRUE(ResponseContains({KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC, KM_MODE_CTR}, modes, len));
     free(modes);
 }
 
@@ -1851,6 +1851,130 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
     EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, FinishOperation(&plaintext));
+}
+
+TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
+                  TAG_BLOCK_MODE, KM_MODE_CTR)));
+    string message = "123";
+    string iv1;
+    string ciphertext1 = EncryptMessage(message, &iv1);
+    EXPECT_EQ(message.size(), ciphertext1.size());
+    EXPECT_EQ(16, iv1.size());
+
+    string iv2;
+    string ciphertext2 = EncryptMessage(message, &iv2);
+    EXPECT_EQ(message.size(), ciphertext2.size());
+    EXPECT_EQ(16, iv2.size());
+
+    // IVs should be random, so ciphertexts should differ.
+    EXPECT_NE(iv1, iv2);
+    EXPECT_NE(ciphertext1, ciphertext2);
+
+    string plaintext = DecryptMessage(ciphertext1, iv1);
+    EXPECT_EQ(message, plaintext);
+}
+
+TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
+                  TAG_BLOCK_MODE, KM_MODE_CTR)));
+
+    int increment = 15;
+    string message(239, 'a');
+    AuthorizationSet input_params;
+    AuthorizationSet output_params;
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
+
+    string ciphertext;
+    size_t input_consumed;
+    for (size_t i = 0; i < message.size(); i += increment)
+        EXPECT_EQ(KM_ERROR_OK,
+                  UpdateOperation(message.substr(i, increment), &ciphertext, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
+    EXPECT_EQ(message.size(), ciphertext.size());
+
+    // Move TAG_NONCE into input_params
+    input_params.Reinitialize(output_params);
+    output_params.Clear();
+
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
+    string plaintext;
+    for (size_t i = 0; i < ciphertext.size(); i += increment)
+        EXPECT_EQ(KM_ERROR_OK,
+                  UpdateOperation(ciphertext.substr(i, increment), &plaintext, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
+    EXPECT_EQ(ciphertext.size(), plaintext.size());
+    EXPECT_EQ(message, plaintext);
+}
+
+struct AesCtrSp80038aTestVector {
+    const char* key;
+    const char* nonce;
+    const char* plaintext;
+    const char* ciphertext;
+};
+
+// These test vectors are taken from
+// http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf, section F.5.
+static const AesCtrSp80038aTestVector kAesCtrSp80038aTestVectors[] = {
+    // AES-128
+    {
+        "2b7e151628aed2a6abf7158809cf4f3c", "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+        "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+        "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff"
+        "5ae4df3edbd5d35e5b4f09020db03eab1e031dda2fbe03d1792170a0f3009cee",
+    },
+    // AES-192
+    {
+        "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b", "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+        "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+        "1abc932417521ca24f2b0459fe7e6e0b090339ec0aa6faefd5ccc2c6f4ce8e94"
+        "1e36b26bd1ebc670d1bd1d665620abf74f78a7f6d29809585a97daec58c6b050",
+    },
+    // AES-256
+    {
+        "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
+        "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+        "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+        "601ec313775789a5b7a7f504bbf3d228f443e3ca4d62b59aca84e990cacaf5c5"
+        "2b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6",
+    },
+};
+
+TEST_F(EncryptionOperationsTest, AesCtrSp80038aTestVector) {
+    for (size_t i = 0; i < 3; i++) {
+        const AesCtrSp80038aTestVector& test(kAesCtrSp80038aTestVectors[i]);
+        const string key = hex2str(test.key);
+        const string nonce = hex2str(test.nonce);
+        const string plaintext = hex2str(test.plaintext);
+        const string ciphertext = hex2str(test.ciphertext);
+        CheckAesCtrTestVector(key, nonce, plaintext, ciphertext);
+    }
+}
+
+TEST_F(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
+                                           .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
+
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT));
+}
+
+TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
+                                           .Authorization(TAG_CALLER_NONCE)));
+
+    AuthorizationSet input_params;
+    input_params.push_back(TAG_NONCE, "123", 3);
+    EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_ENCRYPT, input_params));
 }
 
 TEST_F(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
