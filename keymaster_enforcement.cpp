@@ -296,12 +296,16 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_PADDING:
         case KM_TAG_NONCE:
         case KM_TAG_MIN_MAC_LENGTH:
+        case KM_TAG_KDF:
+        case KM_TAG_EC_CURVE:
+        case KM_TAG_EC_POINT_FORMAT:
 
         /* Tags not used for operations. */
         case KM_TAG_BLOB_USAGE_REQUIREMENTS:
 
         /* Algorithm specific parameters not used for access control. */
         case KM_TAG_RSA_PUBLIC_EXPONENT:
+        case KM_TAG_ECIES_SINGLE_HASH_MODE:
 
         /* Informational tags. */
         case KM_TAG_CREATION_DATETIME:
