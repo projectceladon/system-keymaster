@@ -89,7 +89,7 @@ keymaster_error_t EcdsaKeymaster1KeyFactory::LoadKey(const KeymasterKeyBlob& key
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     keymaster_error_t error;
-    unique_ptr<EC_KEY, EC_Delete> ecdsa(
+    unique_ptr<EC_KEY, EC_KEY_Delete> ecdsa(
         engine_->BuildEcKey(key_material, additional_params, &error));
     if (!ecdsa)
         return error;
