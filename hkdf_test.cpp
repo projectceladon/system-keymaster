@@ -77,16 +77,17 @@ TEST(HkdfTest, Hkdf) {
         const string salt = hex2str(test.salt_hex);
         const string info = hex2str(test.info_hex);
         const string expected = hex2str(test.output_hex);
-
+        keymaster_error_t error;
         // We set the key_length to the length of the expected output and then take
         // the result.
         Rfc5869HmacSha256Kdf hkdf(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
                                   reinterpret_cast<const uint8_t*>(salt.data()), salt.size(),
                                   reinterpret_cast<const uint8_t*>(info.data()), info.size(),
-                                  expected.size());
-
+                                  expected.size(), &error);
+        ASSERT_EQ(error, KM_ERROR_OK);
         Buffer secret_key;
-        hkdf.secret_key(&secret_key);
+        bool result = hkdf.secret_key(&secret_key);
+        ASSERT_TRUE(result);
         ASSERT_EQ(expected.size(), secret_key.available_read());
         EXPECT_EQ(0, memcmp(expected.data(), secret_key.peek_read(), expected.size()));
     }
