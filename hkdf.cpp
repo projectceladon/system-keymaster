@@ -18,38 +18,34 @@
 #include "hkdf.h"
 
 #include <assert.h>
-#include <keymaster/logger.h>
 
 namespace keymaster {
 
 const size_t kSHA256HashLength = 32;
 
 Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(Buffer& secret, Buffer& salt, Buffer& info,
-                                           size_t key_bytes_to_generate) {
+                                           size_t key_bytes_to_generate, keymaster_error_t* error) {
     Rfc5869HmacSha256Kdf(secret.peek_read(), secret.available_read(), salt.peek_read(),
                          salt.available_read(), info.peek_read(), info.available_read(),
-                         key_bytes_to_generate);
+                         key_bytes_to_generate, error);
 }
 
 Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_len,
                                            const uint8_t* salt, size_t salt_len,
                                            const uint8_t* info, size_t info_len,
-                                           size_t key_bytes_to_generate) {
-    // https://tools.ietf.org/html/rfc5869#section-2.2
-    Buffer actual_salt;
-    if (salt) {
-        actual_salt.Reinitialize(salt, salt_len);
-    } else {
-        char zeros[kSHA256HashLength];
-        // If salt is not given, HashLength zeros are used.
-        memset(zeros, 0, sizeof(zeros));
-        actual_salt.Reinitialize(zeros, sizeof(zeros));
-    }
-
+                                           size_t key_bytes_to_generate, keymaster_error_t* error) {
     // Step 1. Extract: PRK = HMAC-SHA256(actual_salt, secret)
     // https://tools.ietf.org/html/rfc5869#section-2.2
     HmacSha256 prk_hmac;
-    bool result = prk_hmac.Init(actual_salt);
+    bool result;
+    if (salt) {
+        result = prk_hmac.Init(salt, salt_len);
+    } else {
+        uint8_t zeros[kSHA256HashLength];
+        // If salt is not given, HashLength zeros are used.
+        memset(zeros, 0, sizeof(zeros));
+        result = prk_hmac.Init(zeros, sizeof(zeros));
+    }
     assert(result);
 
     // |prk| is a pseudorandom key (of kSHA256HashLength octets).
@@ -62,30 +58,42 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
     // https://tools.ietf.org/html/rfc5869#section-2.3
     const size_t n = (key_bytes_to_generate + kSHA256HashLength - 1) / kSHA256HashLength;
     assert(n < 256u);
+    output_.reset(new uint8_t[n * kSHA256HashLength]);
+    if (!output_.get()) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return;
+    }
 
-    output_.Reinitialize(n * kSHA256HashLength);
     uint8_t buf[kSHA256HashLength + info_len + 1];
     uint8_t digest[kSHA256HashLength];
-    Buffer previous;
-
     HmacSha256 hmac;
     result = hmac.Init(prk, sizeof(prk));
     assert(result);
 
     for (size_t i = 1; i <= n; i++) {
-        memcpy(buf, previous.peek_read(), previous.available_read());
-        size_t j = previous.available_read();
+        size_t j = 0;
+        if (i != 1) {
+            memcpy(buf, digest, sizeof(digest));
+            j = sizeof(digest);
+        }
         memcpy(buf + j, info, info_len);
         j += info_len;
         buf[j++] = static_cast<uint8_t>(i);
         result = hmac.Sign(buf, j, digest, sizeof(digest));
         assert(result);
-        output_.write(digest, sizeof(digest));
-        previous.Reinitialize(reinterpret_cast<uint8_t*>(digest), sizeof(digest));
+        memcpy(output_.get() + (i - 1) * sizeof(digest), digest, sizeof(digest));
     }
 
-    if (key_bytes_to_generate)
-        secret_key_.Reinitialize(output_.peek_read(), key_bytes_to_generate);
+    if (key_bytes_to_generate) {
+        secret_key_len_ = key_bytes_to_generate;
+        secret_key_.reset(new uint8_t[key_bytes_to_generate]);
+        if (!secret_key_.get()) {
+            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+            return;
+        }
+        memcpy(secret_key_.get(), output_.get(), key_bytes_to_generate);
+    }
+    *error = KM_ERROR_OK;
 }
 
 }  // namespace keymaster
