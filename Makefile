@@ -125,19 +125,19 @@ memcheck: $(BINARIES:=.memcheck)
 massif: $(BINARIES:=.massif)
 
 hmac_test: hmac_test.o \
-	hmac.o \
 	authorization_set.o \
 	google_keymaster_test_utils.o \
+	hmac.o \
 	logger.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 
 hkdf_test: hkdf_test.o \
+	authorization_set.o \
+	google_keymaster_test_utils.o \
 	hkdf.o \
 	hmac.o \
-	authorization_set.o \
 	logger.o \
-	google_keymaster_test_utils.o \
 	serializable.o \
 	$(GTEST)/src/gtest-all.o
 

@@ -27,16 +27,21 @@ size_t HmacSha256::DigestLength() const {
     return SHA256_DIGEST_LENGTH;
 }
 
+bool HmacSha256::Init(const Buffer& key) {
+    return Init(key.peek_read(), key.available_read());
+}
+
 bool HmacSha256::Init(const uint8_t* key, size_t key_len) {
     if (!key)
         return false;
 
-    key_.Reinitialize(key, key_len);
+    key_len_ = key_len;
+    key_.reset(new uint8_t[key_len]);
+    if (!key_.get()) {
+        return false;
+    }
+    memcpy(key_.get(), key, key_len);
     return true;
-}
-
-bool HmacSha256::Init(const Buffer& key) {
-    return Init(key.peek_read(), key.available_read());
 }
 
 bool HmacSha256::Sign(const Buffer& data, uint8_t* out_digest, size_t digest_len) const {
@@ -44,7 +49,7 @@ bool HmacSha256::Sign(const Buffer& data, uint8_t* out_digest, size_t digest_len
 }
 
 bool HmacSha256::Sign(const uint8_t* data, size_t data_len, uint8_t* out_digest,
-                size_t digest_len) const {
+                      size_t digest_len) const {
     assert(digest_len);
 
     uint8_t tmp[SHA256_DIGEST_LENGTH];
@@ -52,8 +57,7 @@ bool HmacSha256::Sign(const uint8_t* data, size_t data_len, uint8_t* out_digest,
     if (digest_len >= SHA256_DIGEST_LENGTH)
         digest = out_digest;
 
-    if (nullptr == ::HMAC(EVP_sha256(), key_.peek_read(), key_.available_read(),
-                          data, data_len, digest, nullptr)) {
+    if (nullptr == ::HMAC(EVP_sha256(), key_.get(), key_len_, data, data_len, digest, nullptr)) {
         return false;
     }
     if (digest_len < SHA256_DIGEST_LENGTH)
@@ -68,7 +72,7 @@ bool HmacSha256::Verify(const Buffer& data, const Buffer& digest) const {
 }
 
 bool HmacSha256::Verify(const uint8_t* data, size_t data_len, const uint8_t* digest,
-                  size_t digest_len) const {
+                        size_t digest_len) const {
     if (digest_len != SHA256_DIGEST_LENGTH)
         return false;
 
