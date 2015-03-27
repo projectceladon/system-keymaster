@@ -100,27 +100,22 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) 
 }
 
 static char hex_value[256] = {
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  1,  2,  3,  4,  5,  6, 7, 8, 9, 0, 0, 0, 0, 0, 0,  // '0'..'9'
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 1,  2,  3,  4,  5,  6,  7, 8, 9, 0, 0, 0, 0, 0, 0,  // '0'..'9'
     0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 'A'..'F'
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 'a'..'f'
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 11, 12, 13, 14, 15, 0,
+    0, 0,  0,  0,  0,  0,  0,  0,  // 'a'..'f'
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,
+    0, 0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0};
 
 string hex2str(string a) {
     string b;
-    size_t num = a.size()/2;
+    size_t num = a.size() / 2;
     b.resize(num);
     for (size_t i = 0; i < num; i++) {
         b[i] = (hex_value[a[i * 2] & 0xFF] << 4) + (hex_value[a[i * 2 + 1] & 0xFF]);
@@ -453,6 +448,22 @@ void Keymaster1Test::CheckAesOcbTestVector(const string& key, const string& nonc
     AuthorizationSet begin_params, update_params, output_params;
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     update_params.push_back(TAG_ASSOCIATED_DATA, associated_data.data(), associated_data.size());
+    string ciphertext =
+        EncryptMessageWithParams(message, begin_params, update_params, &output_params);
+    EXPECT_EQ(expected_ciphertext, ciphertext);
+}
+
+void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonce,
+                                           const string& message,
+                                           const string& expected_ciphertext) {
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .AesEncryptionKey(key.size() * 8)
+                                         .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
+                                         .Authorization(TAG_CALLER_NONCE),
+                                     KM_KEY_FORMAT_RAW, key));
+
+    AuthorizationSet begin_params, update_params, output_params;
+    begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     string ciphertext =
         EncryptMessageWithParams(message, begin_params, update_params, &output_params);
     EXPECT_EQ(expected_ciphertext, ciphertext);
