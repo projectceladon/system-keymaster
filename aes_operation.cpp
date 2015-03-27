@@ -87,6 +87,12 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
     case KM_MODE_ECB:
     case KM_MODE_CBC:
         return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
+    case KM_MODE_CTR:
+        if (padding != KM_PAD_NONE) {
+            *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+            return NULL;
+        }
+        return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
         return NULL;
@@ -145,7 +151,7 @@ Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
 }
 
 static const keymaster_block_mode_t supported_block_modes[] = {KM_MODE_OCB, KM_MODE_ECB,
-                                                               KM_MODE_CBC};
+                                                               KM_MODE_CBC, KM_MODE_CTR};
 
 const keymaster_block_mode_t*
 AesOperationFactory::SupportedBlockModes(size_t* block_mode_count) const {
@@ -276,6 +282,21 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
             return KM_ERROR_UNSUPPORTED_KEY_SIZE;
         }
         break;
+    case KM_MODE_CTR:
+        switch (key_size_) {
+        case 16:
+            cipher = EVP_aes_128_ctr();
+            break;
+        case 24:
+            cipher = EVP_aes_192_ctr();
+            break;
+        case 32:
+            cipher = EVP_aes_256_ctr();
+            break;
+        default:
+            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        }
+        break;
     default:
         return KM_ERROR_UNSUPPORTED_BLOCK_MODE;
     }
@@ -303,6 +324,7 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
 bool AesEvpOperation::need_iv() const {
     switch (block_mode_) {
     case KM_MODE_CBC:
+    case KM_MODE_CTR:
         return true;
     case KM_MODE_ECB:
         return false;
@@ -359,7 +381,7 @@ keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
     if (iv_blob.data_length != AES_BLOCK_SIZE) {
         LOG_E("Expected %d-byte IV for AES operation, but got %d bytes", AES_BLOCK_SIZE,
               iv_blob.data_length);
-        return KM_ERROR_INVALID_ARGUMENT;
+        return KM_ERROR_INVALID_NONCE;
     }
     iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
     if (!iv_.get())
