@@ -164,7 +164,7 @@ keymaster_error_t HmacOperation::Finish(const AuthorizationSet& /* additional_pa
     case KM_PURPOSE_VERIFY:
         if (signature.available_read() != tag_length_)
             return KM_ERROR_INVALID_INPUT_LENGTH;
-        if (memcmp(signature.peek_read(), digest, tag_length_) != 0)
+        if (CRYPTO_memcmp(signature.peek_read(), digest, tag_length_) != 0)
             return KM_ERROR_VERIFICATION_FAILED;
         return KM_ERROR_OK;
     default:

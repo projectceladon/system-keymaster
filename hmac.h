@@ -21,11 +21,10 @@
 
 namespace keymaster {
 
-
 // Only HMAC-SHA256 is supported.
 class HmacSha256 {
   public:
-    HmacSha256() {};
+    HmacSha256(){};
 
     // DigestLength returns the length, in bytes, of the resulting digest.
     size_t DigestLength() const;
@@ -52,7 +51,8 @@ class HmacSha256 {
                 size_t digest_len) const;
 
   private:
-    Buffer key_;
+    UniquePtr<uint8_t[]> key_;
+    size_t key_len_;
 };
 
 }  // namespace keymaster
