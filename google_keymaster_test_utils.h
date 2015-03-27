@@ -215,7 +215,8 @@ class Keymaster1Test : public testing::Test {
     void CheckAesOcbTestVector(const std::string& key, const std::string& nonce,
                                const std::string& associated_data, const std::string& message,
                                const std::string& expected_ciphertext);
-
+    void CheckAesCtrTestVector(const std::string& key, const std::string& nonce,
+                               const std::string& message, const std::string& expected_ciphertext);
     AuthorizationSet UserAuthParams();
     AuthorizationSet ClientParams();
 
