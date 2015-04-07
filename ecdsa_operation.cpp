@@ -27,7 +27,7 @@ static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
 
 class EcdsaSignOperationFactory : public OperationFactory {
   public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_SIGN); }
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_SIGN); }
 
     virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
         const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
@@ -57,7 +57,7 @@ static OperationFactoryRegistry::Registration<EcdsaSignOperationFactory> sign_re
 
 class EcdsaVerifyOperationFactory : public OperationFactory {
   public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_ECDSA, KM_PURPOSE_VERIFY); }
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_VERIFY); }
 
     virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
         const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
