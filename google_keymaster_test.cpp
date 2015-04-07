@@ -100,7 +100,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
-    EXPECT_TRUE(ResponseContains({KM_MODE_OCB, KM_MODE_ECB, KM_MODE_CBC, KM_MODE_CTR}, modes, len));
+    EXPECT_TRUE(ResponseContains({KM_MODE_ECB, KM_MODE_CBC, KM_MODE_CTR}, modes, len));
     free(modes);
 }
 
@@ -298,24 +298,6 @@ TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
     for (size_t size : valid_sizes) {
         EXPECT_EQ(KM_ERROR_OK,
                   GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size, KM_DIGEST_NONE)))
-            << "Failed to generate size: " << size;
-    }
-}
-
-TEST_F(NewKeyGeneration, AesOcb) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-}
-
-TEST_F(NewKeyGeneration, AesOcbInvalidKeySize) {
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(136).OcbMode(4096, 16)));
-}
-
-TEST_F(NewKeyGeneration, AesOcbAllValidSizes) {
-    size_t valid_sizes[] = {128, 192, 256};
-    for (size_t size : valid_sizes) {
-        EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(size)))
             << "Failed to generate size: " << size;
     }
 }
@@ -1162,16 +1144,16 @@ TEST_F(ImportKeyTest, AesKeySuccess) {
     char key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     string key(key_data, sizeof(key_data));
     ASSERT_EQ(KM_ERROR_OK,
-              ImportKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16),
+              ImportKey(AuthorizationSetBuilder().AesEncryptionKey(128).EcbMode().Authorization(
+                            TAG_PADDING, KM_PAD_PKCS7),
                         KM_KEY_FORMAT_RAW, key));
 
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message = "Hello World!";
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    string plaintext = DecryptMessage(ciphertext, nonce);
+    string ciphertext = EncryptMessage(message);
+    string plaintext = DecryptMessage(ciphertext);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1303,489 +1285,6 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
     EXPECT_EQ(0U, result.size());
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "Hello World!";
-    string nonce1;
-    string ciphertext1 = EncryptMessage(message, &nonce1);
-    EXPECT_EQ(12U, nonce1.size());
-    EXPECT_EQ(message.size() + 16 /* tag */, ciphertext1.size());
-
-    string nonce2;
-    string ciphertext2 = EncryptMessage(message, &nonce2);
-    EXPECT_EQ(12U, nonce2.size());
-    EXPECT_EQ(message.size() + 16 /* tag */, ciphertext2.size());
-
-    // Nonces should be random
-    EXPECT_NE(nonce1, nonce2);
-
-    // Therefore ciphertexts are different
-    EXPECT_NE(ciphertext1, ciphertext2);
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRoundTripSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "Hello World!";
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12U, nonce.size());
-    EXPECT_EQ(message.length() + 16 /* tag */, ciphertext.size());
-
-    string plaintext = DecryptMessage(ciphertext, nonce);
-    EXPECT_EQ(message, plaintext);
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRoundTripCorrupted) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "Hello World!";
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(message.size() + 16 /* tag */, ciphertext.size());
-
-    ciphertext[ciphertext.size() / 2]++;
-
-    AuthorizationSet input_set, output_set;
-    input_set.push_back(TAG_NONCE, nonce.data(), nonce.size());
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_set, &output_set));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
-    EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
-}
-
-TEST_F(EncryptionOperationsTest, AesDecryptGarbage) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string ciphertext(128, 'a');
-    AuthorizationSet input_params;
-    input_params.push_back(TAG_NONCE, "aaaaaaaaaaaa", 12);
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
-    EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
-}
-
-TEST_F(EncryptionOperationsTest, AesDecryptTooShortNonce) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-
-    // Try decrypting garbage ciphertext with too-short nonce
-    string ciphertext(15, 'a');
-    AuthorizationSet input_params;
-    input_params.push_back(TAG_NONCE, "aaaaaaaaaaa", 11);
-    EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_DECRYPT, input_params));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptySuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "";
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12U, nonce.size());
-    EXPECT_EQ(message.size() + 16 /* tag */, ciphertext.size());
-
-    string plaintext = DecryptMessage(ciphertext, nonce);
-    EXPECT_EQ(message, plaintext);
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRoundTripEmptyCorrupted) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "";
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(12U, nonce.size());
-    EXPECT_EQ(message.size() + 16 /* tag */, ciphertext.size());
-
-    ciphertext[ciphertext.size() / 2]++;
-
-    AuthorizationSet input_set;
-    input_set.push_back(TAG_NONCE, nonce.data(), nonce.size());
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_set));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
-    EXPECT_EQ(ciphertext.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&result));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbFullChunk) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message(4096, 'a');
-    string nonce;
-    string ciphertext = EncryptMessage(message, &nonce);
-    EXPECT_EQ(message.length() + 16 /* tag */, ciphertext.size());
-
-    string plaintext = DecryptMessage(ciphertext, nonce);
-    EXPECT_EQ(message, plaintext);
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbVariousChunkLengths) {
-    for (unsigned chunk_length = 1; chunk_length <= 128; ++chunk_length) {
-        ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(
-                                   chunk_length, 16)));
-        string message(128, 'a');
-        string nonce;
-        string ciphertext = EncryptMessage(message, &nonce);
-        int expected_tag_count = (message.length() + chunk_length - 1) / chunk_length;
-        EXPECT_EQ(message.length() + 16 * expected_tag_count, ciphertext.size())
-            << "Unexpected ciphertext size for chunk length " << chunk_length
-            << " expected tag count was " << expected_tag_count
-            << " but actual tag count was probably "
-            << (ciphertext.size() - message.length() - 12) / 16;
-
-        string plaintext = DecryptMessage(ciphertext, nonce);
-        EXPECT_EQ(message, plaintext);
-    }
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbAbort) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16)));
-    string message = "Hello";
-
-    AuthorizationSet input_set, output_set;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_set, &output_set));
-    EXPECT_EQ(1U, output_set.size());
-    EXPECT_EQ(0, output_set.find(TAG_NONCE));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.length(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, AbortOperation());
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbNoChunkLength) {
-    EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .AesEncryptionKey(128)
-                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_OCB)
-                                           .Authorization(TAG_MAC_LENGTH, 16)));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_CHUNK_LENGTH, BeginOperation(KM_PURPOSE_ENCRYPT));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbPaddingUnsupported) {
-    ASSERT_EQ(
-        KM_ERROR_OK,
-        GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16).Authorization(
-            TAG_PADDING, KM_PAD_ZERO)));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbInvalidMacLength) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 17)));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_ENCRYPT));
-}
-
-uint8_t rfc_7523_test_key_data[] = {
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-};
-string rfc_7523_test_key = make_string(rfc_7523_test_key_data);
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector1) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x78, 0x54, 0x07, 0xBF, 0xFF, 0xC8, 0xAD, 0x9E,
-        0xDC, 0xC5, 0x52, 0x0A, 0xC9, 0x11, 0x1E, 0xE6,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector2) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x01,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x68, 0x20, 0xB3, 0x65, 0x7B, 0x6F, 0x61, 0x5A, 0x57, 0x25, 0xBD, 0xA0,
-        0xD3, 0xB4, 0xEB, 0x3A, 0x25, 0x7C, 0x9A, 0xF1, 0xF8, 0xF0, 0x30, 0x09,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector3) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x02,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x81, 0x01, 0x7F, 0x82, 0x03, 0xF0, 0x81, 0x27,
-        0x71, 0x52, 0xFA, 0xDE, 0x69, 0x4A, 0x0A, 0x00,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector4) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x03,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x45, 0xDD, 0x69, 0xF8, 0xF5, 0xAA, 0xE7, 0x24, 0x14, 0x05, 0x4C, 0xD1,
-        0xF3, 0x5D, 0x82, 0x76, 0x0B, 0x2C, 0xD0, 0x0D, 0x2F, 0x99, 0xBF, 0xA9,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector5) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x04,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x57, 0x1D, 0x53, 0x5B, 0x60, 0xB2, 0x77, 0x18, 0x8B, 0xE5, 0x14,
-        0x71, 0x70, 0xA9, 0xA2, 0x2C, 0x3A, 0xD7, 0xA4, 0xFF, 0x38, 0x35,
-        0xB8, 0xC5, 0x70, 0x1C, 0x1C, 0xCE, 0xC8, 0xFC, 0x33, 0x58,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector6) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x05,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x8C, 0xF7, 0x61, 0xB6, 0x90, 0x2E, 0xF7, 0x64,
-        0x46, 0x2A, 0xD8, 0x64, 0x98, 0xCA, 0x6B, 0x97,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector7) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x06,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x5C, 0xE8, 0x8E, 0xC2, 0xE0, 0x69, 0x27, 0x06, 0xA9, 0x15, 0xC0,
-        0x0A, 0xEB, 0x8B, 0x23, 0x96, 0xF4, 0x0E, 0x1C, 0x74, 0x3F, 0x52,
-        0x43, 0x6B, 0xDF, 0x06, 0xD8, 0xFA, 0x1E, 0xCA, 0x34, 0x3D,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector8) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x07,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x1C, 0xA2, 0x20, 0x73, 0x08, 0xC8, 0x7C, 0x01, 0x07, 0x56, 0x10, 0x4D, 0x88, 0x40,
-        0xCE, 0x19, 0x52, 0xF0, 0x96, 0x73, 0xA4, 0x48, 0xA1, 0x22, 0xC9, 0x2C, 0x62, 0x24,
-        0x10, 0x51, 0xF5, 0x73, 0x56, 0xD7, 0xF3, 0xC9, 0x0B, 0xB0, 0xE0, 0x7F,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector9) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x08,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x6D, 0xC2, 0x25, 0xA0, 0x71, 0xFC, 0x1B, 0x9F,
-        0x7C, 0x69, 0xF9, 0x3B, 0x0F, 0x1E, 0x10, 0xDE,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector10) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x09,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x22, 0x1B, 0xD0, 0xDE, 0x7F, 0xA6, 0xFE, 0x99, 0x3E, 0xCC, 0xD7, 0x69, 0x46, 0x0A,
-        0x0A, 0xF2, 0xD6, 0xCD, 0xED, 0x0C, 0x39, 0x5B, 0x1C, 0x3C, 0xE7, 0x25, 0xF3, 0x24,
-        0x94, 0xB9, 0xF9, 0x14, 0xD8, 0x5C, 0x0B, 0x1E, 0xB3, 0x83, 0x57, 0xFF,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector11) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0A,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-        0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-        0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
-    uint8_t expected_ciphertext[] = {
-        0xBD, 0x6F, 0x6C, 0x49, 0x62, 0x01, 0xC6, 0x92, 0x96, 0xC1, 0x1E, 0xFD,
-        0x13, 0x8A, 0x46, 0x7A, 0xBD, 0x3C, 0x70, 0x79, 0x24, 0xB9, 0x64, 0xDE,
-        0xAF, 0xFC, 0x40, 0x31, 0x9A, 0xF5, 0xA4, 0x85, 0x40, 0xFB, 0xBA, 0x18,
-        0x6C, 0x55, 0x53, 0xC6, 0x8A, 0xD9, 0xF5, 0x92, 0xA7, 0x9A, 0x42, 0x40,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector12) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0B,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-        0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
-    uint8_t plaintext[] = {};
-    uint8_t expected_ciphertext[] = {
-        0xFE, 0x80, 0x69, 0x0B, 0xEE, 0x8A, 0x48, 0x5D,
-        0x11, 0xF3, 0x29, 0x65, 0xBC, 0x9D, 0x2A, 0x32,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector13) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0C,
-    };
-    uint8_t associated_data[] = {};
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-        0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x29, 0x42, 0xBF, 0xC7, 0x73, 0xBD, 0xA2, 0x3C, 0xAB, 0xC6, 0xAC, 0xFD,
-        0x9B, 0xFD, 0x58, 0x35, 0xBD, 0x30, 0x0F, 0x09, 0x73, 0x79, 0x2E, 0xF4,
-        0x60, 0x40, 0xC5, 0x3F, 0x14, 0x32, 0xBC, 0xDF, 0xB5, 0xE1, 0xDD, 0xE3,
-        0xBC, 0x18, 0xA5, 0xF8, 0x40, 0xB5, 0x2E, 0x65, 0x34, 0x44, 0xD5, 0xDF,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector14) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0D,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
-        0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
-        0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-    };
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
-        0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
-        0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-    };
-    uint8_t expected_ciphertext[] = {
-        0xD5, 0xCA, 0x91, 0x74, 0x84, 0x10, 0xC1, 0x75, 0x1F, 0xF8, 0xA2, 0xF6, 0x18, 0x25,
-        0x5B, 0x68, 0xA0, 0xA1, 0x2E, 0x09, 0x3F, 0xF4, 0x54, 0x60, 0x6E, 0x59, 0xF9, 0xC1,
-        0xD0, 0xDD, 0xC5, 0x4B, 0x65, 0xE8, 0x62, 0x8E, 0x56, 0x8B, 0xAD, 0x7A, 0xED, 0x07,
-        0xBA, 0x06, 0xA4, 0xA6, 0x94, 0x83, 0xA7, 0x03, 0x54, 0x90, 0xC5, 0x76, 0x9E, 0x60,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          make_string(plaintext), make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector15) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0E,
-    };
-    uint8_t associated_data[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
-        0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
-        0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-    };
-    uint8_t plaintext[] = {};
-    uint8_t expected_ciphertext[] = {
-        0xC5, 0xCD, 0x9D, 0x18, 0x50, 0xC1, 0x41, 0xE3,
-        0x58, 0x64, 0x99, 0x94, 0xEE, 0x70, 0x1B, 0x68,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), make_string(associated_data),
-                          "" /* plaintext */, make_string(expected_ciphertext));
-}
-
-TEST_F(EncryptionOperationsTest, AesOcbRfc7253TestVector16) {
-    uint8_t nonce[] = {
-        0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x0F,
-    };
-    uint8_t associated_data[] = {};
-    uint8_t plaintext[] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
-        0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
-        0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-    };
-    uint8_t expected_ciphertext[] = {
-        0x44, 0x12, 0x92, 0x34, 0x93, 0xC5, 0x7D, 0x5D, 0xE0, 0xD7, 0x00, 0xF7, 0x53, 0xCC,
-        0xE0, 0xD1, 0xD2, 0xD9, 0x50, 0x60, 0x12, 0x2E, 0x9F, 0x15, 0xA5, 0xDD, 0xBF, 0xC5,
-        0x78, 0x7E, 0x50, 0xB5, 0xCC, 0x55, 0xEE, 0x50, 0x7B, 0xCB, 0x08, 0x4E, 0x47, 0x9A,
-        0xD3, 0x63, 0xAC, 0x36, 0x6B, 0x95, 0xA9, 0x8C, 0xA5, 0xF3, 0x00, 0x0B, 0x14, 0x79,
-    };
-    CheckAesOcbTestVector(rfc_7523_test_key, make_string(nonce), "" /* associated_data */,
-                          make_string(plaintext), make_string(expected_ciphertext));
 }
 
 TEST_F(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
@@ -2064,10 +1563,9 @@ TEST_F(AddEntropyTest, AddEntropy) {
 
 typedef KeymasterTest RescopingTest;
 TEST_F(RescopingTest, KeyWithRescopingNotUsable) {
-    ASSERT_EQ(
-        KM_ERROR_OK,
-        GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).OcbMode(4096, 16).Authorization(
-            TAG_RESCOPING_ADD, KM_TAG_MAC_LENGTH)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).EcbMode().Authorization(
+                  TAG_RESCOPING_ADD, KM_TAG_PURPOSE)));
     // TODO(swillden): Add a better error code for this.
     EXPECT_EQ(KM_ERROR_RESCOPABLE_KEY_NOT_USABLE, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
@@ -2075,18 +1573,16 @@ TEST_F(RescopingTest, KeyWithRescopingNotUsable) {
 TEST_F(RescopingTest, RescopeSymmetric) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
-                                           .OcbMode(4096, 16)
-                                           .Authorization(TAG_RESCOPING_ADD, KM_TAG_MAC_LENGTH)
-                                           .Authorization(TAG_RESCOPING_DEL, KM_TAG_MAC_LENGTH)));
-    EXPECT_FALSE(contains(sw_enforced(), TAG_MAC_LENGTH, 15));
-    EXPECT_TRUE(contains(sw_enforced(), TAG_MAC_LENGTH, 16));
+                                           .EcbMode()
+                                           .Authorization(TAG_RESCOPING_ADD, KM_TAG_PURPOSE)
+                                           .Authorization(TAG_RESCOPING_DEL, KM_TAG_PURPOSE)));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
 
     keymaster_key_blob_t rescoped_blob;
     keymaster_key_characteristics_t* rescoped_characteristics;
-    AuthorizationSet new_params = AuthorizationSetBuilder()
-                                      .AesEncryptionKey(128)
-                                      .OcbMode(4096, 15 /* note changed */)
-                                      .build();
+    AuthorizationSet new_params =
+        AuthorizationSetBuilder().AesKey(128).Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN).build();
 
     ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));
     ASSERT_TRUE(rescoped_characteristics != NULL);
@@ -2098,8 +1594,8 @@ TEST_F(RescopingTest, RescopeSymmetric) {
     free(const_cast<uint8_t*>(rescoped_blob.key_material));
 
     EXPECT_TRUE(contains(auths, TAG_ALGORITHM, KM_ALGORITHM_AES));
-    EXPECT_TRUE(contains(auths, TAG_MAC_LENGTH, 15));
-    EXPECT_FALSE(contains(auths, TAG_MAC_LENGTH, 16));
+    EXPECT_TRUE(contains(auths, TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_FALSE(contains(auths, TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
 }
 
 TEST_F(RescopingTest, RescopeRsa) {

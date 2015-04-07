@@ -43,8 +43,6 @@ class AesOperationFactory : public OperationFactory {
     virtual keymaster_purpose_t purpose() const = 0;
 
   private:
-    virtual Operation* CreateOcbOperation(const SymmetricKey& key, bool caller_nonce,
-                                          keymaster_error_t* error);
     virtual Operation* CreateEvpOperation(const SymmetricKey& key,
                                           keymaster_block_mode_t block_mode,
                                           keymaster_padding_t padding, bool caller_iv,
@@ -78,12 +76,6 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
         return NULL;
 
     switch (block_mode) {
-    case KM_MODE_OCB:
-        if (padding != KM_PAD_NONE) {
-            *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-            return NULL;
-        }
-        return CreateOcbOperation(*symmetric_key, caller_nonce, error);
     case KM_MODE_ECB:
     case KM_MODE_CBC:
         return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
@@ -97,34 +89,6 @@ Operation* AesOperationFactory::CreateOperation(const Key& key, keymaster_error_
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
         return NULL;
     }
-}
-
-Operation* AesOperationFactory::CreateOcbOperation(const SymmetricKey& key, bool caller_nonce,
-                                                   keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
-
-    uint32_t chunk_length;
-    if (!key.authorizations().GetTagValue(TAG_CHUNK_LENGTH, &chunk_length) ||
-        chunk_length > AeadModeOperation::MAX_CHUNK_LENGTH)
-        *error = KM_ERROR_UNSUPPORTED_CHUNK_LENGTH;
-
-    uint32_t tag_length;
-    if (!key.authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length) ||
-        tag_length > AeadModeOperation::MAX_TAG_LENGTH)
-        *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
-
-    keymaster_padding_t padding;
-    if (key.authorizations().GetTagValue(TAG_PADDING, &padding) && padding != KM_PAD_NONE)
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-
-    if (*error != KM_ERROR_OK)
-        return NULL;
-
-    Operation* op = new AesOcbOperation(purpose(), key.key_data(), key.key_data_size(),
-                                        chunk_length, tag_length, caller_nonce);
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return op;
 }
 
 Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
@@ -150,8 +114,8 @@ Operation* AesOperationFactory::CreateEvpOperation(const SymmetricKey& key,
     return op;
 }
 
-static const keymaster_block_mode_t supported_block_modes[] = {KM_MODE_OCB, KM_MODE_ECB,
-                                                               KM_MODE_CBC, KM_MODE_CTR};
+static const keymaster_block_mode_t supported_block_modes[] = {KM_MODE_ECB, KM_MODE_CBC,
+                                                               KM_MODE_CTR};
 
 const keymaster_block_mode_t*
 AesOperationFactory::SupportedBlockModes(size_t* block_mode_count) const {
@@ -181,60 +145,6 @@ class AesDecryptionOperationFactory : public AesOperationFactory {
     keymaster_purpose_t purpose() const { return KM_PURPOSE_DECRYPT; }
 };
 static OperationFactoryRegistry::Registration<AesDecryptionOperationFactory> decrypt_registration;
-
-keymaster_error_t AesOcbOperation::Initialize(uint8_t* key, size_t key_size, size_t nonce_length,
-                                              size_t tag_length) {
-    if (tag_length > MAX_TAG_LENGTH || nonce_length > MAX_NONCE_LENGTH)
-        return KM_ERROR_INVALID_KEY_BLOB;
-
-    if (ae_init(ctx(), key, key_size, nonce_length, tag_length) != AE_SUCCESS) {
-        memset_s(ctx(), 0, ae_ctx_sizeof());
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t AesOcbOperation::EncryptChunk(const uint8_t* nonce, size_t /* nonce_length */,
-                                                size_t tag_length,
-                                                const keymaster_blob_t additional_data,
-                                                uint8_t* chunk, size_t chunk_size, Buffer* output) {
-    if (!ctx())
-        return KM_ERROR_UNKNOWN_ERROR;
-    uint8_t __attribute__((aligned(16))) tag[MAX_TAG_LENGTH];
-
-    // Encrypt chunk in place.
-    int ae_err = ae_encrypt(ctx(), nonce, chunk, chunk_size, additional_data.data,
-                            additional_data.data_length, chunk, tag, AE_FINALIZE);
-
-    if (ae_err < 0)
-        return KM_ERROR_UNKNOWN_ERROR;
-    assert(ae_err == (int)buffered_data_length());
-
-    output->write(chunk, buffered_data_length());
-    output->write(tag, tag_length);
-
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t AesOcbOperation::DecryptChunk(const uint8_t* nonce, size_t /* nonce_length */,
-                                                const uint8_t* tag, size_t /* tag_length */,
-                                                const keymaster_blob_t additional_data,
-                                                uint8_t* chunk, size_t chunk_size, Buffer* output) {
-    if (!ctx())
-        return KM_ERROR_UNKNOWN_ERROR;
-
-    // Decrypt chunk in place
-    int ae_err = ae_decrypt(ctx(), nonce, chunk, chunk_size, additional_data.data,
-                            additional_data.data_length, chunk, tag, AE_FINALIZE);
-    if (ae_err == AE_INVALID)
-        return KM_ERROR_VERIFICATION_FAILED;
-    else if (ae_err < 0)
-        return KM_ERROR_UNKNOWN_ERROR;
-    assert(ae_err == (int)buffered_data_length());
-    output->write(chunk, chunk_size);
-
-    return KM_ERROR_OK;
-}
 
 AesEvpOperation::AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
                                  keymaster_padding_t padding, bool caller_iv, const uint8_t* key,
