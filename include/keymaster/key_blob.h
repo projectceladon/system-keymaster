@@ -82,6 +82,7 @@ class KeyBlob : public Serializable {
     inline keymaster_algorithm_t algorithm() const { return algorithm_; }
     inline size_t key_size_bits() const { return key_size_bits_; }
     keymaster_key_origin_t origin() const;
+    bool is_hardware() const;
 
   protected:
     /**

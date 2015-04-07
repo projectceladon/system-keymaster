@@ -191,8 +191,8 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
     if (response->error != KM_ERROR_OK)
         return;
 
-    response->error = SerializeKey(key.get(), origin(), &response->key_blob, &response->enforced,
-                                   &response->unenforced);
+    response->error = SerializeKey(key.get(), KM_ORIGIN_GENERATED, &response->key_blob,
+                                   &response->enforced, &response->unenforced);
 }
 
 void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
@@ -329,6 +329,7 @@ void GoogleKeymaster::Rescope(const RescopeRequest& request, RescopeResponse* re
     if (response->error != KM_ERROR_OK)
         return;
 
+    assert(is_hardware() == blob->is_hardware());
     response->error = SerializeKey(key.get(), blob->origin(), &response->key_blob,
                                    &response->enforced, &response->unenforced);
 }
