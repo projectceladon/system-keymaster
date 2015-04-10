@@ -291,7 +291,7 @@ keymaster_error_t SoftKeymasterDevice::GetPkcs8KeyAlgorithm(const uint8_t* key, 
         *algorithm = KM_ALGORITHM_RSA;
         break;
     case EVP_PKEY_EC:
-        *algorithm = KM_ALGORITHM_ECDSA;
+        *algorithm = KM_ALGORITHM_EC;
         break;
     default:
         LOG_E("Unsupported algorithm %d", EVP_PKEY_type(pkey->type));
