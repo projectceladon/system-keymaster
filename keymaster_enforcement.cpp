@@ -132,9 +132,6 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
 
         /* Algorithm specific parameters not used for access control. */
         case KM_TAG_RSA_PUBLIC_EXPONENT:
-        case KM_TAG_DSA_GENERATOR:
-        case KM_TAG_DSA_P:
-        case KM_TAG_DSA_Q:
 
         /* Informational tags. */
         case KM_TAG_APPLICATION_DATA:

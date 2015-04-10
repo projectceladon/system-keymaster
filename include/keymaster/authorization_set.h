@@ -438,7 +438,7 @@ inline AuthorizationSetBuilder& AuthorizationSetBuilder::RsaKey(uint32_t key_siz
 }
 
 inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcdsaKey(uint32_t key_size) {
-    Authorization(TAG_ALGORITHM, KM_ALGORITHM_ECDSA);
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_EC);
     Authorization(TAG_KEY_SIZE, key_size);
     return *this;
 }
