@@ -249,8 +249,6 @@ TEST_F(KeyBlobTest, EmptyHidden) {
     size_t size = blob_->SerializedSize();
     UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
     blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
-    uint8_t* begin = serialized_blob.get();
-    uint8_t* end = begin + size;
 
     AuthorizationSet wrong_hidden;
 
@@ -265,8 +263,6 @@ TEST_F(KeyBlobTest, WrongRootOfTrust) {
     size_t size = blob_->SerializedSize();
     UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
     blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
-    uint8_t* begin = serialized_blob.get();
-    uint8_t* end = begin + size;
 
     AuthorizationSet wrong_hidden;
     wrong_hidden.push_back(TAG_ROOT_OF_TRUST, "bar", 3);
@@ -283,8 +279,6 @@ TEST_F(KeyBlobTest, WrongAppId) {
     size_t size = blob_->SerializedSize();
     UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
     blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
-    uint8_t* begin = serialized_blob.get();
-    uint8_t* end = begin + size;
 
     AuthorizationSet wrong_hidden;
     wrong_hidden.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
