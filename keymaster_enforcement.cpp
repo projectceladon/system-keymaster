@@ -59,6 +59,12 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
 
     for (unsigned int i = 0; i < auth_set.size(); i++) {
         keymaster_key_param_t param = auth_set[i];
+
+        // KM_TAG_PADDING_OLD and KM_TAG_DIGEST_OLD aren't actually members of the enum, so we can't
+        // switch on them.  There's nothing to validate for them, though, so just ignore them.
+        if (param.tag == KM_TAG_PADDING_OLD || param.tag == KM_TAG_DIGEST_OLD)
+            continue;
+
         switch (param.tag) {
         case KM_TAG_ACTIVE_DATETIME:
             return_error = Active(param, current_time);

@@ -37,7 +37,8 @@ class EcdsaSignOperationFactory : public OperationFactory {
         }
 
         keymaster_digest_t digest;
-        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest)) {
+        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
+            !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
             *error = KM_ERROR_UNSUPPORTED_DIGEST;
             return NULL;
         }
@@ -67,7 +68,8 @@ class EcdsaVerifyOperationFactory : public OperationFactory {
         }
 
         keymaster_digest_t digest;
-        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest)) {
+        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
+            !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
             *error = KM_ERROR_UNSUPPORTED_DIGEST;
             return NULL;
         }
