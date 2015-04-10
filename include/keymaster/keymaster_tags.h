@@ -63,6 +63,11 @@
 
 namespace keymaster {
 
+// The following create the numeric values that KM_TAG_PADDING and KM_TAG_DIGEST used to have.  We
+// need these old values to be able to support old keys that use them.
+static const keymaster_tag_t KM_TAG_DIGEST_OLD = static_cast<keymaster_tag_t>(KM_ENUM | 5);
+static const keymaster_tag_t KM_TAG_PADDING_OLD = static_cast<keymaster_tag_t>(KM_ENUM | 7);
+
 // Until we have C++11, fake std::static_assert.
 template <bool b> struct StaticAssert {};
 template <> struct StaticAssert<true> {
@@ -191,7 +196,9 @@ DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_PURPOSE, keymaster_purpose_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_ALGORITHM, keymaster_algorithm_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_BLOCK_MODE, keymaster_block_mode_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_DIGEST, keymaster_digest_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_DIGEST_OLD, keymaster_digest_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_PADDING, keymaster_padding_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_PADDING_OLD, keymaster_padding_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_RESCOPING_ADD, keymaster_tag_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_RESCOPING_DEL, keymaster_tag_t);
 DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_BLOB_USAGE_REQUIREMENTS,
