@@ -443,23 +443,6 @@ void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_d
     EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << digest;
 }
 
-void Keymaster1Test::CheckAesOcbTestVector(const string& key, const string& nonce,
-                                           const string& associated_data, const string& message,
-                                           const string& expected_ciphertext) {
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
-                                         .AesEncryptionKey(key.size() * 8)
-                                         .OcbMode(4096 /* chunk length */, 16 /* tag length */)
-                                         .Authorization(TAG_CALLER_NONCE),
-                                     KM_KEY_FORMAT_RAW, key));
-
-    AuthorizationSet begin_params, update_params, output_params;
-    begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
-    update_params.push_back(TAG_ASSOCIATED_DATA, associated_data.data(), associated_data.size());
-    string ciphertext =
-        EncryptMessageWithParams(message, begin_params, update_params, &output_params);
-    EXPECT_EQ(expected_ciphertext, ciphertext);
-}
-
 void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonce,
                                            const string& message,
                                            const string& expected_ciphertext) {
