@@ -27,6 +27,8 @@
 
 #include <type_traits>
 
+#include <openssl/x509.h>
+
 #include <hardware/keymaster1.h>
 #define LOG_TAG "SoftKeymasterDevice"
 #include <cutils/log.h>
@@ -228,6 +230,11 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
 
     ImportKeyRequest request;
     StoreDefaultNewKeyParams(&request.key_description);
+    keymaster_algorithm_t algorithm;
+    keymaster_error_t err = GetPkcs8KeyAlgorithm(key, key_length, &algorithm);
+    if (err != KM_ERROR_OK)
+        return err;
+    request.key_description.push_back(TAG_ALGORITHM, algorithm);
     request.SetKeyMaterial(key, key_length);
     request.key_format = KM_KEY_FORMAT_PKCS8;
 
@@ -246,6 +253,50 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
     }
     memcpy(*key_blob, response.key_blob.key_material, *key_blob_length);
     LOG_D("Returning %d bytes in key blob\n", (int)*key_blob_length);
+
+    return KM_ERROR_OK;
+}
+
+struct EVP_PKEY_Delete {
+    void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
+};
+
+struct PKCS8_PRIV_KEY_INFO_Delete {
+    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
+};
+
+/* static */
+keymaster_error_t SoftKeymasterDevice::GetPkcs8KeyAlgorithm(const uint8_t* key, size_t key_length,
+                                                            keymaster_algorithm_t* algorithm) {
+    if (key == NULL) {
+        LOG_E("No key specified for import", 0);
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+    }
+
+    UniquePtr<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_Delete> pkcs8(
+        d2i_PKCS8_PRIV_KEY_INFO(NULL, &key, key_length));
+    if (pkcs8.get() == NULL) {
+        LOG_E("Could not parse PKCS8 key blob", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKCS82PKEY(pkcs8.get()));
+    if (pkey.get() == NULL) {
+        LOG_E("Could not extract key from PKCS8 key blob", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    switch (EVP_PKEY_type(pkey->type)) {
+    case EVP_PKEY_RSA:
+        *algorithm = KM_ALGORITHM_RSA;
+        break;
+    case EVP_PKEY_EC:
+        *algorithm = KM_ALGORITHM_ECDSA;
+        break;
+    default:
+        LOG_E("Unsupported algorithm %d", EVP_PKEY_type(pkey->type));
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
 
     return KM_ERROR_OK;
 }

@@ -165,7 +165,8 @@ class Keymaster1Test : public testing::Test {
 
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose);
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose, const AuthorizationSet& input_set,
-                                     AuthorizationSet* output_set = NULL);
+                                     AuthorizationSet* output_set = NULL,
+                                     bool use_client_params = true);
 
     keymaster_error_t UpdateOperation(const std::string& message, std::string* output,
                                       size_t* input_consumed);
@@ -185,17 +186,20 @@ class Keymaster1Test : public testing::Test {
     keymaster_error_t Rescope(const AuthorizationSet& new_params,
                               keymaster_key_blob_t* rescoped_blob,
                               keymaster_key_characteristics_t** rescoped_characteristics);
-    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
+                               bool use_client_params = true);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
                                const AuthorizationSet& begin_params,
                                const AuthorizationSet& update_params,
                                AuthorizationSet* output_params = NULL);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
-                               const std::string& signature);
+                               const std::string& signature, bool use_client_params = true);
 
-    void SignMessage(const std::string& message, std::string* signature);
+    void SignMessage(const std::string& message, std::string* signature,
+                     bool use_client_params = true);
 
-    void VerifyMessage(const std::string& message, const std::string& signature);
+    void VerifyMessage(const std::string& message, const std::string& signature,
+                       bool use_client_params = true);
 
     std::string EncryptMessage(const std::string& message, std::string* generated_nonce = NULL);
     std::string EncryptMessage(const AuthorizationSet& update_params, const std::string& message,
@@ -237,6 +241,12 @@ class Keymaster1Test : public testing::Test {
     void FreeKeyBlob();
 
     void corrupt_key_blob();
+
+    void set_key_blob(const uint8_t* key, size_t key_length) {
+        FreeKeyBlob();
+        blob_.key_material = key;
+        blob_.key_material_size = key_length;
+    }
 
   private:
     keymaster1_device_t* device_;

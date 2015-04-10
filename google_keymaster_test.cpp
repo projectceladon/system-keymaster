@@ -20,6 +20,8 @@
 
 #include <openssl/engine.h>
 
+#include <hardware/keymaster0.h>
+
 #include <keymaster/google_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
 #include <keymaster/soft_keymaster_device.h>
@@ -1081,6 +1083,25 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     string signature;
     SignMessage(message, &signature);
     VerifyMessage(message, signature);
+}
+
+TEST_F(ImportKeyTest, OldApiRsaSuccess) {
+    string pk8_key = read_file("rsa_privkey_pk8.der");
+    ASSERT_EQ(633U, pk8_key.size());
+
+    // NOTE: This will break when the keymaster0 APIs are removed from keymaster1.  But at that
+    // point softkeymaster will no longer support keymaster0 APIs anyway.
+    uint8_t* key_blob;
+    size_t key_blob_length;
+    ASSERT_EQ(0,
+              device()->import_keypair(device(), reinterpret_cast<const uint8_t*>(pk8_key.data()),
+                                       pk8_key.size(), &key_blob, &key_blob_length));
+    set_key_blob(key_blob, key_blob_length);
+
+    string message(1024 / 8, 'a');
+    string signature;
+    SignMessage(message, &signature, false /* use_client_params */);
+    VerifyMessage(message, signature, false /* use_client_params */);
 }
 
 TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
