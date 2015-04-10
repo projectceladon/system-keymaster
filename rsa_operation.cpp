@@ -50,7 +50,11 @@ class RsaOperationFactory : public OperationFactory {
 bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
                                                 keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    if (!key.authorizations().GetTagValue(TAG_PADDING, padding) || !supported(*padding))
+    if (!key.authorizations().GetTagValue(TAG_PADDING, padding) &&
+        !key.authorizations().GetTagValue(TAG_PADDING_OLD, padding))
+        return false;
+
+    if (!supported(*padding))
         return false;
 
     *error = KM_ERROR_OK;
