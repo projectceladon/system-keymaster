@@ -30,7 +30,7 @@ static int convert_to_evp(keymaster_algorithm_t algorithm) {
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
         return EVP_PKEY_RSA;
-    case KM_ALGORITHM_ECDSA:
+    case KM_ALGORITHM_EC:
         return EVP_PKEY_EC;
     default:
         return -1;

@@ -44,7 +44,7 @@ class EcKeyFactory : public AsymmetricKeyFactory {
 
 class EcdsaKeyFactory : public EcKeyFactory {
   public:
-    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_ECDSA; }
+    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_EC; }
 };
 
 class EcdsaSignOperationFactory;

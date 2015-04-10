@@ -90,13 +90,12 @@ TEST(RoundTrip, EmptyKeymasterResponseError) {
 TEST(RoundTrip, SupportedAlgorithmsResponse) {
     for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
         SupportedAlgorithmsResponse rsp(ver);
-        keymaster_algorithm_t algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_DSA,
-                                              KM_ALGORITHM_ECDSA};
+        keymaster_algorithm_t algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC};
         rsp.error = KM_ERROR_OK;
         rsp.algorithms = dup_array(algorithms);
         rsp.algorithms_length = array_length(algorithms);
 
-        UniquePtr<SupportedAlgorithmsResponse> deserialized(round_trip(ver, rsp, 20));
+        UniquePtr<SupportedAlgorithmsResponse> deserialized(round_trip(ver, rsp, 16));
         EXPECT_EQ(array_length(algorithms), deserialized->algorithms_length);
         EXPECT_EQ(0, memcmp(deserialized->algorithms, algorithms, array_size(algorithms)));
     }

@@ -184,7 +184,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
     }
 
     case TYPE_EC: {
-        req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_ECDSA);
+        req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
         const keymaster_ec_keygen_params_t* ec_params =
             static_cast<const keymaster_ec_keygen_params_t*>(key_params);
         LOG_D("Generating ECDSA pair, key size: %u", ec_params->field_size);
@@ -904,15 +904,7 @@ keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const void* signing_
             !auth_set->push_back(TAG_PADDING, KM_PAD_NONE))
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     } break;
-    case KM_ALGORITHM_DSA: {
-        const keymaster_dsa_sign_params_t* dsa_params =
-            reinterpret_cast<const keymaster_dsa_sign_params_t*>(signing_params);
-        if (dsa_params->digest_type != DIGEST_NONE)
-            return KM_ERROR_UNSUPPORTED_DIGEST;
-        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE))
-            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    } break;
-    case KM_ALGORITHM_ECDSA: {
+    case KM_ALGORITHM_EC: {
         const keymaster_ec_sign_params_t* ecdsa_params =
             reinterpret_cast<const keymaster_ec_sign_params_t*>(signing_params);
         if (ecdsa_params->digest_type != DIGEST_NONE)

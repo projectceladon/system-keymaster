@@ -78,8 +78,7 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     keymaster_algorithm_t* algorithms;
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_algorithms(device(), &algorithms, &len));
     EXPECT_TRUE(ResponseContains(
-        {KM_ALGORITHM_RSA, KM_ALGORITHM_ECDSA, KM_ALGORITHM_AES, KM_ALGORITHM_HMAC}, algorithms,
-        len));
+        {KM_ALGORITHM_RSA, KM_ALGORITHM_EC, KM_ALGORITHM_AES, KM_ALGORITHM_HMAC}, algorithms, len));
     free(algorithms);
 }
 
@@ -95,12 +94,8 @@ TEST_F(CheckSupported, SupportedBlockModes) {
     EXPECT_EQ(0U, len);
     free(modes);
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
-              device()->get_supported_block_modes(device(), KM_ALGORITHM_DSA, KM_PURPOSE_ENCRYPT,
-                                                  &modes, &len));
-
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
-              device()->get_supported_block_modes(device(), KM_ALGORITHM_ECDSA, KM_PURPOSE_ENCRYPT,
+              device()->get_supported_block_modes(device(), KM_ALGORITHM_EC, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
@@ -127,11 +122,7 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
     EXPECT_TRUE(ResponseContains({KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT}, modes, len));
     free(modes);
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
-              device()->get_supported_padding_modes(device(), KM_ALGORITHM_DSA, KM_PURPOSE_SIGN,
-                                                    &modes, &len));
-
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_ECDSA,
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_EC,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
     EXPECT_EQ(0U, len);
     free(modes);
@@ -153,11 +144,7 @@ TEST_F(CheckSupported, SupportedDigests) {
     EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE, KM_DIGEST_SHA_2_256}, digests, len));
     free(digests);
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
-              device()->get_supported_digests(device(), KM_ALGORITHM_DSA, KM_PURPOSE_SIGN, &digests,
-                                              &len));
-
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_ECDSA,
+    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
     EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE}, digests, len));
     free(digests);
@@ -207,11 +194,8 @@ TEST_F(CheckSupported, SupportedExportFormats) {
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_ALGORITHM,
-              device()->get_supported_export_formats(device(), KM_ALGORITHM_DSA, &formats, &len));
-
     EXPECT_EQ(KM_ERROR_OK,
-              device()->get_supported_export_formats(device(), KM_ALGORITHM_ECDSA, &formats, &len));
+              device()->get_supported_export_formats(device(), KM_ALGORITHM_EC, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
@@ -288,7 +272,7 @@ TEST_F(NewKeyGeneration, Ecdsa) {
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 224));
 }
 
@@ -298,7 +282,7 @@ TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
 
     // Now check that unspecified, defaulted tags are correct.
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 224));
@@ -1130,7 +1114,7 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 256));
 
     // And values provided by GoogleKeymaster
@@ -1151,7 +1135,7 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_ECDSA));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 256));
 
     // And values provided by GoogleKeymaster
