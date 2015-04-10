@@ -219,8 +219,11 @@ keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose) {
 
 keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose,
                                                  const AuthorizationSet& input_set,
-                                                 AuthorizationSet* output_set) {
-    AuthorizationSet additional_params(client_params_, array_length(client_params_));
+                                                 AuthorizationSet* output_set,
+                                                 bool use_client_params) {
+    AuthorizationSet additional_params;
+    if (use_client_params)
+        additional_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
     additional_params.push_back(input_set);
 
     keymaster_key_param_t* out_params;
@@ -299,9 +302,11 @@ keymaster_error_t Keymaster1Test::AbortOperation() {
     return device()->abort(device(), op_handle_);
 }
 
-string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message) {
+string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
+                                      bool use_client_params) {
     AuthorizationSet input_params;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
+    EXPECT_EQ(KM_ERROR_OK,
+              BeginOperation(purpose, input_params, NULL /* output_params */, use_client_params));
 
     string result;
     size_t input_consumed;
@@ -326,9 +331,10 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 }
 
 string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
-                                      const string& signature) {
+                                      const string& signature, bool use_client_params) {
     AuthorizationSet input_params;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
+    EXPECT_EQ(KM_ERROR_OK,
+              BeginOperation(purpose, input_params, NULL /* output_params */, use_client_params));
 
     string result;
     size_t input_consumed;
@@ -338,15 +344,16 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
     return result;
 }
 
-void Keymaster1Test::SignMessage(const string& message, string* signature) {
+void Keymaster1Test::SignMessage(const string& message, string* signature, bool use_client_params) {
     SCOPED_TRACE("SignMessage");
-    *signature = ProcessMessage(KM_PURPOSE_SIGN, message);
+    *signature = ProcessMessage(KM_PURPOSE_SIGN, message, use_client_params);
     EXPECT_GT(signature->size(), 0);
 }
 
-void Keymaster1Test::VerifyMessage(const string& message, const string& signature) {
+void Keymaster1Test::VerifyMessage(const string& message, const string& signature,
+                                   bool use_client_params) {
     SCOPED_TRACE("VerifyMessage");
-    ProcessMessage(KM_PURPOSE_VERIFY, message, signature);
+    ProcessMessage(KM_PURPOSE_VERIFY, message, signature, use_client_params);
 }
 
 string Keymaster1Test::EncryptMessage(const string& message, string* generated_nonce) {

@@ -55,6 +55,8 @@ class SoftKeymasterDevice {
                                                   const uint8_t* key_blob, size_t key_blob_length,
                                                   AuthorizationSet* auth_set);
     static void StoreDefaultNewKeyParams(AuthorizationSet* auth_set);
+    static keymaster_error_t GetPkcs8KeyAlgorithm(const uint8_t* key, size_t key_length,
+                                                  keymaster_algorithm_t* algorithm);
 
     static int close_device(hw_device_t* dev);
 
