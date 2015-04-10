@@ -33,7 +33,7 @@ class GoogleSoftKeymaster : public GoogleKeymaster {
         root_of_trust.blob.data_length = 2;
     }
     bool is_enforced(keymaster_tag_t /* tag */) { return false; }
-    keymaster_key_origin_t origin() { return KM_ORIGIN_SOFTWARE; }
+    bool is_hardware() { return false; }
 
     keymaster_error_t AddRngEntropy(const AddEntropyRequest& request) {
         RAND_seed(request.random_data.peek_read(), request.random_data.available_read());
