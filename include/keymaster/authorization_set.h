@@ -415,7 +415,7 @@ class AuthorizationSetBuilder {
     AuthorizationSetBuilder& SigningKey();
     AuthorizationSetBuilder& EncryptionKey();
     AuthorizationSetBuilder& NoDigestOrPadding();
-    AuthorizationSetBuilder& OcbMode(uint32_t chunk_length, uint32_t mac_length);
+    AuthorizationSetBuilder& EcbMode();
 
     AuthorizationSetBuilder& Deduplicate() {
         set.Deduplicate();
@@ -502,11 +502,8 @@ inline AuthorizationSetBuilder& AuthorizationSetBuilder::NoDigestOrPadding() {
     return Authorization(TAG_PADDING, KM_PAD_NONE);
 }
 
-inline AuthorizationSetBuilder& AuthorizationSetBuilder::OcbMode(uint32_t chunk_length,
-                                                                 uint32_t mac_length) {
-    Authorization(TAG_BLOCK_MODE, KM_MODE_OCB);
-    Authorization(TAG_CHUNK_LENGTH, chunk_length);
-    return Authorization(TAG_MAC_LENGTH, mac_length);
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcbMode() {
+    return Authorization(TAG_BLOCK_MODE, KM_MODE_ECB);
 }
 
 }  // namespace keymaster

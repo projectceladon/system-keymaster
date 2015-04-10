@@ -25,37 +25,6 @@
 
 namespace keymaster {
 
-class AesOcbOperation : public AeadModeOperation {
-  public:
-    static const size_t NONCE_LENGTH = 12;
-
-    AesOcbOperation(keymaster_purpose_t purpose, const uint8_t* key, size_t key_size,
-                    size_t chunk_length, size_t tag_length, bool caller_nonce)
-        : AeadModeOperation(purpose, key, key_size, chunk_length, tag_length, NONCE_LENGTH,
-                            caller_nonce) {}
-
-    virtual keymaster_error_t Abort() {
-        /* All cleanup is in the dtor */
-        return KM_ERROR_OK;
-    }
-
-  protected:
-    ae_ctx* ctx() { return ctx_.get(); }
-
-  private:
-    virtual keymaster_error_t Initialize(uint8_t* key, size_t key_size, size_t nonce_length,
-                                         size_t tag_length);
-    virtual keymaster_error_t EncryptChunk(const uint8_t* nonce, size_t nonce_length,
-                                           size_t tag_length,
-                                           const keymaster_blob_t additional_data, uint8_t* chunk,
-                                           size_t chunk_size, Buffer* output);
-    virtual keymaster_error_t DecryptChunk(const uint8_t* nonce, size_t nonce_length,
-                                           const uint8_t* tag, size_t tag_length,
-                                           const keymaster_blob_t additional_data, uint8_t* chunk,
-                                           size_t chunk_size, Buffer* output);
-    AeCtx ctx_;
-};
-
 class AesEvpOperation : public Operation {
   public:
     AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
