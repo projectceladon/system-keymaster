@@ -241,7 +241,7 @@ class NewKeyGeneration : public KeymasterTest {
         EXPECT_FALSE(contains(auths, TAG_AUTH_TIMEOUT, 301));
 
         // Now check that unspecified, defaulted tags are correct.
-        EXPECT_TRUE(contains(auths, TAG_ORIGIN, KM_ORIGIN_SOFTWARE));
+        EXPECT_TRUE(contains(auths, TAG_ORIGIN, KM_ORIGIN_GENERATED));
         EXPECT_TRUE(contains(auths, KM_TAG_CREATION_DATETIME));
     }
 };

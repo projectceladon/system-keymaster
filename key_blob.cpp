@@ -151,12 +151,17 @@ bool KeyBlob::ExtractKeyCharacteristics() {
 }
 
 keymaster_key_origin_t KeyBlob::origin() const {
-    keymaster_key_origin_t origin = KM_ORIGIN_SOFTWARE;
+    keymaster_key_origin_t origin;
     if (!enforced_.GetTagValue(TAG_ORIGIN, &origin) &&
         !unenforced_.GetTagValue(TAG_ORIGIN, &origin))
         // This should be impossible.
         assert(false);
     return origin;
+}
+
+bool KeyBlob::is_hardware() const {
+    keymaster_key_origin_t origin;
+    return enforced_.GetTagValue(TAG_ORIGIN, &origin);
 }
 
 }  // namespace keymaster

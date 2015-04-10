@@ -52,7 +52,7 @@ class KeyBlobTest : public testing::Test {
         enforced_.push_back(TAG_MIN_SECONDS_BETWEEN_OPS, 10);
         enforced_.push_back(TAG_ALL_USERS);
         enforced_.push_back(TAG_NO_AUTH_REQUIRED);
-        enforced_.push_back(TAG_ORIGIN, KM_ORIGIN_HARDWARE);
+        enforced_.push_back(TAG_ORIGIN, KM_ORIGIN_GENERATED);
 
         unenforced_.push_back(TAG_ACTIVE_DATETIME, 10);
         unenforced_.push_back(TAG_ORIGINATION_EXPIRE_DATETIME, 100);

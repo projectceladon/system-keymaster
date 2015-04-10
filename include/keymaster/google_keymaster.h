@@ -73,7 +73,7 @@ class GoogleKeymaster {
 
   private:
     virtual bool is_enforced(keymaster_tag_t tag) = 0;
-    virtual keymaster_key_origin_t origin() = 0;
+    virtual bool is_hardware() = 0;
     virtual keymaster_key_param_t RootOfTrustTag() = 0;
     virtual keymaster_key_blob_t MasterKey() = 0;
     virtual void GenerateNonce(uint8_t* nonce, size_t length) = 0;
