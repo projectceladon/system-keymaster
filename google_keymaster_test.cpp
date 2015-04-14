@@ -33,17 +33,6 @@ using std::istreambuf_iterator;
 using std::string;
 using std::vector;
 
-int main(int argc, char** argv) {
-    ERR_load_crypto_strings();
-    ::testing::InitGoogleTest(&argc, argv);
-    int result = RUN_ALL_TESTS();
-    // Clean up stuff OpenSSL leaves around, so Valgrind doesn't complain.
-    CRYPTO_cleanup_all_ex_data();
-    ERR_remove_thread_state(NULL);
-    ERR_free_strings();
-    return result;
-}
-
 template <typename T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
     os << "{ ";
     bool first = true;
@@ -1365,12 +1354,12 @@ TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
     string iv1;
     string ciphertext1 = EncryptMessage(message, &iv1);
     EXPECT_EQ(message.size(), ciphertext1.size());
-    EXPECT_EQ(16, iv1.size());
+    EXPECT_EQ(16U, iv1.size());
 
     string iv2;
     string ciphertext2 = EncryptMessage(message, &iv2);
     EXPECT_EQ(message.size(), ciphertext2.size());
-    EXPECT_EQ(16, iv2.size());
+    EXPECT_EQ(16U, iv2.size());
 
     // IVs should be random, so ciphertexts should differ.
     EXPECT_NE(iv1, iv2);

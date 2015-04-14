@@ -93,10 +93,32 @@ LOCAL_C_INCLUDES := \
 	system/security/keystore \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror
-# Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
 LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 include $(BUILD_SHARED_LIBRARY)
+
+# Unit tests for libkeymaster
+include $(CLEAR_VARS)
+LOCAL_MODULE := libkeymaster_test
+LOCAL_SRC_FILES := \
+	abstract_factory_registry_test.cpp \
+	authorization_set_test.cpp \
+	google_keymaster_messages_test.cpp \
+	google_keymaster_test.cpp \
+	google_keymaster_test_utils.cpp \
+	hkdf_test.cpp \
+	hmac_test.cpp \
+	key_blob_test.cpp \
+	keymaster_enforcement.cpp \
+	keymaster_enforcement_test.cpp
+LOCAL_C_INCLUDES := \
+	$(LOCAL_PATH)/include
+LOCAL_CFLAGS = -Wall -Werror
+LOCAL_MODULE_TAGS := tests
+LOCAL_SHARED_LIBRARIES := libsoftkeymasterdevice libkeymaster_messages libkeymaster1 libcrypto
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_NATIVE_TEST)
+
