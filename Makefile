@@ -44,12 +44,13 @@ CPPSRCS=\
 	google_keymaster_test.cpp \
 	google_keymaster_test_utils.cpp \
 	google_keymaster_utils.cpp \
+	gtest_main.cpp \
 	hkdf.cpp \
 	hkdf_test.cpp \
 	hmac.cpp \
-	hmac_test.cpp \
 	hmac_key.cpp \
 	hmac_operation.cpp \
+	hmac_test.cpp \
 	key.cpp \
 	key_blob.cpp \
 	key_blob_test.cpp \
@@ -124,13 +125,15 @@ memcheck: $(BINARIES:=.memcheck)
 
 massif: $(BINARIES:=.massif)
 
+GTEST_OBJS = $(GTEST)/src/gtest-all.o gtest_main.o
+
 hmac_test: hmac_test.o \
 	authorization_set.o \
 	google_keymaster_test_utils.o \
 	hmac.o \
 	logger.o \
 	serializable.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 hkdf_test: hkdf_test.o \
 	authorization_set.o \
@@ -139,14 +142,14 @@ hkdf_test: hkdf_test.o \
 	hmac.o \
 	logger.o \
 	serializable.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 authorization_set_test: authorization_set_test.o \
 	authorization_set.o \
 	google_keymaster_test_utils.o \
 	logger.o \
 	serializable.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 key_blob_test: key_blob_test.o \
 	authorization_set.o \
@@ -157,7 +160,7 @@ key_blob_test: key_blob_test.o \
 	openssl_err.o \
 	serializable.o \
 	unencrypted_key_blob.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 google_keymaster_messages_test: google_keymaster_messages_test.o \
 	authorization_set.o \
@@ -166,7 +169,7 @@ google_keymaster_messages_test: google_keymaster_messages_test.o \
 	google_keymaster_utils.o \
 	logger.o \
 	serializable.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 google_keymaster_test: google_keymaster_test.o \
 	aead_mode_operation.o \
@@ -196,11 +199,11 @@ google_keymaster_test: google_keymaster_test.o \
 	soft_keymaster_device.o \
 	symmetric_key.o \
 	unencrypted_key_blob.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 abstract_factory_registry_test: abstract_factory_registry_test.o \
 	logger.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 keymaster_enforcement_test: keymaster_enforcement_test.o \
 	keymaster_enforcement.o \
@@ -210,7 +213,7 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 	google_keymaster_test_utils.o \
 	logger.o \
 	serializable.o \
-	$(GTEST)/src/gtest-all.o
+	$(GTEST_OBJS)
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
 ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)
