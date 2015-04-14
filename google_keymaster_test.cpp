@@ -135,7 +135,7 @@ TEST_F(CheckSupported, SupportedDigests) {
 
     EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE}, digests, len));
+    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
