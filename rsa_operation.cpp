@@ -64,7 +64,11 @@ bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_paddin
 bool RsaOperationFactory::GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
                                                keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_DIGEST;
-    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest) || !supported(*digest))
+    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest) &&
+        !key.authorizations().GetTagValue(TAG_DIGEST_OLD, digest))
+        return false;
+
+    if (!supported(*digest))
         return false;
 
     *error = KM_ERROR_OK;
