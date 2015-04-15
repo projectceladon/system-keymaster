@@ -47,27 +47,26 @@ class HmacOperationFactory : public OperationFactory {
 };
 
 Operation* HmacOperationFactory::CreateOperation(const Key& key,
-                                                 const AuthorizationSet& /* begin_params */,
+                                                 const AuthorizationSet& begin_params,
                                                  keymaster_error_t* error) {
-    *error = KM_ERROR_OK;
+    uint32_t tag_length = 0;
+    begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length);
 
-    uint32_t tag_length;
-    if (!key.authorizations().GetTagValue(TAG_MAC_LENGTH, &tag_length))
-        *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
-
-    keymaster_digest_t digest;
-    if (!key.authorizations().GetTagValue(TAG_DIGEST, &digest))
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
-
-    if (*error != KM_ERROR_OK)
-        return NULL;
+    keymaster_digest_t digest = KM_DIGEST_NONE;
+    key.authorizations().GetTagValue(TAG_DIGEST, &digest);
 
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
-    Operation* op = new HmacOperation(purpose(), symmetric_key->key_data(),
-                                      symmetric_key->key_data_size(), digest, tag_length);
-    if (!op)
+    UniquePtr<HmacOperation> op(new HmacOperation(
+        purpose(), symmetric_key->key_data(), symmetric_key->key_data_size(), digest, tag_length));
+    if (!op.get())
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return op;
+    else
+        *error = op->error();
+
+    if (*error != KM_ERROR_OK)
+        return nullptr;
+
+    return op.release();
 }
 
 static keymaster_digest_t supported_digests[] = {KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
@@ -100,8 +99,12 @@ HmacOperation::HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_dat
     // Initialize CTX first, so dtor won't crash even if we error out later.
     HMAC_CTX_init(&ctx_);
 
-    const EVP_MD* md;
+    const EVP_MD* md = nullptr;
     switch (digest) {
+    case KM_DIGEST_NONE:
+    case KM_DIGEST_MD5:
+        error_ = KM_ERROR_UNSUPPORTED_DIGEST;
+        break;
     case KM_DIGEST_SHA1:
         md = EVP_sha1();
         break;
@@ -117,13 +120,10 @@ HmacOperation::HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_dat
     case KM_DIGEST_SHA_2_512:
         md = EVP_sha512();
         break;
-    default:
-        error_ = KM_ERROR_UNSUPPORTED_DIGEST;
-        return;
     }
 
-    if ((openssl_size_t)tag_length_ > EVP_MD_size(md)) {
-        error_ = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+    if (md == nullptr) {
+        error_ = KM_ERROR_UNSUPPORTED_DIGEST;
         return;
     }
 
@@ -161,13 +161,15 @@ keymaster_error_t HmacOperation::Finish(const AuthorizationSet& /* additional_pa
 
     switch (purpose()) {
     case KM_PURPOSE_SIGN:
-        output->reserve(tag_length_);
-        output->write(digest, tag_length_);
+        if (tag_length_ > digest_len)
+            return KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+        if (!output->reserve(tag_length_) || !output->write(digest, tag_length_))
+            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return KM_ERROR_OK;
     case KM_PURPOSE_VERIFY:
-        if (signature.available_read() != tag_length_)
+        if (signature.available_read() > digest_len)
             return KM_ERROR_INVALID_INPUT_LENGTH;
-        if (CRYPTO_memcmp(signature.peek_read(), digest, tag_length_) != 0)
+        if (CRYPTO_memcmp(signature.peek_read(), digest, signature.available_read()) != 0)
             return KM_ERROR_VERIFICATION_FAILED;
         return KM_ERROR_OK;
     default:

@@ -220,18 +220,12 @@ keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose) {
 
 keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose,
                                                  const AuthorizationSet& input_set,
-                                                 AuthorizationSet* output_set,
-                                                 bool use_client_params) {
-    AuthorizationSet additional_params;
-    if (use_client_params)
-        additional_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
-    additional_params.push_back(input_set);
-
+                                                 AuthorizationSet* output_set) {
     keymaster_key_param_t* out_params;
     size_t out_params_count;
     keymaster_error_t error =
-        device()->begin(device(), purpose, &blob_, additional_params.data(),
-                        additional_params.size(), &out_params, &out_params_count, &op_handle_);
+        device()->begin(device(), purpose, &blob_, input_set.data(), input_set.size(), &out_params,
+                        &out_params_count, &op_handle_);
     if (error == KM_ERROR_OK) {
         if (output_set) {
             output_set->Reinitialize(out_params, out_params_count);
@@ -306,8 +300,9 @@ keymaster_error_t Keymaster1Test::AbortOperation() {
 string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
                                       bool use_client_params) {
     AuthorizationSet input_params;
-    EXPECT_EQ(KM_ERROR_OK,
-              BeginOperation(purpose, input_params, NULL /* output_params */, use_client_params));
+    if (use_client_params)
+        input_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
 
     string result;
     size_t input_consumed;
@@ -334,8 +329,9 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
                                       const string& signature, bool use_client_params) {
     AuthorizationSet input_params;
-    EXPECT_EQ(KM_ERROR_OK,
-              BeginOperation(purpose, input_params, NULL /* output_params */, use_client_params));
+    if (use_client_params)
+        input_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
 
     string result;
     size_t input_consumed;
@@ -348,6 +344,17 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 void Keymaster1Test::SignMessage(const string& message, string* signature, bool use_client_params) {
     SCOPED_TRACE("SignMessage");
     *signature = ProcessMessage(KM_PURPOSE_SIGN, message, use_client_params);
+    EXPECT_GT(signature->size(), 0U);
+}
+
+void Keymaster1Test::MacMessage(const string& message, string* signature, size_t mac_length) {
+    SCOPED_TRACE("SignMessage");
+    AuthorizationSet input_params(AuthorizationSet(client_params_, array_length(client_params_)));
+    input_params.push_back(TAG_MAC_LENGTH, mac_length);
+    AuthorizationSet update_params;
+    AuthorizationSet output_params;
+    *signature =
+        ProcessMessage(KM_PURPOSE_SIGN, message, input_params, update_params, &output_params);
     EXPECT_GT(signature->size(), 0U);
 }
 
@@ -365,7 +372,7 @@ string Keymaster1Test::EncryptMessage(const string& message, string* generated_n
 string Keymaster1Test::EncryptMessage(const AuthorizationSet& update_params, const string& message,
                                       string* generated_nonce) {
     SCOPED_TRACE("EncryptMessage");
-    AuthorizationSet begin_params, output_params;
+    AuthorizationSet begin_params(client_params()), output_params;
     string ciphertext =
         ProcessMessage(KM_PURPOSE_ENCRYPT, message, begin_params, update_params, &output_params);
     if (generated_nonce) {
@@ -400,7 +407,7 @@ string Keymaster1Test::DecryptMessage(const string& ciphertext, const string& no
 string Keymaster1Test::DecryptMessage(const AuthorizationSet& update_params,
                                       const string& ciphertext, const string& nonce) {
     SCOPED_TRACE("DecryptMessage");
-    AuthorizationSet begin_params;
+    AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext, begin_params, update_params);
 }
@@ -436,13 +443,11 @@ Keymaster1Test::Rescope(const AuthorizationSet& new_params, keymaster_key_blob_t
 
 void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
                                          string expected_mac) {
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
-                                         .HmacKey(key.size() * 8)
-                                         .Digest(digest)
-                                         .Authorization(TAG_MAC_LENGTH, expected_mac.size()),
-                                     KM_KEY_FORMAT_RAW, key));
+    ASSERT_EQ(KM_ERROR_OK,
+              ImportKey(AuthorizationSetBuilder().HmacKey(key.size() * 8).Digest(digest),
+                        KM_KEY_FORMAT_RAW, key));
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, expected_mac.size());
     EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << (int)digest;
 }
 
@@ -455,7 +460,7 @@ void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonc
                                          .Authorization(TAG_CALLER_NONCE),
                                      KM_KEY_FORMAT_RAW, key));
 
-    AuthorizationSet begin_params, update_params, output_params;
+    AuthorizationSet begin_params(client_params()), update_params, output_params;
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     string ciphertext =
         EncryptMessageWithParams(message, begin_params, update_params, &output_params);

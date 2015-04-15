@@ -428,58 +428,61 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .HmacKey(128)
-                    .Digest(KM_DIGEST_SHA1)
-                    .Authorization(TAG_MAC_LENGTH, 20));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 20);
     ASSERT_EQ(20U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha224Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_224)
-                                           .Authorization(TAG_MAC_LENGTH, 28)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 28);
     ASSERT_EQ(28U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_256)
-                                           .Authorization(TAG_MAC_LENGTH, 32)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 32);
     ASSERT_EQ(32U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha384Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_384)
-                                           .Authorization(TAG_MAC_LENGTH, 48)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384)));
+
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 48);
     ASSERT_EQ(48U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacSha512Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_512)
-                                           .Authorization(TAG_MAC_LENGTH, 64)));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 64);
     ASSERT_EQ(64U, signature.size());
+}
+
+TEST_F(SigningOperationsTest, HmacLengthInKey) {
+    // TODO(swillden): unified API should generate an error on key generation.
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MAC_LENGTH, 20)));
+    string message = "12345678901234567890123456789012";
+    string signature;
+    MacMessage(message, &signature, 30);
+    // Size in key was ignored.
+    ASSERT_EQ(30U, signature.size());
 }
 
 TEST_F(SigningOperationsTest, HmacRfc4231TestCase1) {
@@ -714,21 +717,18 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase7) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacSha256NoMacLength) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC)
-                                           .Authorization(TAG_KEY_SIZE, 128)
-                                           .SigningKey()
-                                           .Authorization(TAG_DIGEST, KM_DIGEST_SHA_2_256)));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN));
-}
-
 TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_256)
-                                           .Authorization(TAG_MAC_LENGTH, 33)));
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN));
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_MAC_LENGTH, 33);
+    ASSERT_EQ(KM_ERROR_OK,
+              BeginOperation(KM_PURPOSE_SIGN, begin_params, nullptr /* output_params */));
+    string message = "1234567890123456789012345678901";
+    string result;
+    size_t input_consumed;
+    ASSERT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, FinishOperation(&result));
 }
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
@@ -984,57 +984,42 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .HmacKey(128)
-                    .Digest(KM_DIGEST_SHA1)
-                    .Authorization(TAG_MAC_LENGTH, 20));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 20);
     VerifyMessage(message, signature);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha224Success) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .HmacKey(128)
-                    .Digest(KM_DIGEST_SHA_2_224)
-                    .Authorization(TAG_MAC_LENGTH, 28));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 28);
     VerifyMessage(message, signature);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_256)
-                                           .Authorization(TAG_MAC_LENGTH, 32)));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 32);
     VerifyMessage(message, signature);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha384Success) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .HmacKey(128)
-                    .Digest(KM_DIGEST_SHA_2_384)
-                    .Authorization(TAG_MAC_LENGTH, 48));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 48);
     VerifyMessage(message, signature);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha512Success) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .HmacKey(128)
-                    .Digest(KM_DIGEST_SHA_2_512)
-                    .Authorization(TAG_MAC_LENGTH, 64));
+    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 64);
     VerifyMessage(message, signature);
 }
 
@@ -1248,7 +1233,7 @@ TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
 
     string message = "Hello World!";
     string signature;
-    SignMessage(message, &signature);
+    MacMessage(message, &signature, 32);
     VerifyMessage(message, signature);
 }
 
@@ -1466,7 +1451,7 @@ TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
 
     int increment = 15;
     string message(239, 'a');
-    AuthorizationSet input_params;
+    AuthorizationSet input_params(client_params());
     AuthorizationSet output_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
 
@@ -1480,6 +1465,7 @@ TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
 
     // Move TAG_NONCE into input_params
     input_params.Reinitialize(output_params);
+    input_params.push_back(client_params());
     output_params.Clear();
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
@@ -1555,7 +1541,7 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
                                            .Authorization(TAG_CALLER_NONCE)));
 
-    AuthorizationSet input_params;
+    AuthorizationSet input_params(client_params());
     input_params.push_back(TAG_NONCE, "123", 3);
     EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_ENCRYPT, input_params));
 }
@@ -1598,7 +1584,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     EXPECT_EQ(message, plaintext);
 
     // Now specify a nonce, should also work.
-    AuthorizationSet input_params;
+    AuthorizationSet input_params(client_params());
     AuthorizationSet update_params;
     AuthorizationSet output_params;
     input_params.push_back(TAG_NONCE, "abcdefghijklmnop", 16);
@@ -1611,7 +1597,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     EXPECT_EQ(message, plaintext);
 
     // Now try with wrong nonce.
-    input_params.Clear();
+    input_params.Reinitialize(client_params());
     input_params.push_back(TAG_NONCE, "aaaaaaaaaaaaaaaa", 16);
     plaintext = ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext2, input_params, update_params,
                                &output_params);
@@ -1625,7 +1611,7 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
 
     int increment = 15;
     string message(240, 'a');
-    AuthorizationSet input_params;
+    AuthorizationSet input_params(client_params());
     AuthorizationSet output_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
 
@@ -1639,6 +1625,7 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
 
     // Move TAG_NONCE into input_params
     input_params.Reinitialize(output_params);
+    input_params.push_back(client_params());
     output_params.Clear();
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
