@@ -37,10 +37,12 @@ class HmacOperation : public Operation {
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
                                      const Buffer& signature, Buffer* output);
 
+    keymaster_error_t error() { return error_; }
+
   private:
     HMAC_CTX ctx_;
     keymaster_error_t error_;
-    const size_t tag_length_;
+    size_t tag_length_;
 };
 
 }  // namespace keymaster

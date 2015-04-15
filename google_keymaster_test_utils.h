@@ -165,8 +165,7 @@ class Keymaster1Test : public testing::Test {
 
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose);
     keymaster_error_t BeginOperation(keymaster_purpose_t purpose, const AuthorizationSet& input_set,
-                                     AuthorizationSet* output_set = NULL,
-                                     bool use_client_params = true);
+                                     AuthorizationSet* output_set = NULL);
 
     keymaster_error_t UpdateOperation(const std::string& message, std::string* output,
                                       size_t* input_consumed);
@@ -197,6 +196,7 @@ class Keymaster1Test : public testing::Test {
 
     void SignMessage(const std::string& message, std::string* signature,
                      bool use_client_params = true);
+    void MacMessage(const std::string& message, std::string* signature, size_t mac_length);
 
     void VerifyMessage(const std::string& message, const std::string& signature,
                        bool use_client_params = true);
@@ -246,6 +246,10 @@ class Keymaster1Test : public testing::Test {
         FreeKeyBlob();
         blob_.key_material = key;
         blob_.key_material_size = key_length;
+    }
+
+    AuthorizationSet client_params() {
+        return AuthorizationSet(client_params_, sizeof(client_params_) / sizeof(client_params_[0]));
     }
 
   private:
