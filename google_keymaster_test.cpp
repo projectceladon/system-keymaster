@@ -236,8 +236,10 @@ class NewKeyGeneration : public KeymasterTest {
 };
 
 TEST_F(NewKeyGeneration, Rsa) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     CheckBaseParams();
 
     // Check specified tags are all present in auths
@@ -257,7 +259,7 @@ TEST_F(NewKeyGeneration, RsaDefaultSize) {
 
 TEST_F(NewKeyGeneration, Ecdsa) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -267,7 +269,7 @@ TEST_F(NewKeyGeneration, Ecdsa) {
 
 TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     CheckBaseParams();
 
     // Check specified tags are all present in unenforced characteristics
@@ -279,27 +281,29 @@ TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
 
 TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190).Digest(KM_DIGEST_NONE)));
 }
 
 TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
     size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
-        EXPECT_EQ(KM_ERROR_OK,
-                  GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size, KM_DIGEST_NONE)))
+        EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size).Digest(
+                                   KM_DIGEST_NONE)))
             << "Failed to generate size: " << size;
     }
 }
 
 TEST_F(NewKeyGeneration, HmacSha256) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16)));
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
 }
 
 typedef KeymasterTest GetKeyCharacteristics;
 TEST_F(GetKeyCharacteristics, SimpleRsa) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     AuthorizationSet original(sw_enforced());
 
     ASSERT_EQ(KM_ERROR_OK, GetCharacteristics());
@@ -308,8 +312,10 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
 
 typedef KeymasterTest SigningOperationsTest;
 TEST_F(SigningOperationsTest, RsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -317,16 +323,20 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
 
 TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
     // Note that without padding, key size must exactly match digest size.
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_SHA_2_256, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_NONE)));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
 }
 
 TEST_F(SigningOperationsTest, RsaPssSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
@@ -334,8 +344,10 @@ TEST_F(SigningOperationsTest, RsaPssSha256Success) {
 }
 
 TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -344,8 +356,10 @@ TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
 TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     // Key must be at least 10 bytes larger than hash, to provide minimal random salt, so verify
     // that 9 bytes larger than hash won't work.
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256 + 9 * 8, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256 + 9 * 8, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PSS)));
     string message(1024, 'a');
     string signature;
 
@@ -360,15 +374,17 @@ TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
 
 TEST_F(SigningOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
 }
 
 TEST_F(SigningOperationsTest, RsaAbort) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     AuthorizationSet input_params, output_params;
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
     EXPECT_EQ(KM_ERROR_OK, AbortOperation());
@@ -377,14 +393,18 @@ TEST_F(SigningOperationsTest, RsaAbort) {
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(256, 3, KM_DIGEST_MD5,
-                                                        KM_PAD_RSA_PSS /* supported padding */));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(256, 3)
+                    .Digest(KM_DIGEST_MD5)
+                    .Padding(KM_PAD_RSA_PSS /* supported padding */));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-        256, 3, KM_DIGEST_SHA_2_256 /* supported digest */, KM_PAD_PKCS7));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(256, 3)
+                    .Digest(KM_DIGEST_SHA_2_256 /* supported digest */)
+                    .Padding(KM_PAD_PKCS7));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
 }
 
@@ -393,20 +413,25 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey()));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
     // PSS requires a digest.
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(256, 3, KM_DIGEST_NONE, KM_PAD_RSA_PSS));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(256, 3)
+                    .Digest(KM_DIGEST_NONE)
+                    .Padding(KM_PAD_RSA_PSS));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaNoPadding) {
     // Padding must be specified
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey().Authorization(
-                  TAG_DIGEST, KM_DIGEST_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey().Digest(
+                               KM_DIGEST_NONE)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA1, 20));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA1)
+                    .Authorization(TAG_MAC_LENGTH, 20));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -414,8 +439,10 @@ TEST_F(SigningOperationsTest, HmacSha1Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha224Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 28)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_224)
+                                           .Authorization(TAG_MAC_LENGTH, 28)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -423,8 +450,10 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 32)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MAC_LENGTH, 32)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -432,8 +461,10 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha384Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_384, 48)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_384)
+                                           .Authorization(TAG_MAC_LENGTH, 48)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -441,8 +472,10 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha512Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_512, 64)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_512)
+                                           .Authorization(TAG_MAC_LENGTH, 64)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -691,14 +724,18 @@ TEST_F(SigningOperationsTest, HmacSha256NoMacLength) {
 }
 
 TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 33)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MAC_LENGTH, 33)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, BeginOperation(KM_PURPOSE_SIGN));
 }
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
 
     string message = "1234567890123456789012345678901";
@@ -717,8 +754,10 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
 
 typedef KeymasterTest VerificationOperationsTest;
 TEST_F(VerificationOperationsTest, RsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature);
@@ -727,7 +766,10 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
 
 TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
     // Note that without padding, key size must exactly match digest size.
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(256, 3, KM_DIGEST_SHA_2_256, KM_PAD_NONE));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(256, 3)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Padding(KM_PAD_NONE));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -735,7 +777,10 @@ TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(256, 3, KM_DIGEST_SHA_2_256, KM_PAD_NONE));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(256, 3)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Padding(KM_PAD_NONE));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -751,8 +796,10 @@ TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
@@ -761,8 +808,10 @@ TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
-    GenerateKey(
-        AuthorizationSetBuilder().RsaSigningKey(512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(512, 3)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -778,8 +827,10 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
@@ -796,8 +847,10 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(512, 3, KM_DIGEST_SHA_2_256,
-                                                        KM_PAD_RSA_PKCS1_1_5_SIGN));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(512, 3)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -805,8 +858,10 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
-    GenerateKey(AuthorizationSetBuilder().RsaSigningKey(512, 3, KM_DIGEST_SHA_2_256,
-                                                        KM_PAD_RSA_PKCS1_1_5_SIGN));
+    GenerateKey(AuthorizationSetBuilder()
+                    .RsaSigningKey(512, 3)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
     SignMessage(message, &signature);
@@ -822,8 +877,10 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
 }
 
 TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               512, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
@@ -902,7 +959,10 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                 FAIL() << "Missing digest";
             }
 
-            GenerateKey(AuthorizationSetBuilder().RsaSigningKey(key_bits, 3, digest, padding_mode));
+            GenerateKey(AuthorizationSetBuilder()
+                            .RsaSigningKey(key_bits, 3)
+                            .Digest(digest)
+                            .Padding(padding_mode));
             string message(message_len, 'a');
             string signature;
             SignMessage(message, &signature);
@@ -916,7 +976,7 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
 
 TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -924,7 +984,10 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA1, 16));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA1)
+                    .Authorization(TAG_MAC_LENGTH, 20));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -932,7 +995,10 @@ TEST_F(VerificationOperationsTest, HmacSha1Success) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha224Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_224, 16));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_224)
+                    .Authorization(TAG_MAC_LENGTH, 28));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -940,8 +1006,10 @@ TEST_F(VerificationOperationsTest, HmacSha224Success) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_256, 16)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MAC_LENGTH, 32)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -949,7 +1017,10 @@ TEST_F(VerificationOperationsTest, HmacSha256Success) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha384Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_384, 16));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_384)
+                    .Authorization(TAG_MAC_LENGTH, 48));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -957,7 +1028,10 @@ TEST_F(VerificationOperationsTest, HmacSha384Success) {
 }
 
 TEST_F(VerificationOperationsTest, HmacSha512Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128, KM_DIGEST_SHA_2_512, 16));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_512)
+                    .Authorization(TAG_MAC_LENGTH, 64));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature);
@@ -966,8 +1040,10 @@ TEST_F(VerificationOperationsTest, HmacSha512Success) {
 
 typedef VerificationOperationsTest ExportKeyTest;
 TEST_F(ExportKeyTest, RsaSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
     EXPECT_GT(export_data.length(), 0U);
@@ -977,7 +1053,7 @@ TEST_F(ExportKeyTest, RsaSuccess) {
 
 TEST_F(ExportKeyTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224, KM_DIGEST_NONE)));
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &export_data));
     EXPECT_GT(export_data.length(), 0U);
@@ -986,15 +1062,19 @@ TEST_F(ExportKeyTest, EcdsaSuccess) {
 }
 
 TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     string export_data;
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_PKCS8, &export_data));
 }
 
 TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaSigningKey(
-                               256, 3, KM_DIGEST_NONE, KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
     corrupt_key_blob();
     string export_data;
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, ExportKey(KM_KEY_FORMAT_X509, &export_data));
@@ -1021,8 +1101,10 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().RsaSigningKey(
-                                         1024, 65537, KM_DIGEST_NONE, KM_PAD_NONE),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .RsaSigningKey(1024, 65537)
+                                         .Digest(KM_DIGEST_NONE)
+                                         .Padding(KM_PAD_NONE),
                                      KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
@@ -1063,8 +1145,10 @@ TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              ImportKey(AuthorizationSetBuilder().RsaSigningKey(2048 /* Doesn't match key */, 3,
-                                                                KM_DIGEST_NONE, KM_PAD_NONE),
+              ImportKey(AuthorizationSetBuilder()
+                            .RsaSigningKey(2048 /* Doesn't match key */, 3)
+                            .Digest(KM_DIGEST_NONE)
+                            .Padding(KM_PAD_NONE),
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
@@ -1072,8 +1156,10 @@ TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              ImportKey(AuthorizationSetBuilder().RsaSigningKey(256, 3 /* Doesnt' match key */,
-                                                                KM_DIGEST_NONE, KM_PAD_NONE),
+              ImportKey(AuthorizationSetBuilder()
+                            .RsaSigningKey(256, 3 /* Doesnt' match key */)
+                            .Digest(KM_DIGEST_NONE)
+                            .Padding(KM_PAD_NONE),
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
@@ -1081,8 +1167,9 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE),
-                                     KM_KEY_FORMAT_PKCS8, pk8_key));
+    ASSERT_EQ(KM_ERROR_OK,
+              ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE),
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
@@ -1102,8 +1189,9 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256, KM_DIGEST_NONE),
-                                     KM_KEY_FORMAT_PKCS8, pk8_key));
+    ASSERT_EQ(KM_ERROR_OK,
+              ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE),
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 
     // Check values derived from the key.
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
@@ -1123,10 +1211,10 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
-              ImportKey(AuthorizationSetBuilder().EcdsaSigningKey(
-                            224, KM_DIGEST_NONE),  // Size does not match key
-                        KM_KEY_FORMAT_PKCS8,
-                        pk8_key));
+              ImportKey(AuthorizationSetBuilder()
+                            .EcdsaSigningKey(224 /* Doesn't match key */)
+                            .Digest(KM_DIGEST_NONE),
+                        KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
 TEST_F(ImportKeyTest, AesKeySuccess) {
@@ -1149,8 +1237,10 @@ TEST_F(ImportKeyTest, AesKeySuccess) {
 TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
     char key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     string key(key_data, sizeof(key_data));
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().HmacKey(sizeof(key_data) * 8,
-                                                                       KM_DIGEST_SHA_2_256, 32),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .HmacKey(sizeof(key_data) * 8)
+                                         .Digest(KM_DIGEST_SHA_2_256)
+                                         .Authorization(TAG_MAC_LENGTH, 32),
                                      KM_KEY_FORMAT_RAW, key));
 
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
@@ -1164,8 +1254,8 @@ TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
 
 typedef KeymasterTest EncryptionOperationsTest;
 TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_OAEP)));
 
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
@@ -1179,8 +1269,8 @@ TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512U / 8, ciphertext.size());
@@ -1190,8 +1280,8 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_OAEP)));
     string message = "12345678901234567890123";
     string result;
     size_t input_consumed;
@@ -1203,8 +1293,8 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3, KM_PAD_RSA_OAEP)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512U / 8, ciphertext.size());
@@ -1221,8 +1311,8 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(
-                               512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext1 = EncryptMessage(string(message));
     EXPECT_EQ(512U / 8, ciphertext1.size());
@@ -1235,8 +1325,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(
-                               512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512U / 8, ciphertext.size());
@@ -1246,8 +1336,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(
-                               512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "12345678901234567890123456789012345678901234567890123";
     string result;
     size_t input_consumed;
@@ -1259,8 +1349,8 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
 }
 
 TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(
-                               512, 3, KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
+                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message));
     EXPECT_EQ(512U / 8, ciphertext.size());
@@ -1625,7 +1715,8 @@ TEST_F(RescopingTest, RescopeSymmetric) {
 
 TEST_F(RescopingTest, RescopeRsa) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaEncryptionKey(256, 3, KM_PAD_RSA_OAEP)
+                                           .RsaEncryptionKey(256, 3)
+                                           .Padding(KM_PAD_RSA_OAEP)
                                            .Authorization(TAG_RESCOPING_ADD, KM_TAG_PURPOSE)
                                            .Authorization(TAG_RESCOPING_DEL, KM_TAG_PURPOSE)));
     EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_ENCRYPT));
@@ -1636,7 +1727,9 @@ TEST_F(RescopingTest, RescopeRsa) {
     keymaster_key_blob_t rescoped_blob;
     keymaster_key_characteristics_t* rescoped_characteristics;
     AuthorizationSet new_params = AuthorizationSetBuilder()
-                                      .RsaSigningKey(256, 3, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS)
+                                      .RsaSigningKey(256, 3)
+                                      .Digest(KM_DIGEST_SHA_2_256)
+                                      .Padding(KM_PAD_RSA_PSS)
                                       .build();
 
     ASSERT_EQ(KM_ERROR_OK, Rescope(new_params, &rescoped_blob, &rescoped_characteristics));

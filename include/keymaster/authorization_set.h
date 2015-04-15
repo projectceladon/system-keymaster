@@ -413,21 +413,25 @@ class AuthorizationSetBuilder {
     AuthorizationSetBuilder& RsaKey(uint32_t key_size, uint64_t public_exponent);
     AuthorizationSetBuilder& EcdsaKey(uint32_t key_size);
     AuthorizationSetBuilder& AesKey(uint32_t key_size);
-    AuthorizationSetBuilder& HmacKey(uint32_t key_size, keymaster_digest_t digest,
-                                     uint32_t mac_length);
+    AuthorizationSetBuilder& HmacKey(uint32_t key_size);
 
-    AuthorizationSetBuilder& RsaSigningKey(uint32_t key_size, uint64_t public_exponent,
-                                           keymaster_digest_t digest, keymaster_padding_t padding);
-
-    AuthorizationSetBuilder& RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent,
-                                              keymaster_padding_t padding);
-
-    AuthorizationSetBuilder& EcdsaSigningKey(uint32_t key_size, keymaster_digest_t digest);
+    AuthorizationSetBuilder& RsaSigningKey(uint32_t key_size, uint64_t public_exponent);
+    AuthorizationSetBuilder& RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent);
+    AuthorizationSetBuilder& EcdsaSigningKey(uint32_t key_size);
     AuthorizationSetBuilder& AesEncryptionKey(uint32_t key_size);
+
     AuthorizationSetBuilder& SigningKey();
     AuthorizationSetBuilder& EncryptionKey();
     AuthorizationSetBuilder& NoDigestOrPadding();
     AuthorizationSetBuilder& EcbMode();
+
+    AuthorizationSetBuilder& Digest(keymaster_digest_t digest) {
+        return Authorization(TAG_DIGEST, digest);
+    }
+
+    AuthorizationSetBuilder& Padding(keymaster_padding_t padding) {
+        return Authorization(TAG_PADDING, padding);
+    }
 
     AuthorizationSetBuilder& Deduplicate() {
         set.Deduplicate();
@@ -460,38 +464,27 @@ inline AuthorizationSetBuilder& AuthorizationSetBuilder::AesKey(uint32_t key_siz
     return Authorization(TAG_KEY_SIZE, key_size);
 }
 
-inline AuthorizationSetBuilder& AuthorizationSetBuilder::HmacKey(uint32_t key_size,
-                                                                 keymaster_digest_t digest,
-                                                                 uint32_t mac_length) {
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::HmacKey(uint32_t key_size) {
     Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC);
     Authorization(TAG_KEY_SIZE, key_size);
-    SigningKey();
-    Authorization(TAG_DIGEST, digest);
-    return Authorization(TAG_MAC_LENGTH, mac_length);
+    return SigningKey();
 }
 
-inline AuthorizationSetBuilder&
-AuthorizationSetBuilder::RsaSigningKey(uint32_t key_size, uint64_t public_exponent,
-                                       keymaster_digest_t digest, keymaster_padding_t padding) {
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::RsaSigningKey(uint32_t key_size,
+                                                                       uint64_t public_exponent) {
     RsaKey(key_size, public_exponent);
-    SigningKey();
-    Authorization(TAG_DIGEST, digest);
-    return Authorization(TAG_PADDING, padding);
+    return SigningKey();
 }
 
 inline AuthorizationSetBuilder&
-AuthorizationSetBuilder::RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent,
-                                          keymaster_padding_t padding) {
+AuthorizationSetBuilder::RsaEncryptionKey(uint32_t key_size, uint64_t public_exponent) {
     RsaKey(key_size, public_exponent);
-    EncryptionKey();
-    return Authorization(TAG_PADDING, padding);
+    return EncryptionKey();
 }
 
-inline AuthorizationSetBuilder&
-AuthorizationSetBuilder::EcdsaSigningKey(uint32_t key_size, keymaster_digest_t digest) {
+inline AuthorizationSetBuilder& AuthorizationSetBuilder::EcdsaSigningKey(uint32_t key_size) {
     EcdsaKey(key_size);
-    SigningKey();
-    return Authorization(TAG_DIGEST, digest);
+    return SigningKey();
 }
 
 inline AuthorizationSetBuilder& AuthorizationSetBuilder::AesEncryptionKey(uint32_t key_size) {
