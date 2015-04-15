@@ -233,7 +233,8 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
     }
 
-    UniquePtr<Operation> operation(factory->CreateOperation(*key, &response->error));
+    UniquePtr<Operation> operation(
+        factory->CreateOperation(*key, request.additional_params, &response->error));
     if (operation.get() == NULL)
         return;
 
