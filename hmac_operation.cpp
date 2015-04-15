@@ -38,14 +38,17 @@ class HmacOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_HMAC, purpose()); }
 
-    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
 
     virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const;
 
     virtual keymaster_purpose_t purpose() const = 0;
 };
 
-Operation* HmacOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
+Operation* HmacOperationFactory::CreateOperation(const Key& key,
+                                                 const AuthorizationSet& /* begin_params */,
+                                                 keymaster_error_t* error) {
     *error = KM_ERROR_OK;
 
     uint32_t tag_length;

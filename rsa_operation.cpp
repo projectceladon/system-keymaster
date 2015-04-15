@@ -98,7 +98,8 @@ static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE, KM_PAD_
  */
 class RsaDigestingOperationFactory : public RsaOperationFactory {
   public:
-    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
 
     virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
         *digest_count = array_length(supported_digests);
@@ -115,7 +116,9 @@ class RsaDigestingOperationFactory : public RsaOperationFactory {
                                             RSA* key) = 0;
 };
 
-Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
+Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
+                                                         const AuthorizationSet& /* begin_params */,
+                                                         keymaster_error_t* error) {
     keymaster_padding_t padding;
     keymaster_digest_t digest;
     RSA* rsa;
@@ -138,7 +141,8 @@ static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_RSA_OAEP,
  */
 class RsaCryptingOperationFactory : public RsaOperationFactory {
   public:
-    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error);
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
 
     virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
         *padding_mode_count = array_length(supported_crypt_padding);
@@ -154,7 +158,9 @@ class RsaCryptingOperationFactory : public RsaOperationFactory {
     virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) = 0;
 };
 
-Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key, keymaster_error_t* error) {
+Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
+                                                        const AuthorizationSet& /* begin_params */,
+                                                        keymaster_error_t* error) {
     keymaster_padding_t padding;
     RSA* rsa;
     if (!GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
