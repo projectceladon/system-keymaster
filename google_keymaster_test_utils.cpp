@@ -74,8 +74,6 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) 
     }
 
     switch (keymaster_tag_get_type(a.tag)) {
-    default:
-        return false;
     case KM_INVALID:
         return true;
     case KM_INT_REP:
@@ -85,6 +83,7 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) 
     case KM_ENUM:
         return a.enumerated == b.enumerated;
     case KM_LONG:
+    case KM_LONG_REP:
         return a.long_integer == b.long_integer;
     case KM_DATE:
         return a.date_time == b.date_time;
@@ -97,6 +96,8 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) 
         return a.blob.data_length == b.blob.data_length &&
                (memcmp(a.blob.data, b.blob.data, a.blob.data_length) == 0);
     }
+
+    return false;
 }
 
 static char hex_value[256] = {
