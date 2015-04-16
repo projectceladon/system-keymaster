@@ -254,7 +254,7 @@ keymaster_error_t AesEvpOperation::Begin(const AuthorizationSet& input_params,
     if (need_iv()) {
         switch (purpose()) {
         case KM_PURPOSE_ENCRYPT:
-            if (caller_iv_)
+            if (caller_iv_ && input_params.GetTagCount(TAG_NONCE) == 1)
                 error = GetIv(input_params);
             else {
                 iv_.reset(new uint8_t[AES_BLOCK_SIZE]);
