@@ -244,7 +244,6 @@ bool AuthorizationSet::push_back(keymaster_key_param_t elem) {
 static size_t serialized_size(const keymaster_key_param_t& param) {
     switch (keymaster_tag_get_type(param.tag)) {
     case KM_INVALID:
-    default:
         return sizeof(uint32_t);
     case KM_ENUM:
     case KM_ENUM_REP:
@@ -252,15 +251,17 @@ static size_t serialized_size(const keymaster_key_param_t& param) {
     case KM_INT_REP:
         return sizeof(uint32_t) * 2;
     case KM_LONG:
+    case KM_LONG_REP:
     case KM_DATE:
         return sizeof(uint32_t) + sizeof(uint64_t);
     case KM_BOOL:
         return sizeof(uint32_t) + 1;
-        break;
     case KM_BIGNUM:
     case KM_BYTES:
         return sizeof(uint32_t) * 3;
     }
+
+    return sizeof(uint32_t);
 }
 
 static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, const uint8_t* end,
@@ -304,7 +305,6 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, c
         return false;
 
     switch (keymaster_tag_get_type(param->tag)) {
-    default:
     case KM_INVALID:
         return false;
     case KM_ENUM:
@@ -314,6 +314,7 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, c
     case KM_INT_REP:
         return copy_uint32_from_buf(buf_ptr, end, &param->integer);
     case KM_LONG:
+    case KM_LONG_REP:
         return copy_uint64_from_buf(buf_ptr, end, &param->long_integer);
     case KM_DATE:
         return copy_uint64_from_buf(buf_ptr, end, &param->date_time);
@@ -339,6 +340,8 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, c
         return true;
     }
     }
+
+    return false;
 }
 
 size_t AuthorizationSet::SerializedSizeOfElements() const {

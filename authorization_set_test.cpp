@@ -101,11 +101,12 @@ TEST(Lookup, Repeated) {
                              .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
                              .Authorization(TAG_USER_ID, 7)
+                             .Authorization(TAG_USER_SECURE_ID, 47727)
                              .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD)
                              .Authorization(TAG_APPLICATION_ID, "my_app", 6)
                              .Authorization(TAG_KEY_SIZE, 256)
                              .Authorization(TAG_AUTH_TIMEOUT, 300));
-    EXPECT_EQ(8U, set.size());
+    EXPECT_EQ(9U, set.size());
 
     int pos = set.find(TAG_PURPOSE);
     ASSERT_FALSE(pos == -1);
@@ -117,6 +118,10 @@ TEST(Lookup, Repeated) {
     EXPECT_EQ(KM_PURPOSE_VERIFY, set[pos].enumerated);
 
     EXPECT_EQ(-1, set.find(TAG_PURPOSE, pos));
+
+    pos = set.find(TAG_USER_SECURE_ID, pos);
+    EXPECT_EQ(KM_TAG_USER_SECURE_ID, set[pos].tag);
+    EXPECT_EQ(47727U, set[pos].long_integer);
 }
 
 TEST(Lookup, Indexed) {
@@ -148,6 +153,7 @@ TEST(Serialization, RoundTrip) {
                              .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD)
                              .Authorization(TAG_APPLICATION_ID, "my_app", 6)
                              .Authorization(TAG_KEY_SIZE, 256)
+                             .Authorization(TAG_USER_SECURE_ID, 47727)
                              .Authorization(TAG_AUTH_TIMEOUT, 300)
                              .Authorization(TAG_ALL_USERS)
                              .Authorization(TAG_RSA_PUBLIC_EXPONENT, 3)
@@ -446,6 +452,30 @@ TEST(GetValue, GetLong) {
 
     // Find one that isn't there
     EXPECT_FALSE(set2.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &val));
+}
+
+TEST(GetValue, GetLongRep) {
+    AuthorizationSet set1(AuthorizationSetBuilder()
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                              .Authorization(TAG_USER_SECURE_ID, 8338)
+                              .Authorization(TAG_USER_SECURE_ID, 4334)
+                              .Authorization(TAG_RSA_PUBLIC_EXPONENT, 3));
+
+    AuthorizationSet set2(AuthorizationSetBuilder()
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                              .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA));
+
+    uint64_t val;
+    EXPECT_TRUE(set1.GetTagValue(TAG_USER_SECURE_ID, 0, &val));
+    EXPECT_EQ(8338U, val);
+    EXPECT_TRUE(set1.GetTagValue(TAG_USER_SECURE_ID, 1, &val));
+    EXPECT_EQ(4334U, val);
+
+    // Find one that isn't there
+    EXPECT_FALSE(set2.GetTagValue(TAG_USER_SECURE_ID, &val));
 }
 
 TEST(GetValue, GetEnum) {
