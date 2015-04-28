@@ -1604,6 +1604,31 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     EXPECT_NE(message, plaintext);
 }
 
+TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
+                  TAG_BLOCK_MODE, KM_MODE_CBC)));
+
+    string message = "12345678901234567890123456789012";
+    string iv1;
+    // Don't specify nonce, should get a random one.
+    string ciphertext1 = EncryptMessage(message, &iv1);
+    EXPECT_EQ(message.size(), ciphertext1.size());
+    EXPECT_EQ(16U, iv1.size());
+
+    string plaintext = DecryptMessage(ciphertext1, iv1);
+    EXPECT_EQ(message, plaintext);
+
+    // Now specify a nonce, should fail.
+    AuthorizationSet input_params(client_params());
+    AuthorizationSet update_params;
+    AuthorizationSet output_params;
+    input_params.push_back(TAG_NONCE, "abcdefghijklmnop", 16);
+
+    EXPECT_EQ(KM_ERROR_CALLER_NONCE_PROHIBITED,
+              BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
+}
+
 TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
