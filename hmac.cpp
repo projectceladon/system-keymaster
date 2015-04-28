@@ -21,6 +21,10 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 
+#if defined(OPENSSL_IS_BORINGSSL)
+#include <openssl/mem.h>
+#endif
+
 namespace keymaster {
 
 size_t HmacSha256::DigestLength() const {
