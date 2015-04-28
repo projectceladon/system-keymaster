@@ -51,13 +51,19 @@ Operation* HmacOperationFactory::CreateOperation(const Key& key,
                                                  keymaster_error_t* error) {
     uint32_t tag_length = 0;
     begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length);
+    if (tag_length % 8 != 0) {
+        LOG_E("MAC length %d nod a multiple of 8 bits", tag_length);
+        *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+        return nullptr;
+    }
 
     keymaster_digest_t digest = KM_DIGEST_NONE;
     key.authorizations().GetTagValue(TAG_DIGEST, &digest);
 
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
-    UniquePtr<HmacOperation> op(new HmacOperation(
-        purpose(), symmetric_key->key_data(), symmetric_key->key_data_size(), digest, tag_length));
+    UniquePtr<HmacOperation> op(new HmacOperation(purpose(), symmetric_key->key_data(),
+                                                  symmetric_key->key_data_size(), digest,
+                                                  tag_length / 8));
     if (!op.get())
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     else

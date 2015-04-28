@@ -431,7 +431,7 @@ TEST_F(SigningOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 20);
+    MacMessage(message, &signature, 160);
     ASSERT_EQ(20U, signature.size());
 }
 
@@ -440,7 +440,7 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 28);
+    MacMessage(message, &signature, 224);
     ASSERT_EQ(28U, signature.size());
 }
 
@@ -449,7 +449,7 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 32);
+    MacMessage(message, &signature, 256);
     ASSERT_EQ(32U, signature.size());
 }
 
@@ -459,7 +459,7 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
 
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 48);
+    MacMessage(message, &signature, 384);
     ASSERT_EQ(48U, signature.size());
 }
 
@@ -468,7 +468,7 @@ TEST_F(SigningOperationsTest, HmacSha512Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 64);
+    MacMessage(message, &signature, 512);
     ASSERT_EQ(64U, signature.size());
 }
 
@@ -480,7 +480,7 @@ TEST_F(SigningOperationsTest, HmacLengthInKey) {
                                            .Authorization(TAG_MAC_LENGTH, 20)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 30);
+    MacMessage(message, &signature, 240);
     // Size in key was ignored.
     ASSERT_EQ(30U, signature.size());
 }
@@ -721,7 +721,7 @@ TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_MAC_LENGTH, 33);
+    begin_params.push_back(TAG_MAC_LENGTH, 264);
     ASSERT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_SIGN, begin_params, nullptr /* output_params */));
     string message = "1234567890123456789012345678901";
@@ -987,7 +987,7 @@ TEST_F(VerificationOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 20);
+    MacMessage(message, &signature, 160);
     VerifyMessage(message, signature);
 }
 
@@ -995,7 +995,7 @@ TEST_F(VerificationOperationsTest, HmacSha224Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 28);
+    MacMessage(message, &signature, 224);
     VerifyMessage(message, signature);
 }
 
@@ -1003,7 +1003,7 @@ TEST_F(VerificationOperationsTest, HmacSha256Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 32);
+    MacMessage(message, &signature, 256);
     VerifyMessage(message, signature);
 }
 
@@ -1011,7 +1011,7 @@ TEST_F(VerificationOperationsTest, HmacSha384Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 48);
+    MacMessage(message, &signature, 384);
     VerifyMessage(message, signature);
 }
 
@@ -1019,7 +1019,7 @@ TEST_F(VerificationOperationsTest, HmacSha512Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 64);
+    MacMessage(message, &signature, 512);
     VerifyMessage(message, signature);
 }
 
