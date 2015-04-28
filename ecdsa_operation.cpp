@@ -29,7 +29,8 @@ class EcdsaSignOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_SIGN); }
 
-    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& /* begin_params */,
+                                       keymaster_error_t* error) {
         const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
@@ -60,7 +61,8 @@ class EcdsaVerifyOperationFactory : public OperationFactory {
   public:
     virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_VERIFY); }
 
-    virtual Operation* CreateOperation(const Key& key, keymaster_error_t* error) {
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& /* begin_params */,
+                                       keymaster_error_t* error) {
         const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
         if (!ecdsa_key) {
             *error = KM_ERROR_UNKNOWN_ERROR;
