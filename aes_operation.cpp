@@ -257,15 +257,12 @@ keymaster_error_t AesEvpOperation::Begin(const AuthorizationSet& input_params,
     if (need_iv()) {
         switch (purpose()) {
         case KM_PURPOSE_ENCRYPT:
-            if (caller_iv_ && input_params.GetTagCount(TAG_NONCE) == 1)
+            if (input_params.find(TAG_NONCE) == -1)
+                error = GenerateIv();
+            else if (caller_iv_)
                 error = GetIv(input_params);
-            else {
-                iv_.reset(new uint8_t[AES_BLOCK_SIZE]);
-                if (!iv_.get())
-                    return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-                if (!RAND_bytes(iv_.get(), AES_BLOCK_SIZE))
-                    error = TranslateLastOpenSslError();
-            }
+            else
+                error = KM_ERROR_CALLER_NONCE_PROHIBITED;
 
             if (error == KM_ERROR_OK)
                 output_params->push_back(TAG_NONCE, iv_.get(), AES_BLOCK_SIZE);
@@ -299,6 +296,15 @@ keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
     iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t AesEvpOperation::GenerateIv() {
+    iv_.reset(new uint8_t[AES_BLOCK_SIZE]);
+    if (!iv_.get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    if (!RAND_bytes(iv_.get(), AES_BLOCK_SIZE))
+        return TranslateLastOpenSslError();
     return KM_ERROR_OK;
 }
 
