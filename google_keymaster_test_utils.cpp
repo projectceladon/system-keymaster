@@ -436,8 +436,10 @@ Keymaster1Test::Rescope(const AuthorizationSet& new_params, keymaster_key_blob_t
 
 void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
                                          string expected_mac) {
-    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder().HmacKey(key.size() * 8, digest,
-                                                                       expected_mac.size()),
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .HmacKey(key.size() * 8)
+                                         .Digest(digest)
+                                         .Authorization(TAG_MAC_LENGTH, expected_mac.size()),
                                      KM_KEY_FORMAT_RAW, key));
     string signature;
     SignMessage(message, &signature);
