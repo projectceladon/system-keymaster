@@ -24,6 +24,8 @@ namespace keymaster {
 class SoftKeymasterLogger : public Logger
 {
 public:
+    SoftKeymasterLogger() { set_instance(this); }
+
     virtual int log_msg(LogLevel level, const char* fmt, va_list args) const;
 };
 
