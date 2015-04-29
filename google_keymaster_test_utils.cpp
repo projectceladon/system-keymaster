@@ -447,7 +447,7 @@ void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_d
               ImportKey(AuthorizationSetBuilder().HmacKey(key.size() * 8).Digest(digest),
                         KM_KEY_FORMAT_RAW, key));
     string signature;
-    MacMessage(message, &signature, expected_mac.size());
+    MacMessage(message, &signature, expected_mac.size() * 8);
     EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << (int)digest;
 }
 
