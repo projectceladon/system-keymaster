@@ -159,7 +159,7 @@ keymaster_error_t AeadModeOperation::HandleNonce(const AuthorizationSet& input_p
 }
 
 keymaster_error_t AeadModeOperation::GenerateNonce() {
-    if (RAND_bytes(nonce_, nonce_length_))
+    if (RAND_bytes(nonce_, nonce_length_) == 1)
         return KM_ERROR_OK;
     LOG_S("Failed to generate %d-byte nonce", nonce_length_);
     return TranslateLastOpenSslError();

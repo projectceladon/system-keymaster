@@ -303,7 +303,7 @@ keymaster_error_t AesEvpOperation::GenerateIv() {
     iv_.reset(new uint8_t[AES_BLOCK_SIZE]);
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    if (!RAND_bytes(iv_.get(), AES_BLOCK_SIZE))
+    if (RAND_bytes(iv_.get(), AES_BLOCK_SIZE) != 1)
         return TranslateLastOpenSslError();
     return KM_ERROR_OK;
 }
