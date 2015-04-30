@@ -36,7 +36,8 @@ class GoogleSoftKeymaster : public GoogleKeymaster {
     bool is_hardware() { return false; }
 
     keymaster_error_t AddRngEntropy(const AddEntropyRequest& request) {
-        RAND_seed(request.random_data.peek_read(), request.random_data.available_read());
+        RAND_add(request.random_data.peek_read(), request.random_data.available_read(),
+                 0 /* Don't assume any entropy is added to the pool. */);
         return KM_ERROR_OK;
     }
 
