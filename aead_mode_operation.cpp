@@ -137,7 +137,7 @@ keymaster_error_t AeadModeOperation::HandleNonce(const AuthorizationSet& input_p
             error = ExtractNonce(input_params);
         else {
             if (input_params.find(TAG_NONCE) != -1)
-                return KM_ERROR_INVALID_NONCE;
+                return KM_ERROR_CALLER_NONCE_PROHIBITED;
             error = GenerateNonce();
         }
 

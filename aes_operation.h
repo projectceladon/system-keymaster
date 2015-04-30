@@ -45,6 +45,7 @@ class AesEvpOperation : public Operation {
   private:
     keymaster_error_t InitializeCipher();
     keymaster_error_t GetIv(const AuthorizationSet& input_params);
+    keymaster_error_t GenerateIv();
     bool need_iv() const;
 
     EVP_CIPHER_CTX ctx_;
