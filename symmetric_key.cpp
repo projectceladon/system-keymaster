@@ -36,7 +36,7 @@ Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
     if (!key.get())
         return NULL;
 
-    if (!RAND_bytes(key->key_data_.get(), key->key_data_size_)) {
+    if (RAND_bytes(key->key_data_.get(), key->key_data_size_) != 1) {
         LOG_E("Error %ul generating %d bit AES key", ERR_get_error(), key->key_data_size_ * 8);
         *error = TranslateLastOpenSslError();
         return NULL;

@@ -38,7 +38,7 @@ keymaster_error_t OperationTable::Add(Operation* operation,
     }
 
     UniquePtr<Operation> op(operation);
-    if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) == 0)
+    if (RAND_bytes(reinterpret_cast<uint8_t*>(op_handle), sizeof(*op_handle)) != 1)
         return TranslateLastOpenSslError();
     if (*op_handle == 0) {
         // Statistically this is vanishingly unlikely, which means if it ever happens in practice,
