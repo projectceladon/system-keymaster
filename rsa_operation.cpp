@@ -19,6 +19,7 @@
 #include <limits.h>
 
 #include <openssl/err.h>
+#include <openssl/mem.h>
 
 #include <keymaster/logger.h>
 
@@ -458,7 +459,7 @@ keymaster_error_t RsaVerifyOperation::DecryptAndMatch(const Buffer& signature,
         RSA_verify_PKCS1_PSS_mgf1(rsa_key_, to_match, digest_algorithm_, NULL, decrypted_data.get(),
                                   -2 /* salt length recovered from signature */))
         return KM_ERROR_OK;
-    else if (padding_ != KM_PAD_RSA_PSS && memcmp_s(decrypted_data.get(), to_match, len) == 0)
+    else if (padding_ != KM_PAD_RSA_PSS && CRYPTO_memcmp(decrypted_data.get(), to_match, len) == 0)
         return KM_ERROR_OK;
 
     return KM_ERROR_VERIFICATION_FAILED;
