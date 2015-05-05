@@ -16,15 +16,12 @@
 
 #include "openssl_err.h"
 
-#include <openssl/err.h>
-#include <openssl/evp.h>
-
-#if defined(OPENSSL_IS_BORINGSSL)
 #include <openssl/asn1.h>
 #include <openssl/cipher.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/pkcs8.h>
 #include <openssl/x509v3.h>
-#endif
 
 #include <hardware/keymaster_defs.h>
 #include <keymaster/logger.h>
@@ -32,12 +29,10 @@
 namespace keymaster {
 
 static keymaster_error_t TranslateEvpError(int reason);
-#if defined(OPENSSL_IS_BORINGSSL)
 static keymaster_error_t TranslateASN1Error(int reason);
 static keymaster_error_t TranslateCipherError(int reason);
 static keymaster_error_t TranslatePKCS8Error(int reason);
 static keymaster_error_t TranslateX509v3Error(int reason);
-#endif
 
 keymaster_error_t TranslateLastOpenSslError(bool log_message) {
     unsigned long error = ERR_peek_last_error();
@@ -51,7 +46,6 @@ keymaster_error_t TranslateLastOpenSslError(bool log_message) {
 
     case ERR_LIB_EVP:
         return TranslateEvpError(reason);
-#if defined(OPENSSL_IS_BORINGSSL)
     case ERR_LIB_ASN1:
         return TranslateASN1Error(reason);
     case ERR_LIB_CIPHER:
@@ -60,18 +54,11 @@ keymaster_error_t TranslateLastOpenSslError(bool log_message) {
         return TranslatePKCS8Error(reason);
     case ERR_LIB_X509V3:
         return TranslateX509v3Error(reason);
-#else
-    case ERR_LIB_ASN1:
-        LOG_E("ASN.1 parsing error %d", reason);
-        return KM_ERROR_INVALID_ARGUMENT;
-#endif
     }
 
     LOG_E("Openssl error %d, %d", ERR_GET_LIB(error), reason);
     return KM_ERROR_UNKNOWN_ERROR;
 }
-
-#if defined(OPENSSL_IS_BORINGSSL)
 
 keymaster_error_t TranslatePKCS8Error(int reason) {
     switch (reason) {
@@ -114,12 +101,6 @@ keymaster_error_t TranslateCipherError(int reason) {
 
 keymaster_error_t TranslateASN1Error(int reason) {
     switch (reason) {
-    case ASN1_R_UNSUPPORTED_CIPHER:
-        return KM_ERROR_UNSUPPORTED_ALGORITHM;
-
-    case ASN1_R_ERROR_LOADING_SECTION:
-        return KM_ERROR_INVALID_KEY_BLOB;
-
     case ASN1_R_ENCODE_ERROR:
         return KM_ERROR_INVALID_ARGUMENT;
 
@@ -138,55 +119,17 @@ keymaster_error_t TranslateX509v3Error(int reason) {
     }
 }
 
-#endif  // OPENSSL_IS_BORINGSSL
-
 keymaster_error_t TranslateEvpError(int reason) {
     switch (reason) {
 
     case EVP_R_UNKNOWN_DIGEST:
         return KM_ERROR_UNSUPPORTED_DIGEST;
 
-#if !defined(OPENSSL_IS_BORINGSSL)
-    case EVP_R_UNSUPPORTED_PRF:
-    case EVP_R_UNSUPPORTED_PRIVATE_KEY_ALGORITHM:
-    case EVP_R_UNSUPPORTED_KEY_DERIVATION_FUNCTION:
-    case EVP_R_UNSUPPORTED_SALT_TYPE:
-    case EVP_R_UNKNOWN_PBE_ALGORITHM:
-    case EVP_R_UNSUPORTED_NUMBER_OF_ROUNDS:
-    case EVP_R_UNSUPPORTED_CIPHER:
-    case EVP_R_PKCS8_UNKNOWN_BROKEN_TYPE:
-    case EVP_R_UNKNOWN_CIPHER:
-#endif
     case EVP_R_UNSUPPORTED_ALGORITHM:
     case EVP_R_OPERATON_NOT_INITIALIZED:
     case EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE:
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
 
-#if !defined(OPENSSL_IS_BORINGSSL)
-    case EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH:
-    case EVP_R_WRONG_FINAL_BLOCK_LENGTH:
-        return KM_ERROR_INVALID_INPUT_LENGTH;
-
-    case EVP_R_UNSUPPORTED_KEYLENGTH:
-    case EVP_R_BAD_KEY_LENGTH:
-        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
-#endif
-
-#if !defined(OPENSSL_IS_BORINGSSL)
-    case EVP_R_BAD_BLOCK_LENGTH:
-    case EVP_R_BN_DECODE_ERROR:
-    case EVP_R_BN_PUBKEY_ERROR:
-    case EVP_R_CIPHER_PARAMETER_ERROR:
-    case EVP_R_ERROR_LOADING_SECTION:
-    case EVP_R_EXPECTING_A_ECDSA_KEY:
-    case EVP_R_EXPECTING_A_EC_KEY:
-    case EVP_R_INVALID_DIGEST:
-    case EVP_R_INVALID_KEY_LENGTH:
-    case EVP_R_NO_DSA_PARAMETERS:
-    case EVP_R_PRIVATE_KEY_DECODE_ERROR:
-    case EVP_R_PRIVATE_KEY_ENCODE_ERROR:
-    case EVP_R_PUBLIC_KEY_NOT_RSA:
-#endif
     case EVP_R_BUFFER_TOO_SMALL:
     case EVP_R_EXPECTING_AN_RSA_KEY:
     case EVP_R_EXPECTING_A_DH_KEY:
@@ -195,10 +138,6 @@ keymaster_error_t TranslateEvpError(int reason) {
     case EVP_R_WRONG_PUBLIC_KEY_TYPE:
         return KM_ERROR_INVALID_KEY_BLOB;
 
-#if !defined(OPENSSL_IS_BORINGSSL)
-    case EVP_R_BAD_DECRYPT:
-    case EVP_R_ENCODE_ERROR:
-#endif
     case EVP_R_DIFFERENT_PARAMETERS:
     case EVP_R_DECODE_ERROR:
         return KM_ERROR_INVALID_ARGUMENT;

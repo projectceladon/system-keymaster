@@ -18,15 +18,10 @@
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/mem.h>
 
 #include "openssl_err.h"
 #include "symmetric_key.h"
-
-#if defined(OPENSSL_IS_BORINGSSL)
-typedef size_t openssl_size_t;
-#else
-typedef int openssl_size_t;
-#endif
 
 namespace keymaster {
 
