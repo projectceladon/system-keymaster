@@ -102,7 +102,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 # Unit tests for libkeymaster
 include $(CLEAR_VARS)
-LOCAL_MODULE := libkeymaster_test
+LOCAL_MODULE := keymaster_tests
 LOCAL_SRC_FILES := \
 	abstract_factory_registry_test.cpp \
 	authorization_set_test.cpp \
