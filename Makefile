@@ -1,3 +1,28 @@
+#####
+# Local unit test Makefile
+#
+# This makefile builds and runs the keymaster unit tests locally on the development
+# machine, not on an Android device.  Android.mk builds the same tests into the
+# "keymaster_tests" binary for execution on-device, but this Makefile runs them locally,
+# for a very fast edit/build/test development cycle.
+#
+# To build and run these tests, one pre-requisite must be manually installed: BoringSSL.
+# This Makefile expects to find BoringSSL in a directory adjacent to $ANDROID_BUILD_TOP.
+# To get and build it, first install the Ninja build tool (e.g. apt-get install
+# ninja-build), then do:
+#
+# cd $ANDROID_BUILD_TOP/..
+# git clone https://boringssl.googlesource.com/boringssl
+# cd boringssl
+# mdkir build
+# cd build
+# cmake -GNinja ..
+# ninja
+#
+# Then return to $ANDROID_BUILD_TOP/system/keymaster and run "make".
+#####
+
+
 BASE=../..
 SUBS=system/core \
 	hardware/libhardware \
@@ -6,7 +31,7 @@ GTEST=$(BASE)/external/gtest
 
 INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
 	-I $(BASE)/libnativehelper/include/nativehelper \
-	-I $(GTEST) -Iinclude
+	-I $(GTEST) -Iinclude -I$(BASE)/../boringssl/include
 
 ifdef USE_CLANG
 CC=/usr/bin/clang
@@ -26,7 +51,7 @@ CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-paramete
 # Uncomment to enable debug logging.
 # CXXFLAGS += -DDEBUG
 
-LDLIBS=-lcrypto -lpthread -lstdc++ -lgcov
+LDLIBS=-L$(BASE)/../boringssl/build/crypto -lcrypto -lpthread -lstdc++ -lgcov
 
 CPPSRCS=\
 	abstract_factory_registry_test.cpp \
