@@ -424,7 +424,11 @@ keymaster_error_t RsaVerifyOperation::VerifyDigested(const Buffer& signature) {
 
 keymaster_error_t RsaVerifyOperation::DecryptAndMatch(const Buffer& signature,
                                                       const uint8_t* to_match, size_t len) {
+#ifdef OPENSSL_IS_BORINGSSL
     size_t key_len = RSA_size(rsa_key_);
+#else
+    size_t key_len = (size_t)RSA_size(rsa_key_);
+#endif
 
     int openssl_padding;
     switch (padding_) {
@@ -469,7 +473,11 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     assert(output);
     int openssl_padding;
 
+#if defined(OPENSSL_IS_BORINGSSL)
     size_t key_len = RSA_size(rsa_key_);
+#else
+    size_t key_len = (size_t)RSA_size(rsa_key_);
+#endif
 
     size_t message_size = data_.available_read();
     switch (padding_) {
@@ -502,7 +510,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
         LOG_E("Error %d encrypting data with RSA", ERR_get_error());
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    assert(bytes_encrypted == static_cast<int>(RSA_size(rsa_key_)));
+    assert(bytes_encrypted == RSA_size(rsa_key_));
     output->advance_write(bytes_encrypted);
 
     return KM_ERROR_OK;

@@ -17,8 +17,6 @@
 #include <gtest/gtest.h>
 
 #include <openssl/engine.h>
-#include <openssl/err.h>
-#include <openssl/ex_data.h>
 
 int main(int argc, char** argv) {
     ERR_load_crypto_strings();
