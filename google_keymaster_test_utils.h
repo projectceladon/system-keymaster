@@ -198,24 +198,30 @@ class Keymaster1Test : public testing::Test {
                                const std::string& signature);
 
     void SignMessage(const std::string& message, std::string* signature, keymaster_digest_t digest);
+    void SignMessage(const std::string& message, std::string* signature, keymaster_digest_t digest,
+                     keymaster_padding_t padding);
     void MacMessage(const std::string& message, std::string* signature, keymaster_digest_t digest,
                     size_t mac_length);
 
     void VerifyMessage(const std::string& message, const std::string& signature,
                        keymaster_digest_t digest);
+    void VerifyMessage(const std::string& message, const std::string& signature,
+                       keymaster_digest_t digest, keymaster_padding_t padding);
 
-    std::string EncryptMessage(const std::string& message, std::string* generated_nonce = NULL);
-    std::string EncryptMessage(const AuthorizationSet& update_params, const std::string& message,
+    std::string EncryptMessage(const std::string& message, keymaster_padding_t padding,
                                std::string* generated_nonce = NULL);
+    std::string EncryptMessage(const AuthorizationSet& update_params, const std::string& message,
+                               keymaster_padding_t padding, std::string* generated_nonce = NULL);
     std::string EncryptMessageWithParams(const std::string& message,
                                          const AuthorizationSet& begin_params,
                                          const AuthorizationSet& update_params,
                                          AuthorizationSet* output_params);
 
-    std::string DecryptMessage(const std::string& ciphertext);
-    std::string DecryptMessage(const std::string& ciphertext, const std::string& nonce);
-    std::string DecryptMessage(const AuthorizationSet& update_params, const std::string& ciphertext,
+    std::string DecryptMessage(const std::string& ciphertext, keymaster_padding_t padding);
+    std::string DecryptMessage(const std::string& ciphertext, keymaster_padding_t padding,
                                const std::string& nonce);
+    std::string DecryptMessage(const AuthorizationSet& update_params, const std::string& ciphertext,
+                               keymaster_padding_t padding, const std::string& nonce);
 
     void CheckHmacTestVector(std::string key, std::string message, keymaster_digest_t digest,
                              std::string expected_mac);

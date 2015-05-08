@@ -318,18 +318,17 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
                                            .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_NONE);
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
 TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
-    // Note that without padding, key size must exactly match digest size.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(256, 3)
+                                           .RsaSigningKey(384, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
-                                           .Padding(KM_PAD_NONE)));
+                                           .Padding(KM_PAD_RSA_PSS)));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
 TEST_F(SigningOperationsTest, RsaPssSha256Success) {
@@ -340,7 +339,7 @@ TEST_F(SigningOperationsTest, RsaPssSha256Success) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
 TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
@@ -350,7 +349,7 @@ TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
                                            .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
 }
 
 TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
@@ -365,6 +364,7 @@ TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 
     string result;
@@ -381,6 +381,7 @@ TEST_F(SigningOperationsTest, RsaAbort) {
                                            .Padding(KM_PAD_NONE)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
     EXPECT_EQ(KM_ERROR_OK, AbortOperation());
     // Another abort should fail
@@ -416,6 +417,7 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
                     .Padding(KM_PAD_RSA_PSS));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
@@ -435,6 +437,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
                                            .Padding(KM_PAD_NONE)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 
     string message = "1234567890123456789012345678901";
@@ -789,34 +792,34 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
                                            .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_NONE);
-    VerifyMessage(message, signature, KM_DIGEST_NONE);
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
 TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
-    // Note that without padding, key size must exactly match digest size.
     GenerateKey(AuthorizationSetBuilder()
-                    .RsaSigningKey(256, 3)
+                    .RsaSigningKey(384, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
-                    .Padding(KM_PAD_NONE));
+                    .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
 TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
     GenerateKey(AuthorizationSetBuilder()
-                    .RsaSigningKey(256, 3)
+                    .RsaSigningKey(384, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
-                    .Padding(KM_PAD_NONE));
+                    .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
     ++signature[signature.size() / 2];
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
@@ -834,8 +837,8 @@ TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
 TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
@@ -845,11 +848,12 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
                     .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
     ++signature[signature.size() / 2];
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
@@ -867,11 +871,12 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
     ++message[message.size() / 2];
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
@@ -888,8 +893,8 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
                     .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
 }
 
 TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
@@ -899,11 +904,12 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
                     .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
     ++signature[signature.size() / 2];
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
@@ -921,11 +927,12 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
     ++message[message.size() / 2];
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
@@ -981,8 +988,8 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
             case KM_DIGEST_SHA_2_256:
                 switch (padding_mode) {
                 case KM_PAD_NONE:
-                    // Key size matches digest size
-                    break;
+                    // Digesting requires padding
+                    continue;
                 case KM_PAD_RSA_PKCS1_1_5_SIGN:
                     key_bits += 8 * 11;
                     break;
@@ -1004,8 +1011,8 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                             .Padding(padding_mode));
             string message(message_len, 'a');
             string signature;
-            SignMessage(message, &signature, digest);
-            VerifyMessage(message, signature, digest);
+            SignMessage(message, &signature, digest, padding_mode);
+            VerifyMessage(message, signature, digest, padding_mode);
         }
     }
 
@@ -1142,8 +1149,8 @@ TEST_F(ImportKeyTest, RsaSuccess) {
 
     string message(1024 / 8, 'a');
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_NONE);
-    VerifyMessage(message, signature, KM_DIGEST_NONE);
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
 TEST_F(ImportKeyTest, OldApiRsaSuccess) {
@@ -1162,6 +1169,7 @@ TEST_F(ImportKeyTest, OldApiRsaSuccess) {
     string message(1024 / 8, 'a');
     AuthorizationSet begin_params;  // Don't use client data.
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     AuthorizationSet update_params;
     AuthorizationSet output_params;
     string signature =
@@ -1258,8 +1266,8 @@ TEST_F(ImportKeyTest, AesKeySuccess) {
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(message);
-    string plaintext = DecryptMessage(ciphertext);
+    string ciphertext = EncryptMessage(message, KM_PAD_NONE);
+    string plaintext = DecryptMessage(ciphertext, KM_PAD_NONE);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1287,10 +1295,10 @@ TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
                                KM_PAD_RSA_OAEP)));
 
     string message = "Hello World!";
-    string ciphertext1 = EncryptMessage(string(message));
+    string ciphertext1 = EncryptMessage(string(message), KM_PAD_RSA_OAEP);
     EXPECT_EQ(512U / 8, ciphertext1.size());
 
-    string ciphertext2 = EncryptMessage(string(message));
+    string ciphertext2 = EncryptMessage(string(message), KM_PAD_RSA_OAEP);
     EXPECT_EQ(512U / 8, ciphertext2.size());
 
     // OAEP randomizes padding so every result should be different.
@@ -1301,10 +1309,10 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(string(message));
+    string ciphertext = EncryptMessage(string(message), KM_PAD_RSA_OAEP);
     EXPECT_EQ(512U / 8, ciphertext.size());
 
-    string plaintext = DecryptMessage(ciphertext);
+    string plaintext = DecryptMessage(ciphertext, KM_PAD_RSA_OAEP);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1315,7 +1323,9 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
     string result;
     size_t input_consumed;
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
     EXPECT_EQ(0U, result.size());
@@ -1325,7 +1335,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(string(message));
+    string ciphertext = EncryptMessage(string(message), KM_PAD_RSA_OAEP);
     EXPECT_EQ(512U / 8, ciphertext.size());
 
     // Corrupt the ciphertext
@@ -1333,7 +1343,9 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
     EXPECT_EQ(0U, result.size());
@@ -1343,10 +1355,10 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
-    string ciphertext1 = EncryptMessage(string(message));
+    string ciphertext1 = EncryptMessage(string(message), KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
     EXPECT_EQ(512U / 8, ciphertext1.size());
 
-    string ciphertext2 = EncryptMessage(string(message));
+    string ciphertext2 = EncryptMessage(string(message), KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
     EXPECT_EQ(512U / 8, ciphertext2.size());
 
     // PKCS1 v1.5 randomizes padding so every result should be different.
@@ -1357,10 +1369,10 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(string(message));
+    string ciphertext = EncryptMessage(string(message), KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
     EXPECT_EQ(512U / 8, ciphertext.size());
 
-    string plaintext = DecryptMessage(ciphertext);
+    string plaintext = DecryptMessage(ciphertext, KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1371,7 +1383,9 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     string result;
     size_t input_consumed;
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
     EXPECT_EQ(0U, result.size());
@@ -1381,7 +1395,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(string(message));
+    string ciphertext = EncryptMessage(string(message), KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
     EXPECT_EQ(512U / 8, ciphertext.size());
 
     // Corrupt the ciphertext
@@ -1389,7 +1403,9 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
     EXPECT_EQ(0U, result.size());
@@ -1421,28 +1437,30 @@ TEST_F(EncryptionOperationsTest, HmacEncrypt) {
 }
 
 TEST_F(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_ECB)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
+                                           .Padding(KM_PAD_NONE)));
     // Two-block message.
     string message = "12345678901234567890123456789012";
-    string ciphertext1 = EncryptMessage(message);
+    string ciphertext1 = EncryptMessage(message, KM_PAD_NONE);
     EXPECT_EQ(message.size(), ciphertext1.size());
 
-    string ciphertext2 = EncryptMessage(string(message));
+    string ciphertext2 = EncryptMessage(string(message), KM_PAD_NONE);
     EXPECT_EQ(message.size(), ciphertext2.size());
 
     // ECB is deterministic.
     EXPECT_EQ(ciphertext1, ciphertext2);
 
-    string plaintext = DecryptMessage(ciphertext1);
+    string plaintext = DecryptMessage(ciphertext1, KM_PAD_NONE);
     EXPECT_EQ(message, plaintext);
 }
 
 TEST_F(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_ECB)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
+                                           .Padding(KM_PAD_NONE)));
     // Message is slightly shorter than two blocks.
     string message = "1234567890123456789012345678901";
 
@@ -1463,9 +1481,9 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7Padding) {
     // Try various message lengths; all should work.
     for (size_t i = 0; i < 32; ++i) {
         string message(i, 'a');
-        string ciphertext = EncryptMessage(message);
+        string ciphertext = EncryptMessage(message, KM_PAD_PKCS7);
         EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
-        string plaintext = DecryptMessage(ciphertext);
+        string plaintext = DecryptMessage(ciphertext, KM_PAD_PKCS7);
         EXPECT_EQ(message, plaintext);
     }
 }
@@ -1477,7 +1495,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
                                            .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
 
     string message = "a";
-    string ciphertext = EncryptMessage(message);
+    string ciphertext = EncryptMessage(message, KM_PAD_PKCS7);
     EXPECT_EQ(16U, ciphertext.size());
     EXPECT_NE(ciphertext, message);
     ++ciphertext[ciphertext.size() / 2];
@@ -1491,17 +1509,18 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
 }
 
 TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_CTR)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
+                                           .Padding(KM_PAD_NONE)));
     string message = "123";
     string iv1;
-    string ciphertext1 = EncryptMessage(message, &iv1);
+    string ciphertext1 = EncryptMessage(message, KM_PAD_NONE, &iv1);
     EXPECT_EQ(message.size(), ciphertext1.size());
     EXPECT_EQ(16U, iv1.size());
 
     string iv2;
-    string ciphertext2 = EncryptMessage(message, &iv2);
+    string ciphertext2 = EncryptMessage(message, KM_PAD_NONE, &iv2);
     EXPECT_EQ(message.size(), ciphertext2.size());
     EXPECT_EQ(16U, iv2.size());
 
@@ -1509,14 +1528,15 @@ TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
     EXPECT_NE(iv1, iv2);
     EXPECT_NE(ciphertext1, ciphertext2);
 
-    string plaintext = DecryptMessage(ciphertext1, iv1);
+    string plaintext = DecryptMessage(ciphertext1, KM_PAD_NONE, iv1);
     EXPECT_EQ(message, plaintext);
 }
 
 TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_CTR)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
+                                           .Padding(KM_PAD_NONE)));
 
     int increment = 15;
     string message(239, 'a');
@@ -1601,14 +1621,15 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
                                            .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
 
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT));
 }
 
 TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
-                                           .Authorization(TAG_CALLER_NONCE)));
+                                           .Authorization(TAG_CALLER_NONCE)
+                                           .Padding(KM_PAD_NONE)));
 
     AuthorizationSet input_params(client_params());
     input_params.push_back(TAG_NONCE, "123", 3);
@@ -1616,24 +1637,25 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
 }
 
 TEST_F(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_CBC)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
+                                           .Padding(KM_PAD_NONE)));
     // Two-block message.
     string message = "12345678901234567890123456789012";
     string iv1;
-    string ciphertext1 = EncryptMessage(message, &iv1);
+    string ciphertext1 = EncryptMessage(message, KM_PAD_NONE, &iv1);
     EXPECT_EQ(message.size(), ciphertext1.size());
 
     string iv2;
-    string ciphertext2 = EncryptMessage(message, &iv2);
+    string ciphertext2 = EncryptMessage(message, KM_PAD_NONE, &iv2);
     EXPECT_EQ(message.size(), ciphertext2.size());
 
     // IVs should be random, so ciphertexts should differ.
     EXPECT_NE(iv1, iv2);
     EXPECT_NE(ciphertext1, ciphertext2);
 
-    string plaintext = DecryptMessage(ciphertext1, iv1);
+    string plaintext = DecryptMessage(ciphertext1, KM_PAD_NONE, iv1);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1641,15 +1663,16 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
-                                           .Authorization(TAG_CALLER_NONCE)));
+                                           .Authorization(TAG_CALLER_NONCE)
+                                           .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string iv1;
     // Don't specify nonce, should get a random one.
-    string ciphertext1 = EncryptMessage(message, &iv1);
+    string ciphertext1 = EncryptMessage(message, KM_PAD_NONE, &iv1);
     EXPECT_EQ(message.size(), ciphertext1.size());
     EXPECT_EQ(16U, iv1.size());
 
-    string plaintext = DecryptMessage(ciphertext1, iv1);
+    string plaintext = DecryptMessage(ciphertext1, KM_PAD_NONE, iv1);
     EXPECT_EQ(message, plaintext);
 
     // Now specify a nonce, should also work.
@@ -1674,18 +1697,19 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
 }
 
 TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_CBC)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
+                                           .Padding(KM_PAD_NONE)));
 
     string message = "12345678901234567890123456789012";
     string iv1;
     // Don't specify nonce, should get a random one.
-    string ciphertext1 = EncryptMessage(message, &iv1);
+    string ciphertext1 = EncryptMessage(message, KM_PAD_NONE, &iv1);
     EXPECT_EQ(message.size(), ciphertext1.size());
     EXPECT_EQ(16U, iv1.size());
 
-    string plaintext = DecryptMessage(ciphertext1, iv1);
+    string plaintext = DecryptMessage(ciphertext1, KM_PAD_NONE, iv1);
     EXPECT_EQ(message, plaintext);
 
     // Now specify a nonce, should fail.
@@ -1699,9 +1723,10 @@ TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
 }
 
 TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
-                  TAG_BLOCK_MODE, KM_MODE_CBC)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
+                                           .Padding(KM_PAD_NONE)));
 
     int increment = 15;
     string message(240, 'a');
@@ -1742,9 +1767,9 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
     for (size_t i = 0; i < 32; ++i) {
         string message(i, 'a');
         string iv;
-        string ciphertext = EncryptMessage(message, &iv);
+        string ciphertext = EncryptMessage(message, KM_PAD_PKCS7, &iv);
         EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
-        string plaintext = DecryptMessage(ciphertext, iv);
+        string plaintext = DecryptMessage(ciphertext, KM_PAD_PKCS7, iv);
         EXPECT_EQ(message, plaintext);
     }
 }

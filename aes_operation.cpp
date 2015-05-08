@@ -51,7 +51,7 @@ class AesOperationFactory : public OperationFactory {
 };
 
 Operation* AesOperationFactory::CreateOperation(const Key& key,
-                                                const AuthorizationSet& /* begin_params */,
+                                                const AuthorizationSet&  begin_params ,
                                                 keymaster_error_t* error) {
     *error = KM_ERROR_OK;
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
@@ -63,7 +63,7 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
-        return NULL;
+        return nullptr;
     }
 
     keymaster_block_mode_t block_mode;
@@ -71,12 +71,16 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
 
     keymaster_padding_t padding = KM_PAD_NONE;
-    key.authorizations().GetTagValue(TAG_PADDING, &padding);
+    begin_params.GetTagValue(TAG_PADDING, &padding);
+    if (!key.authorizations().GetTagValue(TAG_PADDING, &padding)) {
+        LOG_E("Padding mode %d was specified, but not authorized by key", padding);
+        *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+    }
 
     bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);
 
     if (*error != KM_ERROR_OK)
-        return NULL;
+        return nullptr;
 
     switch (block_mode) {
     case KM_MODE_ECB:
@@ -84,13 +88,13 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
         return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
     case KM_MODE_CTR:
         if (padding != KM_PAD_NONE) {
-            *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-            return NULL;
+            *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+            return nullptr;
         }
         return CreateEvpOperation(*symmetric_key, block_mode, padding, caller_nonce, error);
     default:
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return NULL;
+        return nullptr;
     }
 }
 
