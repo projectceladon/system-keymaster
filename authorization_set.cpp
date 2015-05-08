@@ -583,4 +583,11 @@ bool AuthorizationSet::GetTagValueBool(keymaster_tag_t tag) const {
     return elems_[pos].boolean;
 }
 
+bool AuthorizationSet::ContainsEnumValue(keymaster_tag_t tag, uint32_t value) const {
+    for (auto& entry : *this)
+        if (entry.tag == tag && entry.enumerated == value)
+            return true;
+    return false;
+}
+
 }  // namespace keymaster
