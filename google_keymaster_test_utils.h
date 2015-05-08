@@ -185,21 +185,24 @@ class Keymaster1Test : public testing::Test {
     keymaster_error_t Rescope(const AuthorizationSet& new_params,
                               keymaster_key_blob_t* rescoped_blob,
                               keymaster_key_characteristics_t** rescoped_characteristics);
-    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
-                               bool use_client_params = true);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
                                const AuthorizationSet& begin_params,
                                const AuthorizationSet& update_params,
                                AuthorizationSet* output_params = NULL);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
-                               const std::string& signature, bool use_client_params = true);
+                               const std::string& signature, const AuthorizationSet& begin_params,
+                               const AuthorizationSet& update_params,
+                               AuthorizationSet* output_params = NULL);
+    std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
+                               const std::string& signature);
 
-    void SignMessage(const std::string& message, std::string* signature,
-                     bool use_client_params = true);
-    void MacMessage(const std::string& message, std::string* signature, size_t mac_length);
+    void SignMessage(const std::string& message, std::string* signature, keymaster_digest_t digest);
+    void MacMessage(const std::string& message, std::string* signature, keymaster_digest_t digest,
+                    size_t mac_length);
 
     void VerifyMessage(const std::string& message, const std::string& signature,
-                       bool use_client_params = true);
+                       keymaster_digest_t digest);
 
     std::string EncryptMessage(const std::string& message, std::string* generated_nonce = NULL);
     std::string EncryptMessage(const AuthorizationSet& update_params, const std::string& message,

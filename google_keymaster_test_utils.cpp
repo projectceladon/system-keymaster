@@ -297,12 +297,8 @@ keymaster_error_t Keymaster1Test::AbortOperation() {
     return device()->abort(device(), op_handle_);
 }
 
-string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
-                                      bool use_client_params) {
-    AuthorizationSet input_params;
-    if (use_client_params)
-        input_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
+string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message) {
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, client_params(), NULL /* output_params */));
 
     string result;
     size_t input_consumed;
@@ -327,11 +323,22 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 }
 
 string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
-                                      const string& signature, bool use_client_params) {
-    AuthorizationSet input_params;
-    if (use_client_params)
-        input_params.push_back(AuthorizationSet(client_params_, array_length(client_params_)));
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, input_params, NULL /* output_params */));
+                                      const string& signature, const AuthorizationSet& begin_params,
+                                      const AuthorizationSet& update_params,
+                                      AuthorizationSet* output_params) {
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, begin_params, output_params));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(update_params, signature, &result));
+    return result;
+}
+
+string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
+                                      const string& signature) {
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, client_params(), NULL /* output_params */));
 
     string result;
     size_t input_consumed;
@@ -341,16 +348,24 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
     return result;
 }
 
-void Keymaster1Test::SignMessage(const string& message, string* signature, bool use_client_params) {
+void Keymaster1Test::SignMessage(const string& message, string* signature,
+                                 keymaster_digest_t digest) {
     SCOPED_TRACE("SignMessage");
-    *signature = ProcessMessage(KM_PURPOSE_SIGN, message, use_client_params);
+    AuthorizationSet input_params(AuthorizationSet(client_params_, array_length(client_params_)));
+    input_params.push_back(TAG_DIGEST, digest);
+    AuthorizationSet update_params;
+    AuthorizationSet output_params;
+    *signature =
+        ProcessMessage(KM_PURPOSE_SIGN, message, input_params, update_params, &output_params);
     EXPECT_GT(signature->size(), 0U);
 }
 
-void Keymaster1Test::MacMessage(const string& message, string* signature, size_t mac_length) {
+void Keymaster1Test::MacMessage(const string& message, string* signature, keymaster_digest_t digest,
+                                size_t mac_length) {
     SCOPED_TRACE("SignMessage");
     AuthorizationSet input_params(AuthorizationSet(client_params_, array_length(client_params_)));
     input_params.push_back(TAG_MAC_LENGTH, mac_length);
+    input_params.push_back(TAG_DIGEST, digest);
     AuthorizationSet update_params;
     AuthorizationSet output_params;
     *signature =
@@ -359,9 +374,14 @@ void Keymaster1Test::MacMessage(const string& message, string* signature, size_t
 }
 
 void Keymaster1Test::VerifyMessage(const string& message, const string& signature,
-                                   bool use_client_params) {
+                                   keymaster_digest_t digest) {
     SCOPED_TRACE("VerifyMessage");
-    ProcessMessage(KM_PURPOSE_VERIFY, message, signature, use_client_params);
+    AuthorizationSet input_params(client_params());
+    input_params.push_back(TAG_DIGEST, digest);
+    AuthorizationSet update_params;
+    AuthorizationSet output_params;
+    ProcessMessage(KM_PURPOSE_VERIFY, message, signature, input_params, update_params,
+                   &output_params);
 }
 
 string Keymaster1Test::EncryptMessage(const string& message, string* generated_nonce) {
@@ -447,7 +467,7 @@ void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_d
               ImportKey(AuthorizationSetBuilder().HmacKey(key.size() * 8).Digest(digest),
                         KM_KEY_FORMAT_RAW, key));
     string signature;
-    MacMessage(message, &signature, expected_mac.size() * 8);
+    MacMessage(message, &signature, digest, expected_mac.size() * 8);
     EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << (int)digest;
 }
 
