@@ -47,15 +47,13 @@ class EcdsaKeyFactory : public EcKeyFactory {
     virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_EC; }
 };
 
-class EcdsaSignOperationFactory;
-class EcdsaVerifyOperationFactory;
+class EcdsaOperationFactory;
 
 class EcKey : public AsymmetricKey {
   private:
     friend EcKeyFactory;
     friend EcdsaKeyFactory;
-    friend EcdsaSignOperationFactory;
-    friend EcdsaVerifyOperationFactory;
+    friend EcdsaOperationFactory;
 
     EcKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
     EcKey(EC_KEY* ec_key, const AuthorizationSet auths) : AsymmetricKey(auths), ec_key_(ec_key) {}

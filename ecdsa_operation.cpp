@@ -25,66 +25,58 @@ namespace keymaster {
 
 static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
 
-class EcdsaSignOperationFactory : public OperationFactory {
-  public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_SIGN); }
+class EcdsaOperationFactory : public OperationFactory {
+  private:
+    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_EC, purpose()); }
+    Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                               keymaster_error_t* error) override;
+    const keymaster_digest_t* SupportedDigests(size_t* digest_count) const override;
 
-    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& /* begin_params */,
-                                       keymaster_error_t* error) {
-        const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
-        if (!ecdsa_key) {
-            *error = KM_ERROR_UNKNOWN_ERROR;
-            return NULL;
-        }
+    virtual keymaster_purpose_t purpose() const = 0;
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) = 0;
+};
 
-        keymaster_digest_t digest;
-        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
-            !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
-            *error = KM_ERROR_UNSUPPORTED_DIGEST;
-            return NULL;
-        }
-
-        Operation* op = new EcdsaSignOperation(KM_PURPOSE_SIGN, digest, ecdsa_key->key());
-        if (!op)
-            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return op;
+Operation* EcdsaOperationFactory::CreateOperation(const Key& key,
+                                                  const AuthorizationSet& /* begin_params */,
+                                                  keymaster_error_t* error) {
+    const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
+    if (!ecdsa_key) {
+        *error = KM_ERROR_UNKNOWN_ERROR;
+        return nullptr;
     }
 
-    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
-        *digest_count = array_length(supported_digests);
-        return supported_digests;
+    keymaster_digest_t digest;
+    if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
+        !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+        return NULL;
+    }
+    Operation* op = InstantiateOperation(digest, ecdsa_key->key());
+    if (!op)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return op;
+}
+
+const keymaster_digest_t* EcdsaOperationFactory::SupportedDigests(size_t* digest_count) const {
+    *digest_count = array_length(supported_digests);
+    return supported_digests;
+}
+
+class EcdsaSignOperationFactory : public EcdsaOperationFactory {
+  private:
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
+        return new EcdsaSignOperation(purpose(), digest, key);
     }
 };
+
 static OperationFactoryRegistry::Registration<EcdsaSignOperationFactory> sign_registration;
 
-class EcdsaVerifyOperationFactory : public OperationFactory {
+class EcdsaVerifyOperationFactory : public EcdsaOperationFactory {
   public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_EC, KM_PURPOSE_VERIFY); }
-
-    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& /* begin_params */,
-                                       keymaster_error_t* error) {
-        const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
-        if (!ecdsa_key) {
-            *error = KM_ERROR_UNKNOWN_ERROR;
-            return NULL;
-        }
-
-        keymaster_digest_t digest;
-        if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
-            !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
-            *error = KM_ERROR_UNSUPPORTED_DIGEST;
-            return NULL;
-        }
-
-        Operation* op = new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, ecdsa_key->key());
-        if (!op)
-            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return op;
-    }
-
-    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
-        *digest_count = array_length(supported_digests);
-        return supported_digests;
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
+        return new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, key);
     }
 };
 static OperationFactoryRegistry::Registration<EcdsaVerifyOperationFactory> verify_registration;
