@@ -415,11 +415,36 @@ string Keymaster1Test::EncryptMessage(const string& message, keymaster_padding_t
     return EncryptMessage(update_params, message, padding, generated_nonce);
 }
 
+string Keymaster1Test::EncryptMessage(const string& message, keymaster_block_mode_t block_mode,
+                                      keymaster_padding_t padding, string* generated_nonce) {
+    AuthorizationSet update_params;
+    return EncryptMessage(update_params, message, block_mode, padding, generated_nonce);
+}
+
 string Keymaster1Test::EncryptMessage(const AuthorizationSet& update_params, const string& message,
                                       keymaster_padding_t padding, string* generated_nonce) {
     SCOPED_TRACE("EncryptMessage");
     AuthorizationSet begin_params(client_params()), output_params;
     begin_params.push_back(TAG_PADDING, padding);
+    string ciphertext =
+        ProcessMessage(KM_PURPOSE_ENCRYPT, message, begin_params, update_params, &output_params);
+    if (generated_nonce) {
+        keymaster_blob_t nonce_blob;
+        EXPECT_TRUE(output_params.GetTagValue(TAG_NONCE, &nonce_blob));
+        *generated_nonce = make_string(nonce_blob.data, nonce_blob.data_length);
+    } else {
+        EXPECT_EQ(-1, output_params.find(TAG_NONCE));
+    }
+    return ciphertext;
+}
+
+string Keymaster1Test::EncryptMessage(const AuthorizationSet& update_params, const string& message,
+                                      keymaster_block_mode_t block_mode,
+                                      keymaster_padding_t padding, string* generated_nonce) {
+    SCOPED_TRACE("EncryptMessage");
+    AuthorizationSet begin_params(client_params()), output_params;
+    begin_params.push_back(TAG_PADDING, padding);
+    begin_params.push_back(TAG_BLOCK_MODE, block_mode);
     string ciphertext =
         ProcessMessage(KM_PURPOSE_ENCRYPT, message, begin_params, update_params, &output_params);
     if (generated_nonce) {
@@ -448,11 +473,32 @@ string Keymaster1Test::DecryptMessage(const string& ciphertext, keymaster_paddin
     return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext, begin_params, update_params);
 }
 
+string Keymaster1Test::DecryptMessage(const string& ciphertext, keymaster_block_mode_t block_mode,
+                                      keymaster_padding_t padding) {
+    SCOPED_TRACE("DecryptMessage");
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, padding);
+    begin_params.push_back(TAG_BLOCK_MODE, block_mode);
+    AuthorizationSet update_params;
+    return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext, begin_params, update_params);
+}
+
 string Keymaster1Test::DecryptMessage(const string& ciphertext, keymaster_padding_t padding,
                                       const string& nonce) {
     SCOPED_TRACE("DecryptMessage");
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_PADDING, padding);
+    begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
+    AuthorizationSet update_params;
+    return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext, begin_params, update_params);
+}
+
+string Keymaster1Test::DecryptMessage(const string& ciphertext, keymaster_block_mode_t block_mode,
+                                      keymaster_padding_t padding, const string& nonce) {
+    SCOPED_TRACE("DecryptMessage");
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, padding);
+    begin_params.push_back(TAG_BLOCK_MODE, block_mode);
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     AuthorizationSet update_params;
     return ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext, begin_params, update_params);
@@ -519,6 +565,7 @@ void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonc
 
     AuthorizationSet begin_params(client_params()), update_params, output_params;
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
     string ciphertext =
         EncryptMessageWithParams(message, begin_params, update_params, &output_params);
     EXPECT_EQ(expected_ciphertext, ciphertext);
