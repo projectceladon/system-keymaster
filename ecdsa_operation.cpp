@@ -37,7 +37,7 @@ class EcdsaOperationFactory : public OperationFactory {
 };
 
 Operation* EcdsaOperationFactory::CreateOperation(const Key& key,
-                                                  const AuthorizationSet& /* begin_params */,
+                                                  const AuthorizationSet& begin_params,
                                                   keymaster_error_t* error) {
     const EcKey* ecdsa_key = static_cast<const EcKey*>(&key);
     if (!ecdsa_key) {
@@ -45,12 +45,22 @@ Operation* EcdsaOperationFactory::CreateOperation(const Key& key,
         return nullptr;
     }
 
+    *error = KM_ERROR_UNSUPPORTED_DIGEST;
     keymaster_digest_t digest;
-    if (!ecdsa_key->authorizations().GetTagValue(TAG_DIGEST, &digest) &&
-        !ecdsa_key->authorizations().GetTagValue(TAG_DIGEST_OLD, &digest)) {
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+    if (!begin_params.GetTagValue(TAG_DIGEST, &digest)) {
+        LOG_E("%d digests specified in begin params", begin_params.GetTagCount(TAG_DIGEST));
+        return nullptr;
+    } else if (!supported(digest)) {
+        LOG_E("Digest %d not supported", digest);
+        return nullptr;
+    } else if (!ecdsa_key->authorizations().Contains(TAG_DIGEST, digest) &&
+               !ecdsa_key->authorizations().Contains(TAG_DIGEST_OLD, digest)) {
+        LOG_E("Digest %d was specified, but not authorized by key", digest);
+        *error = KM_ERROR_INCOMPATIBLE_DIGEST;
         return NULL;
     }
+    *error = KM_ERROR_OK;
+
     Operation* op = InstantiateOperation(digest, ecdsa_key->key());
     if (!op)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;

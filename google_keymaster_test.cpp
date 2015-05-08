@@ -318,7 +318,7 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
                                            .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
 }
 
 TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
@@ -329,7 +329,7 @@ TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
                                            .Padding(KM_PAD_NONE)));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(SigningOperationsTest, RsaPssSha256Success) {
@@ -340,7 +340,7 @@ TEST_F(SigningOperationsTest, RsaPssSha256Success) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
@@ -350,7 +350,7 @@ TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
                                            .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
@@ -363,7 +363,9 @@ TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     string message(1024, 'a');
     string signature;
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 
     string result;
     size_t input_consumed;
@@ -377,8 +379,9 @@ TEST_F(SigningOperationsTest, RsaAbort) {
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
-    AuthorizationSet input_params, output_params;
-    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
     EXPECT_EQ(KM_ERROR_OK, AbortOperation());
     // Another abort should fail
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, AbortOperation());
@@ -397,7 +400,9 @@ TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
                     .RsaSigningKey(256, 3)
                     .Digest(KM_DIGEST_SHA_2_256 /* supported digest */)
                     .Padding(KM_PAD_PKCS7));
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
 TEST_F(SigningOperationsTest, RsaNoDigest) {
@@ -409,14 +414,18 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
                     .RsaSigningKey(256, 3)
                     .Digest(KM_DIGEST_NONE)
                     .Padding(KM_PAD_RSA_PSS));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
 TEST_F(SigningOperationsTest, RsaNoPadding) {
     // Padding must be specified
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey().Digest(
                                KM_DIGEST_NONE)));
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
 TEST_F(SigningOperationsTest, RsaTooShortMessage) {
@@ -424,7 +433,9 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
-    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 
     string message = "1234567890123456789012345678901";
     string result;
@@ -452,7 +463,7 @@ TEST_F(SigningOperationsTest, EcdsaSuccess) {
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
 }
 
 TEST_F(SigningOperationsTest, AesEcbSign) {
@@ -467,7 +478,7 @@ TEST_F(SigningOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 160);
+    MacMessage(message, &signature, KM_DIGEST_SHA1, 160);
     ASSERT_EQ(20U, signature.size());
 }
 
@@ -476,7 +487,7 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 224);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_224, 224);
     ASSERT_EQ(28U, signature.size());
 }
 
@@ -485,7 +496,7 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 256);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 256);
     ASSERT_EQ(32U, signature.size());
 }
 
@@ -495,7 +506,7 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
 
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 384);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_384, 384);
     ASSERT_EQ(48U, signature.size());
 }
 
@@ -504,7 +515,7 @@ TEST_F(SigningOperationsTest, HmacSha512Success) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 512);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_512, 512);
     ASSERT_EQ(64U, signature.size());
 }
 
@@ -516,7 +527,7 @@ TEST_F(SigningOperationsTest, HmacLengthInKey) {
                                            .Authorization(TAG_MAC_LENGTH, 20)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, 240);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 240);
     // Size in key was ignored.
     ASSERT_EQ(30U, signature.size());
 }
@@ -758,6 +769,7 @@ TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_MAC_LENGTH, 264);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
     ASSERT_EQ(KM_ERROR_OK,
               BeginOperation(KM_PURPOSE_SIGN, begin_params, nullptr /* output_params */));
     string message = "1234567890123456789012345678901";
@@ -777,8 +789,8 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
                                            .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
 TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
@@ -789,8 +801,8 @@ TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
                     .Padding(KM_PAD_NONE));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
@@ -800,10 +812,12 @@ TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
                     .Padding(KM_PAD_NONE));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     ++signature[signature.size() / 2];
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
     size_t input_consumed;
@@ -820,8 +834,8 @@ TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
@@ -831,10 +845,12 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
                     .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     ++signature[signature.size() / 2];
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
     size_t input_consumed;
@@ -851,10 +867,12 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     ++message[message.size() / 2];
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
     size_t input_consumed;
@@ -870,8 +888,8 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
                     .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
@@ -881,10 +899,12 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
                     .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN));
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     ++signature[signature.size() / 2];
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
     size_t input_consumed;
@@ -901,10 +921,12 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
     // Use large message, which won't work without digesting.
     string message(1024, 'a');
     string signature;
-    SignMessage(message, &signature);
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     ++message[message.size() / 2];
 
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
     size_t input_consumed;
@@ -982,8 +1004,8 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                             .Padding(padding_mode));
             string message(message_len, 'a');
             string signature;
-            SignMessage(message, &signature);
-            VerifyMessage(message, signature);
+            SignMessage(message, &signature, digest);
+            VerifyMessage(message, signature, digest);
         }
     }
 
@@ -996,48 +1018,48 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 160);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA1, 160);
+    VerifyMessage(message, signature, KM_DIGEST_SHA1);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha224Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 224);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_224, 224);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_224);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha256Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 256);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha384Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 384);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_384, 384);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_384);
 }
 
 TEST_F(VerificationOperationsTest, HmacSha512Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, 512);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_512, 512);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_512);
 }
 
 typedef VerificationOperationsTest ExportKeyTest;
@@ -1120,8 +1142,8 @@ TEST_F(ImportKeyTest, RsaSuccess) {
 
     string message(1024 / 8, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
 TEST_F(ImportKeyTest, OldApiRsaSuccess) {
@@ -1138,9 +1160,14 @@ TEST_F(ImportKeyTest, OldApiRsaSuccess) {
     set_key_blob(key_blob, key_blob_length);
 
     string message(1024 / 8, 'a');
-    string signature;
-    SignMessage(message, &signature, false /* use_client_params */);
-    VerifyMessage(message, signature, false /* use_client_params */);
+    AuthorizationSet begin_params;  // Don't use client data.
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    AuthorizationSet update_params;
+    AuthorizationSet output_params;
+    string signature =
+        ProcessMessage(KM_PURPOSE_SIGN, message, begin_params, update_params, &output_params);
+    ProcessMessage(KM_PURPOSE_VERIFY, message, signature, begin_params, update_params,
+                   &output_params);
 }
 
 TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
@@ -1183,8 +1210,8 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
 
     string message(1024 / 8, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
 TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
@@ -1205,8 +1232,8 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
 
     string message(1024 / 8, 'a');
     string signature;
-    SignMessage(message, &signature);
-    VerifyMessage(message, signature);
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
 TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
@@ -1250,8 +1277,8 @@ TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
 
     string message = "Hello World!";
     string signature;
-    MacMessage(message, &signature, 32);
-    VerifyMessage(message, signature);
+    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 32);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
 typedef KeymasterTest EncryptionOperationsTest;

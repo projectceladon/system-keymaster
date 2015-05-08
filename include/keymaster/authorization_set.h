@@ -163,6 +163,14 @@ class AuthorizationSet : public Serializable {
     }
 
     /**
+     * Returns true if the set contains the specified tag and value.
+     */
+    template <keymaster_tag_t Tag, typename T>
+    bool Contains(TypedEnumTag<KM_ENUM, Tag, T> tag, T val) const {
+        return ContainsEnumValue(tag, val);
+    }
+
+    /**
      * If the specified integer-typed \p tag exists, places its value in \p val and returns true.
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
