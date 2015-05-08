@@ -221,8 +221,16 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (key.get() == NULL)
         return;
 
+    // TODO(swillden): Move this check to a general authorization checker.
     if (key->rescopable()) {
         response->error = KM_ERROR_RESCOPABLE_KEY_NOT_USABLE;
+        return;
+    }
+
+    // TODO(swillden): Move this check to a general authorization checker.
+    if (!key->authorizations().Contains(TAG_PURPOSE, request.purpose)) {
+        // TODO(swillden): Consider introducing error codes for unauthorized usages.
+        response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
         return;
     }
 

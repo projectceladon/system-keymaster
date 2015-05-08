@@ -155,6 +155,14 @@ class AuthorizationSet : public Serializable {
     size_t GetTagCount(keymaster_tag_t tag) const;
 
     /**
+     * Returns true if the set contains the specified tag and value.
+     */
+    template <keymaster_tag_t Tag, typename T>
+    bool Contains(TypedEnumTag<KM_ENUM_REP, Tag, T> tag, T val) const {
+        return ContainsEnumValue(tag, val);
+    }
+
+    /**
      * If the specified integer-typed \p tag exists, places its value in \p val and returns true.
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
@@ -365,6 +373,8 @@ class AuthorizationSet : public Serializable {
     bool GetTagValueDate(keymaster_tag_t tag, uint64_t* val) const;
     bool GetTagValueBlob(keymaster_tag_t tag, keymaster_blob_t* val) const;
     bool GetTagValueBool(keymaster_tag_t tag) const;
+
+    bool ContainsEnumValue(keymaster_tag_t tag, uint32_t val) const;
 
     keymaster_key_param_t* elems_;
     size_t elems_size_;
