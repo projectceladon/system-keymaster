@@ -23,7 +23,6 @@
 #include "symmetric_key.h"
 
 #if defined(OPENSSL_IS_BORINGSSL)
-#include <openssl/mem.h>
 typedef size_t openssl_size_t;
 #else
 typedef int openssl_size_t;
