@@ -114,11 +114,13 @@ keymaster_error_t TranslateCipherError(int reason) {
 
 keymaster_error_t TranslateASN1Error(int reason) {
     switch (reason) {
+#if !defined(OPENSSL_IS_BORINGSSL)
     case ASN1_R_UNSUPPORTED_CIPHER:
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
 
     case ASN1_R_ERROR_LOADING_SECTION:
         return KM_ERROR_INVALID_KEY_BLOB;
+#endif
 
     case ASN1_R_ENCODE_ERROR:
         return KM_ERROR_INVALID_ARGUMENT;
