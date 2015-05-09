@@ -36,14 +36,14 @@ static const int MIN_PSS_SALT_LEN = 8 /* salt len */ + 2 /* overhead */;
  */
 class RsaOperationFactory : public OperationFactory {
   public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_RSA, purpose()); }
+    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_RSA, purpose()); }
     virtual keymaster_purpose_t purpose() const = 0;
 
   protected:
     bool GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
                                keymaster_error_t* error) const;
-    bool GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
-                              keymaster_error_t* error) const;
+    bool GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
+                              keymaster_digest_t* digest, keymaster_error_t* error) const;
     static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
 };
 
@@ -61,16 +61,22 @@ bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_paddin
     return true;
 }
 
-bool RsaOperationFactory::GetAndValidateDigest(const Key& key, keymaster_digest_t* digest,
+bool RsaOperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
+                                               keymaster_digest_t* digest,
                                                keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_DIGEST;
-    if (!key.authorizations().GetTagValue(TAG_DIGEST, digest) &&
-        !key.authorizations().GetTagValue(TAG_DIGEST_OLD, digest))
+    if (!begin_params.GetTagValue(TAG_DIGEST, digest)) {
+        LOG_E("%d digests specified in begin params", begin_params.GetTagCount(TAG_DIGEST));
         return false;
-
-    if (!supported(*digest))
+    } else if (!supported(*digest)) {
+        LOG_E("Digest %d not supported", *digest);
         return false;
-
+    } else if (!key.authorizations().Contains(TAG_DIGEST, *digest) &&
+               !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
+        LOG_E("Digest %d was specified, but not authorized by key", *digest);
+        *error = KM_ERROR_INCOMPATIBLE_DIGEST;
+        return false;
+    }
     *error = KM_ERROR_OK;
     return true;
 }
@@ -117,12 +123,12 @@ class RsaDigestingOperationFactory : public RsaOperationFactory {
 };
 
 Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
-                                                         const AuthorizationSet& /* begin_params */,
+                                                         const AuthorizationSet& begin_params,
                                                          keymaster_error_t* error) {
     keymaster_padding_t padding;
     keymaster_digest_t digest;
     RSA* rsa;
-    if (!GetAndValidateDigest(key, &digest, error) ||
+    if (!GetAndValidateDigest(begin_params, key, &digest, error) ||
         !GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
         return NULL;
 
