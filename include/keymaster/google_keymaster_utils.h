@@ -127,6 +127,13 @@ inline OPTNONE void* memset_s(void* s, int c, size_t n) {
 #undef OPTNONE
 
 /**
+ * Variant of memcmp that has the same runtime regardless of whether the data matches (i.e. doesn't
+ * short-circuit).  Not an exact equivalent to memcmp because it doesn't return <0 if p1 < p2, just
+ * 0 for match and non-zero for non-match.
+ */
+int memcmp_s(const void* p1, const void* p2, size_t length);
+
+/**
  * Eraser clears buffers.  Construct it with a buffer or object and the destructor will ensure that
  * it is zeroed.
  */
