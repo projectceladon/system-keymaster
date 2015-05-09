@@ -477,6 +477,50 @@ TEST_F(SigningOperationsTest, AesEcbSign) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
 }
 
+TEST_F(SigningOperationsTest, RsaTooShortMessage) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN));
+
+    string message = "1234567890123456789012345678901";
+    string result;
+    size_t input_consumed;
+    ASSERT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(0U, result.size());
+    EXPECT_EQ(31U, input_consumed);
+
+    string signature;
+    ASSERT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&signature));
+    EXPECT_EQ(0U, signature.length());
+}
+
+TEST_F(SigningOperationsTest, RsaSignWithEncryptionKey) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaEncryptionKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
+}
+
+TEST_F(SigningOperationsTest, EcdsaSuccess) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature);
+}
+
+TEST_F(SigningOperationsTest, AesEcbSign) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
+                  TAG_BLOCK_MODE, KM_MODE_ECB)));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
+}
+
 TEST_F(SigningOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "12345678901234567890123456789012";
@@ -1421,6 +1465,22 @@ TEST_F(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
 }
 
 TEST_F(EncryptionOperationsTest, EcdsaEncrypt) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
+}
+
+TEST_F(EncryptionOperationsTest, HmacEncrypt) {
+    ASSERT_EQ(
+        KM_ERROR_OK,
+        GenerateKey(
+            AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE).Padding(KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
+}
+
+TEST_F(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
