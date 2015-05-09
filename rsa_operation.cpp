@@ -40,22 +40,29 @@ class RsaOperationFactory : public OperationFactory {
     virtual keymaster_purpose_t purpose() const = 0;
 
   protected:
-    bool GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
-                               keymaster_error_t* error) const;
+    bool GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
+                               keymaster_padding_t* padding, keymaster_error_t* error) const;
     bool GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
                               keymaster_digest_t* digest, keymaster_error_t* error) const;
     static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
 };
 
-bool RsaOperationFactory::GetAndValidatePadding(const Key& key, keymaster_padding_t* padding,
+bool RsaOperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_params,
+                                                const Key& key, keymaster_padding_t* padding,
                                                 keymaster_error_t* error) const {
     *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    if (!key.authorizations().GetTagValue(TAG_PADDING, padding) &&
-        !key.authorizations().GetTagValue(TAG_PADDING_OLD, padding))
+    if (!begin_params.GetTagValue(TAG_PADDING, padding)) {
+        LOG_E("%d padding modes specified in begin params", begin_params.GetTagCount(TAG_PADDING));
         return false;
-
-    if (!supported(*padding))
+    } else if (!supported(*padding)) {
+        LOG_E("Padding mode %d not supported", *padding);
         return false;
+    } else if (!key.authorizations().Contains(TAG_PADDING, *padding) &&
+               !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
+        LOG_E("Padding mode %d was specified, but not authorized by key", *padding);
+        *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+        return false;
+    }
 
     *error = KM_ERROR_OK;
     return true;
@@ -129,7 +136,8 @@ Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
     keymaster_digest_t digest;
     RSA* rsa;
     if (!GetAndValidateDigest(begin_params, key, &digest, error) ||
-        !GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
+        !GetAndValidatePadding(begin_params, key, &padding, error) ||
+        !(rsa = GetRsaKey(key, error)))
         return NULL;
 
     Operation* op = InstantiateOperation(digest, padding, rsa);
@@ -165,11 +173,12 @@ class RsaCryptingOperationFactory : public RsaOperationFactory {
 };
 
 Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
-                                                        const AuthorizationSet& /* begin_params */,
+                                                        const AuthorizationSet& begin_params,
                                                         keymaster_error_t* error) {
     keymaster_padding_t padding;
     RSA* rsa;
-    if (!GetAndValidatePadding(key, &padding, error) || !(rsa = GetRsaKey(key, error)))
+    if (!GetAndValidatePadding(begin_params, key, &padding, error) ||
+        !(rsa = GetRsaKey(key, error)))
         return NULL;
 
     Operation* op = InstantiateOperation(padding, rsa);
@@ -365,15 +374,19 @@ keymaster_error_t RsaSignOperation::SignDigested(Buffer* output) {
     UniquePtr<uint8_t[]> padded_digest;
     switch (padding_) {
     case KM_PAD_NONE:
-        return PrivateEncrypt(digest_buf_, digest_size, RSA_NO_PADDING, output);
+        LOG_E("Digesting requires padding", 0);
+        return KM_ERROR_INCOMPATIBLE_PADDING_MODE;
     case KM_PAD_RSA_PKCS1_1_5_SIGN:
         return PrivateEncrypt(digest_buf_, digest_size, RSA_PKCS1_PADDING, output);
     case KM_PAD_RSA_PSS:
         // OpenSSL doesn't verify that the key is large enough for the digest size.  This can cause
         // a segfault in some cases, and in others can result in a unsafely-small salt.
-        if ((unsigned)RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + digest_size)
+        if ((unsigned)RSA_size(rsa_key_) < MIN_PSS_SALT_LEN + digest_size) {
+            LOG_E("%d-byte too small for PSS padding and %d-byte digest", RSA_size(rsa_key_),
+                  digest_size);
             // TODO(swillden): Add a better return code for this.
             return KM_ERROR_INCOMPATIBLE_DIGEST;
+        }
 
         if ((error = PssPadDigest(&padded_digest)) != KM_ERROR_OK)
             return error;
