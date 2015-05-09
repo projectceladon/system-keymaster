@@ -51,7 +51,7 @@ class AesOperationFactory : public OperationFactory {
 };
 
 Operation* AesOperationFactory::CreateOperation(const Key& key,
-                                                const AuthorizationSet& begin_params,
+                                                const AuthorizationSet&  begin_params ,
                                                 keymaster_error_t* error) {
     *error = KM_ERROR_OK;
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
@@ -67,19 +67,8 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
     }
 
     keymaster_block_mode_t block_mode;
-    if (!begin_params.GetTagValue(TAG_BLOCK_MODE, &block_mode)) {
-        LOG_E("%d block modes specified in begin params", begin_params.GetTagCount(TAG_BLOCK_MODE));
+    if (!key.authorizations().GetTagValue(TAG_BLOCK_MODE, &block_mode) || !supported(block_mode))
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return nullptr;
-    } else if (!supported(block_mode)) {
-        LOG_E("Block mode %d not supported", block_mode);
-        *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
-        return nullptr;
-    } else if (!key.authorizations().Contains(TAG_BLOCK_MODE, block_mode)) {
-        LOG_E("Block mode %d was specified, but not authorized by key", block_mode);
-        *error = KM_ERROR_INCOMPATIBLE_BLOCK_MODE;
-        return nullptr;
-    }
 
     keymaster_padding_t padding = KM_PAD_NONE;
     begin_params.GetTagValue(TAG_PADDING, &padding);
