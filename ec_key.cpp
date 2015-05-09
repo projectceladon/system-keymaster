@@ -56,6 +56,11 @@ Key* EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
         return NULL;
     }
 
+#if !defined(OPENSSL_IS_BORINGSSL)
+    EC_GROUP_set_point_conversion_form(group.get(), POINT_CONVERSION_UNCOMPRESSED);
+    EC_GROUP_set_asn1_flag(group.get(), OPENSSL_EC_NAMED_CURVE);
+#endif
+
     if (EC_KEY_set_group(ec_key.get(), group.get()) != 1 ||
         EC_KEY_generate_key(ec_key.get()) != 1 || EC_KEY_check_key(ec_key.get()) < 0) {
         *error = TranslateLastOpenSslError();

@@ -17,10 +17,8 @@
 #include "hmac.h"
 
 #include <assert.h>
-
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#include <openssl/mem.h>
 #include <openssl/sha.h>
 
 namespace keymaster {
