@@ -1266,8 +1266,8 @@ TEST_F(ImportKeyTest, AesKeySuccess) {
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message = "Hello World!";
-    string ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
-    string plaintext = DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_NONE);
+    string ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_PKCS7);
+    string plaintext = DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_PKCS7);
     EXPECT_EQ(message, plaintext);
 }
 
@@ -1466,6 +1466,7 @@ TEST_F(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     string ciphertext;
     size_t input_consumed;
@@ -1504,6 +1505,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_PKCS7);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
     string plaintext;
     size_t input_consumed;
@@ -1546,6 +1548,7 @@ TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
     string message(239, 'a');
     AuthorizationSet input_params(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     AuthorizationSet output_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
 
@@ -1561,6 +1564,7 @@ TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
     input_params.Reinitialize(output_params);
     input_params.push_back(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     output_params.Clear();
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
@@ -1628,6 +1632,7 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
                                            .Authorization(TAG_PADDING, KM_PAD_PKCS7)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
 }
 
@@ -1640,6 +1645,7 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
 
     AuthorizationSet input_params(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     input_params.push_back(TAG_NONCE, "123", 3);
     EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_ENCRYPT, input_params));
 }
@@ -1689,6 +1695,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     AuthorizationSet output_params;
     input_params.push_back(TAG_NONCE, "abcdefghijklmnop", 16);
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CBC);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     string ciphertext2 =
         ProcessMessage(KM_PURPOSE_ENCRYPT, message, input_params, update_params, &output_params);
 
@@ -1700,6 +1707,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     // Now try with wrong nonce.
     input_params.Reinitialize(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CBC);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     input_params.push_back(TAG_NONCE, "aaaaaaaaaaaaaaaa", 16);
     plaintext = ProcessMessage(KM_PURPOSE_DECRYPT, ciphertext2, input_params, update_params,
                                &output_params);
@@ -1728,6 +1736,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
     AuthorizationSet output_params;
     input_params.push_back(TAG_NONCE, "abcdefghijklmnop", 16);
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CBC);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
 
     EXPECT_EQ(KM_ERROR_CALLER_NONCE_PROHIBITED,
               BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
@@ -1743,6 +1752,7 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
     string message(240, 'a');
     AuthorizationSet input_params(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CBC);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     AuthorizationSet output_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
 
@@ -1758,6 +1768,7 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
     input_params.Reinitialize(output_params);
     input_params.push_back(client_params());
     input_params.push_back(TAG_BLOCK_MODE, KM_MODE_CBC);
+    input_params.push_back(TAG_PADDING, KM_PAD_NONE);
     output_params.Clear();
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, input_params, &output_params));
