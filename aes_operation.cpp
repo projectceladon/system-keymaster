@@ -81,11 +81,20 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
         return nullptr;
     }
 
-    keymaster_padding_t padding = KM_PAD_NONE;
-    begin_params.GetTagValue(TAG_PADDING, &padding);
-    if (!key.authorizations().GetTagValue(TAG_PADDING, &padding)) {
+    keymaster_padding_t padding;
+    if (!begin_params.GetTagValue(TAG_PADDING, &padding)) {
+        LOG_E("%d padding modes specified in begin params",
+              begin_params.GetTagCount(TAG_PADDING));
+        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+        return nullptr;
+    } else if (!supported(padding)) {
+        LOG_E("Padding mode %d not supported", padding);
+        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+        return nullptr;
+    } else if (!key.authorizations().Contains(TAG_PADDING, padding)) {
         LOG_E("Padding mode %d was specified, but not authorized by key", padding);
         *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+        return nullptr;
     }
 
     bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);

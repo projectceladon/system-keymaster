@@ -566,6 +566,7 @@ void Keymaster1Test::CheckAesCtrTestVector(const string& key, const string& nonc
     AuthorizationSet begin_params(client_params()), update_params, output_params;
     begin_params.push_back(TAG_NONCE, nonce.data(), nonce.size());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_CTR);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     string ciphertext =
         EncryptMessageWithParams(message, begin_params, update_params, &output_params);
     EXPECT_EQ(expected_ciphertext, ciphertext);
