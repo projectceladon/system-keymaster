@@ -396,44 +396,4 @@ bool GetVersionResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint
     return true;
 }
 
-void RescopeRequest::SetKeyMaterial(const void* key_material, size_t length) {
-    set_key_blob(&key_blob, key_material, length);
-}
-
-size_t RescopeRequest::SerializedSize() const {
-    return key_blob_size(key_blob) + additional_params.SerializedSize() +
-           new_authorizations.SerializedSize();
-}
-
-uint8_t* RescopeRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
-    buf = serialize_key_blob(key_blob, buf, end);
-    buf = additional_params.Serialize(buf, end);
-    return new_authorizations.Serialize(buf, end);
-}
-
-bool RescopeRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return deserialize_key_blob(&key_blob, buf_ptr, end) &&
-           additional_params.Deserialize(buf_ptr, end) &&
-           new_authorizations.Deserialize(buf_ptr, end);
-}
-
-void RescopeResponse::SetKeyMaterial(const void* key_material, size_t length) {
-    set_key_blob(&key_blob, key_material, length);
-}
-
-size_t RescopeResponse::NonErrorSerializedSize() const {
-    return key_blob_size(key_blob) + enforced.SerializedSize() + unenforced.SerializedSize();
-}
-
-uint8_t* RescopeResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    buf = serialize_key_blob(key_blob, buf, end);
-    buf = enforced.Serialize(buf, end);
-    return unenforced.Serialize(buf, end);
-}
-
-bool RescopeResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return deserialize_key_blob(&key_blob, buf_ptr, end) && enforced.Deserialize(buf_ptr, end) &&
-           unenforced.Deserialize(buf_ptr, end);
-}
-
 }  // namespace keymaster

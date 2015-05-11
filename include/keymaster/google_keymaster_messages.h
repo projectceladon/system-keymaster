@@ -399,48 +399,6 @@ struct GetVersionResponse : public KeymasterResponse {
     uint8_t subminor_ver;
 };
 
-struct RescopeRequest : public KeymasterMessage {
-    RescopeRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
-        key_blob.key_material = NULL;
-        key_blob.key_material_size = 0;
-    }
-    ~RescopeRequest() { delete[] key_blob.key_material; }
-
-    void SetKeyMaterial(const void* key_material, size_t length);
-    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
-        SetKeyMaterial(blob.key_material, blob.key_material_size);
-    }
-
-    size_t SerializedSize() const;
-    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
-
-    keymaster_key_blob_t key_blob;
-    AuthorizationSet additional_params;
-    AuthorizationSet new_authorizations;
-};
-
-struct RescopeResponse : public KeymasterResponse {
-    RescopeResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {
-        key_blob.key_material = NULL;
-        key_blob.key_material_size = 0;
-    }
-    ~RescopeResponse() { delete[] key_blob.key_material; }
-
-    void SetKeyMaterial(const void* key_material, size_t length);
-    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
-        SetKeyMaterial(blob.key_material, blob.key_material_size);
-    }
-
-    size_t NonErrorSerializedSize() const;
-    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const;
-    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
-
-    keymaster_key_blob_t key_blob;
-    AuthorizationSet enforced;
-    AuthorizationSet unenforced;
-};
-
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_

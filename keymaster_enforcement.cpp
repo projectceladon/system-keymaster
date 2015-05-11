@@ -131,9 +131,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         case KM_TAG_NONCE:
         case KM_TAG_RETURN_UNAUTHED:
 
-        /* Tags handled in AuthorizeRescope and not used for operations. */
-        case KM_TAG_RESCOPING_ADD:
-        case KM_TAG_RESCOPING_DEL:
+        /* Tags not used for operations. */
         case KM_TAG_BLOB_USAGE_REQUIREMENTS:
 
         /* Algorithm specific parameters not used for access control. */
@@ -257,84 +255,6 @@ keymaster_error_t KeymasterEnforcement::AuthenticationIsFresh(const keymaster_ke
     } else {
         return KM_ERROR_KEY_USER_NOT_AUTHENTICATED;
     }
-}
-
-bool KeymasterEnforcement::valid_rescope_del(const AuthorizationSet& auth_set,
-                                             const keymaster_tag_t tag) const {
-    int tag_index = auth_set.find(KM_TAG_RESCOPING_DEL);
-    while (tag_index >= 0) {
-        if (static_cast<keymaster_tag_t>(auth_set[tag_index].integer) == tag) {
-            return true;
-        }
-        tag_index = auth_set.find(KM_TAG_RESCOPING_DEL, tag_index);
-    }
-
-    return false;
-}
-
-bool KeymasterEnforcement::valid_rescope_add(const AuthorizationSet& auth_set,
-                                             const keymaster_tag_t tag) const {
-    int tag_index = auth_set.find(KM_TAG_RESCOPING_ADD);
-    while (tag_index >= 0) {
-        if (static_cast<keymaster_tag_t>(auth_set[tag_index].integer) == tag) {
-            return true;
-        }
-        tag_index = auth_set.find(KM_TAG_RESCOPING_ADD, tag_index);
-    }
-
-    return false;
-}
-
-keymaster_error_t
-KeymasterEnforcement::AuthorizeRescope(const AuthorizationSet& old_auth_set,
-                                       const AuthorizationSet& new_auth_set) const {
-    keymaster_error_t return_error = KM_ERROR_OK;
-    /* TODO(swillden): Require authentication. */
-
-    /*
-     * For each tag in the old AuthenticationSet that is not in the new AuthenticationSet test
-     * that the tag is validly deleted. For each tag in the old AuthenticationSet that has a
-     * different value in the new AuthenticationSet, test that the tag can be validly deleted and
-     * added.
-     */
-    for (unsigned int i = 0; i < old_auth_set.size(); i++) {
-        keymaster_key_param_t kkp_old = old_auth_set[i];
-        if (kkp_old.tag == KM_TAG_RESCOPING_ADD || kkp_old.tag == KM_TAG_RESCOPING_DEL) {
-            continue;
-        }
-        int newIndex = new_auth_set.find(kkp_old.tag, -1);
-        if (newIndex < 0) {
-            if (!valid_rescope_del(old_auth_set, kkp_old.tag)) {
-                return KM_ERROR_INVALID_RESCOPING;
-            }
-        } else {
-            keymaster_key_param_t kkp_new = new_auth_set[newIndex];
-            if (!(kkp_old == kkp_new) && (!valid_rescope_add(old_auth_set, kkp_old.tag) ||
-                                          !valid_rescope_del(old_auth_set, kkp_old.tag))) {
-                return KM_ERROR_INVALID_RESCOPING;
-            }
-        }
-    }
-
-    /**
-     * For each tag in the new Authentication set that is absent in the old AuthenticationSet test
-     * that the tag can validly been added. We do not need to test tags with different values in
-     * this loop because they will have all ben handled previously.
-     */
-    for (unsigned int i = 0; i < new_auth_set.size(); i++) {
-        keymaster_key_param_t kkp_new = new_auth_set[i];
-        if (kkp_new.tag == KM_TAG_RESCOPING_ADD || kkp_new.tag == KM_TAG_RESCOPING_DEL) {
-            continue;
-        }
-        int old_index = old_auth_set.find(kkp_new.tag, -1);
-        if (old_index < 0) {
-            if (!valid_rescope_add(old_auth_set, kkp_new.tag)) {
-                return KM_ERROR_INVALID_RESCOPING;
-            }
-        }
-    }
-
-    return return_error;
 }
 
 void KeymasterEnforcement::update_key_access_time(const km_id_t keyid) {

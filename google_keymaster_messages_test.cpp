@@ -445,33 +445,6 @@ TEST(RoundTrip, AddEntropyRequest) {
     }
 }
 
-TEST(RoundTrip, RescopeRequest) {
-    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
-        RescopeRequest msg(ver);
-        msg.additional_params.Reinitialize(params, array_length(params));
-        msg.new_authorizations.Reinitialize(params, array_length(params));
-
-        UniquePtr<RescopeRequest> deserialized(round_trip(ver, msg, 160));
-        EXPECT_EQ(msg.new_authorizations, deserialized->new_authorizations);
-    }
-}
-
-TEST(RoundTrip, RescopeResponse) {
-    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
-        RescopeResponse msg(ver);
-        msg.error = KM_ERROR_OK;
-        msg.enforced.Reinitialize(params, array_length(params));
-        msg.unenforced.Reinitialize(params, array_length(params));
-        msg.SetKeyMaterial("foo", 3);
-
-        UniquePtr<RescopeResponse> deserialized(round_trip(ver, msg, 167));
-        EXPECT_EQ(msg.enforced, deserialized->enforced);
-        EXPECT_EQ(msg.unenforced, deserialized->unenforced);
-        EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
-        EXPECT_EQ(0, memcmp("foo", deserialized->key_blob.key_material, 3));
-    }
-}
-
 uint8_t msgbuf[] = {
     220, 88,  183, 255, 71,  1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   173, 0,   0,   0,   228, 174, 98,  187, 191, 135, 253, 200, 51,  230, 114, 247, 151, 109,
@@ -536,8 +509,6 @@ GARBAGE_TEST(ImportKeyRequest);
 GARBAGE_TEST(ImportKeyResponse);
 GARBAGE_TEST(ExportKeyRequest);
 GARBAGE_TEST(ExportKeyResponse);
-GARBAGE_TEST(RescopeRequest);
-GARBAGE_TEST(RescopeResponse);
 
 // The macro doesn't work on this one.
 TEST(GarbageTest, SupportedResponse) {

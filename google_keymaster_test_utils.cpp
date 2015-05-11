@@ -536,13 +536,6 @@ keymaster_error_t Keymaster1Test::ExportKey(keymaster_key_format_t format, strin
     return error;
 }
 
-keymaster_error_t
-Keymaster1Test::Rescope(const AuthorizationSet& new_params, keymaster_key_blob_t* rescoped_blob,
-                        keymaster_key_characteristics_t** rescoped_characteristics) {
-    return device()->rescope(device(), new_params.data(), new_params.size(), &blob_, &client_id_,
-                             NULL /* app data */, rescoped_blob, rescoped_characteristics);
-}
-
 void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
                                          string expected_mac) {
     ASSERT_EQ(KM_ERROR_OK,

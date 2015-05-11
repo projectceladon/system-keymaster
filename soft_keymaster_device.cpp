@@ -101,7 +101,6 @@ SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new GoogleSoftKeymaster(16)) 
     device_.add_rng_entropy = add_rng_entropy;
     device_.generate_key = generate_key;
     device_.get_key_characteristics = get_key_characteristics;
-    device_.rescope = rescope;
     device_.import_key = import_key;
     device_.export_key = export_key;
     device_.delete_key = NULL;
@@ -675,39 +674,6 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
     *characteristics = BuildCharacteristics(response.enforced, response.unenforced);
     if (!*characteristics)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return KM_ERROR_OK;
-}
-
-/* static */
-keymaster_error_t SoftKeymasterDevice::rescope(
-    const keymaster1_device_t* dev, const keymaster_key_param_t* new_params,
-    size_t new_params_count, const keymaster_key_blob_t* key_blob,
-    const keymaster_blob_t* client_id, const keymaster_blob_t* app_data,
-    keymaster_key_blob_t* rescoped_key_blob, keymaster_key_characteristics_t** characteristics) {
-    if (!key_blob || !key_blob->key_material || !new_params)
-        return KM_ERROR_UNEXPECTED_NULL_POINTER;
-
-    if (!rescoped_key_blob)
-        return KM_ERROR_OUTPUT_PARAMETER_NULL;
-
-    RescopeRequest request;
-    request.SetKeyMaterial(*key_blob);
-    AddClientAndAppData(client_id, app_data, &request);
-    request.new_authorizations.Reinitialize(new_params, new_params_count);
-
-    RescopeResponse response;
-    convert_device(dev)->impl_->Rescope(request, &response);
-    if (response.error != KM_ERROR_OK)
-        return response.error;
-
-    rescoped_key_blob->key_material_size = response.key_blob.key_material_size;
-    uint8_t* tmp = reinterpret_cast<uint8_t*>(malloc(rescoped_key_blob->key_material_size));
-    memcpy(tmp, response.key_blob.key_material, response.key_blob.key_material_size);
-    rescoped_key_blob->key_material = tmp;
-
-    if (characteristics)
-        *characteristics = BuildCharacteristics(response.enforced, response.unenforced);
-
     return KM_ERROR_OK;
 }
 
