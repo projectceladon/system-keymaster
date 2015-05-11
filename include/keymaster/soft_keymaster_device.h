@@ -120,13 +120,6 @@ class SoftKeymasterDevice {
                                                      const keymaster_blob_t* client_id,
                                                      const keymaster_blob_t* app_data,
                                                      keymaster_key_characteristics_t** character);
-    static keymaster_error_t rescope(const keymaster1_device_t* dev,
-                                     const keymaster_key_param_t* new_params,
-                                     size_t new_params_count, const keymaster_key_blob_t* key_blob,
-                                     const keymaster_blob_t* client_id,
-                                     const keymaster_blob_t* app_data,
-                                     keymaster_key_blob_t* rescoped_key_blob,
-                                     keymaster_key_characteristics_t** characteristics);
     static keymaster_error_t import_key(const keymaster1_device_t* dev,
                                         const keymaster_key_param_t* params, size_t params_count,
                                         keymaster_key_format_t key_format, const uint8_t* key_data,

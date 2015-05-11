@@ -31,10 +31,4 @@ Key::Key(const KeyBlob& blob) {
     authorizations_.push_back(blob.enforced());
 }
 
-bool Key::rescopable() const {
-    size_t rescope_tag_count = authorizations_.GetTagCount(TAG_RESCOPING_ADD) +
-                               authorizations_.GetTagCount(TAG_RESCOPING_DEL);
-    return rescope_tag_count > 0;
-}
-
 }  // namespace keymaster

@@ -46,9 +46,6 @@ class KeyFactory {
                            keymaster_key_format_t key_format, const uint8_t* key_data,
                            size_t key_data_length, keymaster_error_t* error) = 0;
     virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) = 0;
-    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
-                            const AuthorizationSet& new_authorizations,
-                            keymaster_error_t* error) = 0;
 
     // Informational methods.
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) = 0;
@@ -78,7 +75,6 @@ class Key {
                                                      size_t* size) const = 0;
 
     const AuthorizationSet& authorizations() const { return authorizations_; }
-    bool rescopable() const;
 
   protected:
     Key(const KeyBlob& blob);

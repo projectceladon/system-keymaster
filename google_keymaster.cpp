@@ -222,12 +222,6 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
 
     // TODO(swillden): Move this check to a general authorization checker.
-    if (key->rescopable()) {
-        response->error = KM_ERROR_RESCOPABLE_KEY_NOT_USABLE;
-        return;
-    }
-
-    // TODO(swillden): Move this check to a general authorization checker.
     if (!key->authorizations().Contains(TAG_PURPOSE, request.purpose)) {
         // TODO(swillden): Consider introducing error codes for unauthorized usages.
         response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
@@ -318,30 +312,6 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
     }
 }
 
-void GoogleKeymaster::Rescope(const RescopeRequest& request, RescopeResponse* response) {
-    if (response == NULL)
-        return;
-
-    UniquePtr<UnencryptedKeyBlob> blob(
-        LoadKeyBlob(request.key_blob, request.additional_params, &response->error));
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    KeyFactory* factory = KeyFactoryRegistry::Get(blob->algorithm());
-    if (!factory) {
-        response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-        return;
-    }
-
-    UniquePtr<Key> key;
-    key.reset(factory->RescopeKey(*blob, request.new_authorizations, &response->error));
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    assert(is_hardware() == blob->is_hardware());
-    response->error = SerializeKey(key.get(), blob->origin(), &response->key_blob,
-                                   &response->enforced, &response->unenforced);
-}
 void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
     if (response == NULL)
         return;

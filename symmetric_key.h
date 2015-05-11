@@ -24,11 +24,9 @@ namespace keymaster {
 class SymmetricKey;
 
 class SymmetricKeyFactory : public KeyFactory {
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
-    virtual Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
-                           keymaster_error_t* error);
-    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
-                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
+    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) override;
+    Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
+                   keymaster_error_t* error) override;
 
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) {

@@ -125,21 +125,6 @@ Key* EcKeyFactory::ImportKey(const AuthorizationSet& key_description,
     return new EcKey(ec_key.release(), authorizations);
 }
 
-Key* EcKeyFactory::RescopeKey(const UnencryptedKeyBlob& blob,
-                              const AuthorizationSet& new_authorizations,
-                              keymaster_error_t* error) {
-    if (!error)
-        return NULL;
-
-    EcKey original_key(blob, error);
-    if (*error != KM_ERROR_OK)
-        return NULL;
-
-    EcKey* new_key = new EcKey(original_key.ec_key_.release(), new_authorizations);
-    *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return new_key;
-}
-
 /* static */
 EC_GROUP* EcKeyFactory::choose_group(size_t key_size_bits) {
     switch (key_size_bits) {
