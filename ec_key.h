@@ -25,13 +25,11 @@ namespace keymaster {
 
 class EcKeyFactory : public AsymmetricKeyFactory {
   public:
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
-    virtual Key* ImportKey(const AuthorizationSet& key_description,
-                           keymaster_key_format_t key_format, const uint8_t* key_data,
-                           size_t key_data_length, keymaster_error_t* error);
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
-    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
-                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
+    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) override;
+    Key* ImportKey(const AuthorizationSet& key_description, keymaster_key_format_t key_format,
+                   const uint8_t* key_data, size_t key_data_length,
+                   keymaster_error_t* error) override;
+    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
 
   private:
     static EC_GROUP* choose_group(size_t key_size_bits);

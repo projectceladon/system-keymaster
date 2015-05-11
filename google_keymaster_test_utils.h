@@ -182,9 +182,6 @@ class Keymaster1Test : public testing::Test {
 
     keymaster_error_t GetVersion(uint8_t* major, uint8_t* minor, uint8_t* subminor);
 
-    keymaster_error_t Rescope(const AuthorizationSet& new_params,
-                              keymaster_key_blob_t* rescoped_blob,
-                              keymaster_key_characteristics_t** rescoped_characteristics);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message);
     std::string ProcessMessage(keymaster_purpose_t purpose, const std::string& message,
                                const AuthorizationSet& begin_params,

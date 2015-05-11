@@ -50,13 +50,6 @@ class KeymasterEnforcement {
                                          const AuthorizationSet& auth_set, const uid_t uid);
 
     /**
-     * Ensures that all access control criteria are met for a rescope including added and deleted
-     * parameters. Returns KM_ERROR_OK if all criteria is met.
-     */
-    keymaster_error_t AuthorizeRescope(const AuthorizationSet& old_auth_set,
-                                       const AuthorizationSet& new_auth_set) const;
-
-    /**
      * This is maintained in system/core/include/cutiles/multiuser.h but copied here so that this
      * code can be reused without access to the core Android libs.
      */
@@ -107,8 +100,8 @@ class KeymasterEnforcement {
     keymaster_error_t UserAuthenticated(const keymaster_key_param_t param, const uid_t uid);
 
     /*
-     * Handles KM_TAG_RESCOPE_AUTH_TIMEOUT and KM_TAG_AUTH_TIMEOUT tags.  Returns KM_ERROR_OK if the
-     * last time the user authenticated is within the required freshness.
+     * Handles KM_TAG_AUTH_TIMEOUT tags.  Returns KM_ERROR_OK if the last time the user
+     * authenticated is within the required freshness.
      */
     keymaster_error_t AuthenticationIsFresh(const keymaster_key_param_t param,
                                             const time_t current_time) const;
@@ -141,18 +134,6 @@ class KeymasterEnforcement {
         /* Returns an iterator to the node with the keyid or end if not found. */
         List<access_time_struct>::iterator find(uint32_t keyid);
     };
-
-    /*
-     * Returns true if it is valid to delete tag from authSet. It is valid to be deleted if authSet
-     * contains a KM_TAG_RESCOPING_DEL parameter with tag as it's value.
-     */
-    bool valid_rescope_add(const AuthorizationSet& auth_set, const keymaster_tag_t tag) const;
-
-    /*
-     * Returns true if it is valid to add tag to the authSet. It is valid to be added if authSet
-     * contains a KM_TAG_RESCOPING_ADD parameter with tag as it's value.
-     */
-    bool valid_rescope_del(const AuthorizationSet& auth_set, const keymaster_tag_t tag) const;
 
     /*
      * Tests if the purpose is a valid member of keymaster_purpose_t and if the purpose is among

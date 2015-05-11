@@ -25,14 +25,12 @@ namespace keymaster {
 
 class RsaKeyFactory : public AsymmetricKeyFactory {
   public:
-    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_RSA; }
-    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
-    virtual Key* ImportKey(const AuthorizationSet& key_description,
-                           keymaster_key_format_t key_format, const uint8_t* key_data,
-                           size_t key_data_length, keymaster_error_t* error);
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
-    virtual Key* RescopeKey(const UnencryptedKeyBlob& blob,
-                            const AuthorizationSet& new_authorizations, keymaster_error_t* error);
+    keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_RSA; }
+    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
+    Key* ImportKey(const AuthorizationSet& key_description, keymaster_key_format_t key_format,
+                   const uint8_t* key_data, size_t key_data_length,
+                   keymaster_error_t* error) override;
+    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
 };
 
 class RsaOperationFactory;
@@ -45,9 +43,9 @@ class RsaKey : public AsymmetricKey {
     RsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
     RsaKey(RSA* rsa_key, const AuthorizationSet& auths) : AsymmetricKey(auths), rsa_key_(rsa_key) {}
 
-    virtual int evp_key_type() { return EVP_PKEY_RSA; }
-    virtual bool InternalToEvp(EVP_PKEY* pkey) const;
-    virtual bool EvpToInternal(const EVP_PKEY* pkey);
+    int evp_key_type() override { return EVP_PKEY_RSA; }
+    bool InternalToEvp(EVP_PKEY* pkey) const override;
+    bool EvpToInternal(const EVP_PKEY* pkey) override;
 
     bool SupportedMode(keymaster_purpose_t purpose, keymaster_padding_t padding);
     bool SupportedMode(keymaster_purpose_t purpose, keymaster_digest_t digest);
