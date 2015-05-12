@@ -148,6 +148,10 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         case KM_TAG_ASSOCIATED_DATA:
             return_error = KM_ERROR_OK;
             break;
+        default:
+            // TODO(swillden): remove this default case.
+            return_error = KM_ERROR_UNIMPLEMENTED;
+            break;
         }
 
         if (return_error != KM_ERROR_OK) {
