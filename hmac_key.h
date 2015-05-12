@@ -21,6 +21,14 @@
 
 namespace keymaster {
 
+class HmacKeyFactory : public SymmetricKeyFactory {
+  public:
+    keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_HMAC; }
+
+    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
+    SymmetricKey* CreateKey(const AuthorizationSet& auths) override;
+};
+
 class HmacKey : public SymmetricKey {
     static const size_t MAX_HMAC_KEY_SIZE = 256; /* Arbitrary limit, for DoS prevention */
 
@@ -29,7 +37,7 @@ class HmacKey : public SymmetricKey {
     HmacKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
 
   private:
-    virtual bool size_supported(size_t key_size) { return key_size < MAX_HMAC_KEY_SIZE; }
+    bool size_supported(size_t key_size) const override { return key_size < MAX_HMAC_KEY_SIZE; }
 };
 
 }  // namespace keymaster
