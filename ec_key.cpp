@@ -22,8 +22,6 @@
 
 namespace keymaster {
 
-static KeyFactoryRegistry::Registration<EcdsaKeyFactory> registration;
-
 Key* EcKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
     return new EcKey(blob, error);
 }

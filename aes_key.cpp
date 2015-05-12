@@ -26,16 +26,12 @@
 
 namespace keymaster {
 
-class AesKeyFactory : public SymmetricKeyFactory {
-  public:
-    keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_AES; }
+Key* AesKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+    return new AesKey(blob, error);
+}
 
-    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
-        return new AesKey(blob, error);
-    }
-
-    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths) { return new AesKey(auths); }
-};
-static KeyFactoryRegistry::Registration<AesKeyFactory> registration;
+SymmetricKey* AesKeyFactory::CreateKey(const AuthorizationSet& auths) {
+    return new AesKey(auths);
+}
 
 }  // namespace keymaster

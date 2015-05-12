@@ -70,7 +70,7 @@ class SymmetricKey : public Key {
 
     keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
     keymaster_error_t set_size(size_t key_size);
-    virtual bool size_supported(size_t key_size) = 0;
+    virtual bool size_supported(size_t key_size) const = 0;
 
     size_t key_data_size_;
     UniquePtr<uint8_t[]> key_data_;
