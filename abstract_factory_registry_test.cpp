@@ -140,6 +140,10 @@ TEST(RegistryTest, RegisterAndDeregisterTen) {
     EXPECT_TRUE(TestRegistry::instance_ptr == NULL);
 }
 
+template <typename Registry> void register_and_deregister_factory() {
+    TestRegistry::Registration<Registry> registration;
+}
+
 TEST(RegistryTest, DoubleRegister) {
     // Registry instance hasn't been created.
     EXPECT_TRUE(TestRegistry::instance_ptr == NULL);
@@ -156,7 +160,6 @@ TEST(RegistryTest, DoubleRegister) {
 
     // Register another with the same key.
     TestRegistry::Registration<TestFactory<1>> registration2;
-
     // Registry should have been deleted, and pointer zeroed
     EXPECT_TRUE(TestRegistry::instance_ptr == NULL);
 }

@@ -55,10 +55,7 @@ static const size_t DEFAULT_REGISTRY_CAPACITY = 8;
  *
  * 4.  Register each of the concrete factories by creating an instance of
  *     AbstractFactoryRegistry<AbstractFactory>::Registration<ConcreteFactory> for each concrete
- *     factory.  The best way to do this is to create static Registration instances at file scope in
- *     appropriate compilation units.  Their constructors will create and register the concrete
- *     factories during startup and their destructors will clean up during shutdown.  Registration
- *     is not new'able, specifically to discourage dynamic allocation.
+ *     factory.
  *
  * 5.  At run-time call Get() or GetAll() to retrieve AbstractFactory-typed pointers to the concrete
  *     factories, then use the factories.
@@ -100,13 +97,18 @@ template <typename AbstractFactoryType> class AbstractFactoryRegistry {
             AbstractFactoryRegistry::instance()->Register(factory_.get());
         }
 
+        template <typename Arg1Type>
+        Registration(Arg1Type arg1)
+            : factory_(new ConcreteFactoryType(arg1)) {
+            AbstractFactoryRegistry::instance()->Register(factory_.get());
+        }
+
         ~Registration() {
             if (instance_ptr)
                 instance_ptr->Deregister(factory_.get());
         }
 
       private:
-        void* operator new(size_t);  // Prevent heap allocation
         UniquePtr<ConcreteFactoryType> factory_;
     };
 
@@ -128,7 +130,7 @@ template <typename AbstractFactoryType> class AbstractFactoryRegistry {
 
     AbstractFactoryRegistry()
         : capacity_(DEFAULT_REGISTRY_CAPACITY), size_(0),
-          entries_(new AbstractFactoryType* [capacity_]) {}
+          entries_(new AbstractFactoryType*[capacity_]) {}
     ~AbstractFactoryRegistry() {
         assert(this == instance_ptr);
         instance_ptr = 0;
@@ -181,7 +183,7 @@ void AbstractFactoryRegistry<AbstractFactoryType>::Register(AbstractFactoryType*
 
     if (size_ == capacity_) {
         size_t new_capacity = capacity_ * 2;
-        UniquePtr<AbstractFactoryType* []> new_entries(new AbstractFactoryType* [new_capacity]);
+        UniquePtr<AbstractFactoryType* []> new_entries(new AbstractFactoryType*[new_capacity]);
         if (!new_entries.get()) {
             LOG_S("Tried to register multiple abstract factories for the same type", 0);
             return;
