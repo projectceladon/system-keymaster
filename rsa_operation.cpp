@@ -528,7 +528,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
         LOG_E("Error %d encrypting data with RSA", ERR_get_error());
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    assert(bytes_encrypted == RSA_size(rsa_key_));
+    assert(bytes_encrypted == (int)RSA_size(rsa_key_));
     output->advance_write(bytes_encrypted);
 
     return KM_ERROR_OK;
