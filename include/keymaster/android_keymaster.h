@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
-#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
+#ifndef SYSTEM_KEYMASTER_ANDROID_KEYMASTER_H_
+#define SYSTEM_KEYMASTER_ANDROID_KEYMASTER_H_
 
+#include <keymaster/android_keymaster_messages.h>
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster_messages.h>
 
 namespace keymaster {
 
@@ -27,11 +27,14 @@ class UnencryptedKeyBlob;
 class OperationTable;
 
 /**
- * OpenSSL-based Keymaster backing implementation, for use as a pure software implmentation
- * (softkeymaster) and in a trusted execution environment (TEE), like ARM TrustZone.  This class
- * doesn't actually implement the Keymaster HAL interface, instead it implements an alternative API
- * which is similar to and based upon the HAL, but uses C++ "message" classes which support
- * serialization.
+ * This is the reference implementation of Keymaster.  In addition to acting as a reference for
+ * other Keymaster implementers to check their assumptions against, it is used by Keystore as the
+ * default implementation when no secure implementation is available, and may be installed and
+ * executed in secure hardware as a secure implementation.
+ *
+ * Note that this class doesn't actually implement the Keymaster HAL interface, instead it
+ * implements an alternative API which is similar to and based upon the HAL, but uses C++ "message"
+ * classes which support serialization.
  *
  * For non-secure, pure software implementation there is a HAL translation layer that converts the
  * HAL's parameters to and from the message representations, which are then passed in to this
@@ -41,10 +44,10 @@ class OperationTable;
  * the TEE. In the TEE implementation there's another component which deserializes the messages,
  * extracts the relevant parameters and calls this API.
  */
-class GoogleKeymaster {
+class AndroidKeymaster {
   public:
-    GoogleKeymaster(size_t operation_table_size);
-    virtual ~GoogleKeymaster();
+    AndroidKeymaster(size_t operation_table_size);
+    virtual ~AndroidKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
     void SupportedBlockModes(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
@@ -100,4 +103,4 @@ class GoogleKeymaster {
 
 }  // namespace keymaster
 
-#endif  //  SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_H_
+#endif  //  SYSTEM_KEYMASTER_ANDROID_KEYMASTER_H_

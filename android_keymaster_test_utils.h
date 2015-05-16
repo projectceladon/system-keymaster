@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_TEST_UTILS_H_
-#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_TEST_UTILS_H_
+#ifndef SYSTEM_KEYMASTER_ANDROID_KEYMASTER_TEST_UTILS_H_
+#define SYSTEM_KEYMASTER_ANDROID_KEYMASTER_TEST_UTILS_H_
 
 /*
  * Utilities used to help with testing.  Not used in production code.
@@ -286,4 +286,4 @@ class Keymaster1Test : public testing::Test {
 }  // namespace test
 }  // namespace keymaster
 
-#endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_TEST_UTILS_H_
+#endif  // SYSTEM_KEYMASTER_ANDROID_KEYMASTER_TEST_UTILS_H_

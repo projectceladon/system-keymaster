@@ -17,9 +17,9 @@
 #include <gtest/gtest.h>
 
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 
-#include "google_keymaster_test_utils.h"
+#include "android_keymaster_test_utils.h"
 
 namespace keymaster {
 

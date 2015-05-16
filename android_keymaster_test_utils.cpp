@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "google_keymaster_test_utils.h"
+#include "android_keymaster_test_utils.h"
 
 #include <algorithm>
 
 #include <openssl/rand.h>
 
-#include <keymaster/google_keymaster_messages.h>
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_messages.h>
+#include <keymaster/android_keymaster_utils.h>
 
 using std::is_permutation;
 using std::ostream;

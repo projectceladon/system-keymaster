@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
-#define SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
+#ifndef SYSTEM_KEYMASTER_ANDROID_SOFT_KEYMASTER_H_
+#define SYSTEM_KEYMASTER_ANDROID_SOFT_KEYMASTER_H_
 
-#include <keymaster/google_keymaster.h>
+#include <keymaster/android_keymaster.h>
 
 #include <openssl/rand.h>
 
@@ -25,9 +25,9 @@
 
 namespace keymaster {
 
-class GoogleSoftKeymaster : public GoogleKeymaster {
+class AndroidSoftKeymaster : public AndroidKeymaster {
   public:
-    GoogleSoftKeymaster(size_t operation_table_size) : GoogleKeymaster(operation_table_size) {
+    AndroidSoftKeymaster(size_t operation_table_size) : AndroidKeymaster(operation_table_size) {
         root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
         root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("SW");
         root_of_trust.blob.data_length = 2;
@@ -61,8 +61,8 @@ class GoogleSoftKeymaster : public GoogleKeymaster {
     keymaster_key_param_t root_of_trust;
 };
 
-uint8_t GoogleSoftKeymaster::master_key_[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t AndroidSoftKeymaster::master_key_[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 }  // namespace
 
-#endif  // SYSTEM_KEYMASTER_GOOGLE_SOFT_KEYMASTER_H_
+#endif  // SYSTEM_KEYMASTER_ANDROID_SOFT_KEYMASTER_H_

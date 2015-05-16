@@ -18,7 +18,7 @@
 
 #include <errno.h>
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster.h>
+#include <keymaster/android_keymaster.h>
 #include <stdio.h>
 #include <time.h>
 
