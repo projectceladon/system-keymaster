@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
-#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
+#ifndef SYSTEM_KEYMASTER_ANDROID_KEYMASTER_UTILS_H_
+#define SYSTEM_KEYMASTER_ANDROID_KEYMASTER_UTILS_H_
 
 #include <stdint.h>
 #include <string.h>
@@ -208,4 +208,4 @@ template <typename T> T hton(T t) {
 
 }  // namespace keymaster
 
-#endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_UTILS_H_
+#endif  // SYSTEM_KEYMASTER_ANDROID_KEYMASTER_UTILS_H_

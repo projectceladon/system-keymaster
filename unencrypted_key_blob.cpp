@@ -19,7 +19,7 @@
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 
 #include "ae.h"
 #include "unencrypted_key_blob.h"

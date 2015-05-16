@@ -21,7 +21,7 @@
 
 #include <hardware/keymaster1.h>
 
-#include <keymaster/google_keymaster.h>
+#include <keymaster/android_keymaster.h>
 #include <keymaster/logger.h>
 
 #include <UniquePtr.h>
@@ -147,7 +147,7 @@ class SoftKeymasterDevice {
                                    keymaster_operation_handle_t operation_handle);
 
     keymaster1_device_t device_;
-    UniquePtr<GoogleKeymaster> impl_;
+    UniquePtr<AndroidKeymaster> impl_;
 };
 
 }  // namespace keymaster

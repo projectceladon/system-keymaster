@@ -16,7 +16,7 @@
 
 #include <assert.h>
 
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/key_blob.h>
 #include <keymaster/logger.h>
 

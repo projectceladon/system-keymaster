@@ -22,11 +22,11 @@
 
 #include <hardware/keymaster0.h>
 
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
 #include <keymaster/soft_keymaster_device.h>
 
-#include "google_keymaster_test_utils.h"
+#include "android_keymaster_test_utils.h"
 
 using std::ifstream;
 using std::istreambuf_iterator;
@@ -1143,7 +1143,7 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 1024));
     EXPECT_TRUE(contains(sw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 65537U));
 
-    // And values provided by GoogleKeymaster
+    // And values provided by AndroidKeymaster
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
@@ -1212,7 +1212,7 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 256));
 
-    // And values provided by GoogleKeymaster
+    // And values provided by AndroidKeymaster
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
@@ -1234,7 +1234,7 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 256));
 
-    // And values provided by GoogleKeymaster
+    // And values provided by AndroidKeymaster
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
