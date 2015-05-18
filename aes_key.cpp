@@ -22,16 +22,20 @@
 #include <openssl/rand.h>
 
 #include "aes_operation.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
-Key* AesKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
-    return new AesKey(blob, error);
-}
+keymaster_error_t AesKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
+                                         const AuthorizationSet& hw_enforced,
+                                         const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) {
+    if (!key)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-SymmetricKey* AesKeyFactory::CreateKey(const AuthorizationSet& auths) {
-    return new AesKey(auths);
+    keymaster_error_t error = KM_ERROR_OK;
+    key->reset(new AesKey(key_material, hw_enforced, sw_enforced, &error));
+    if (!key->get())
+        error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return error;
 }
 
 }  // namespace keymaster

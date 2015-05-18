@@ -25,22 +25,25 @@ namespace keymaster {
 
 class AesKeyFactory : public SymmetricKeyFactory {
   public:
+    AesKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
+
     keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_AES; }
 
-    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
-    SymmetricKey* CreateKey(const AuthorizationSet& auths) override;
+    keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
+                              const AuthorizationSet& hw_enforced,
+                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
+
+  private:
+    bool key_size_supported(size_t key_size_bits) const override {
+        return key_size_bits == 128 || key_size_bits == 192 || key_size_bits == 256;
+    }
 };
 
 class AesKey : public SymmetricKey {
   public:
-    AesKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
-    AesKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
-
-  private:
-    bool size_supported(size_t key_size) const override {
-        // AES keys only come in three sizes, 128, 192 and 256 bits.
-        return key_size == 128 / 8 || key_size == 192 / 8 || key_size == 256 / 8;
-    }
+    AesKey(const KeymasterKeyBlob& key_material, const AuthorizationSet& hw_enforced,
+           const AuthorizationSet& sw_enforced, keymaster_error_t* error)
+        : SymmetricKey(key_material, hw_enforced, sw_enforced, error) {}
 };
 
 }  // namespace keymaster

@@ -23,7 +23,7 @@
 namespace keymaster {
 
 class Key;
-class UnencryptedKeyBlob;
+class KeymasterContext;
 class OperationTable;
 
 /**
@@ -46,7 +46,7 @@ class OperationTable;
  */
 class AndroidKeymaster {
   public:
-    AndroidKeymaster(size_t operation_table_size);
+    AndroidKeymaster(KeymasterContext* context, size_t operation_table_size);
     virtual ~AndroidKeymaster();
 
     void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
@@ -61,7 +61,7 @@ class AndroidKeymaster {
     void SupportedExportFormats(keymaster_algorithm_t algorithm,
                                 SupportedResponse<keymaster_key_format_t>* response) const;
 
-    virtual keymaster_error_t AddRngEntropy(const AddEntropyRequest& request) = 0;
+    keymaster_error_t AddRngEntropy(const AddEntropyRequest& request);
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
@@ -74,30 +74,12 @@ class AndroidKeymaster {
     void GetVersion(const GetVersionRequest& request, GetVersionResponse* response);
 
   private:
-    virtual bool is_enforced(keymaster_tag_t tag) = 0;
-    virtual bool is_hardware() = 0;
-    virtual keymaster_key_param_t RootOfTrustTag() = 0;
-    virtual keymaster_key_blob_t MasterKey() = 0;
-    virtual void GenerateNonce(uint8_t* nonce, size_t length) = 0;
+    keymaster_error_t LoadKey(const keymaster_key_blob_t& key_blob,
+                              const AuthorizationSet& additional_params,
+                              AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced,
+                              keymaster_algorithm_t* algorithm, UniquePtr<Key>* key);
 
-    keymaster_error_t SerializeKey(const Key* key, keymaster_key_origin_t origin,
-                                   keymaster_key_blob_t* keymaster_blob, AuthorizationSet* enforced,
-                                   AuthorizationSet* unenforced);
-    Key* LoadKey(const keymaster_key_blob_t& key, const AuthorizationSet& client_params,
-                 keymaster_algorithm_t* algorithm, keymaster_error_t* error);
-    UnencryptedKeyBlob* LoadKeyBlob(const keymaster_key_blob_t& key,
-                                    const AuthorizationSet& client_params,
-                                    keymaster_error_t* error);
-
-    keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
-                                        keymaster_key_origin_t origin, AuthorizationSet* enforced,
-                                        AuthorizationSet* unenforced);
-    keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                AuthorizationSet* hidden);
-
-    void AddAuthorization(const keymaster_key_param_t& auth, AuthorizationSet* enforced,
-                          AuthorizationSet* unenforced);
-
+    UniquePtr<KeymasterContext> context_;
     UniquePtr<OperationTable> operation_table_;
 };
 
