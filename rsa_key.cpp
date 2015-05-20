@@ -81,9 +81,29 @@ keymaster_error_t RsaKeyFactory::ImportKey(const AuthorizationSet& key_descripti
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
+    AuthorizationSet authorizations;
+    uint64_t public_exponent;
+    uint32_t key_size;
     keymaster_error_t error =
-        KeyMaterialToEvpKey(input_key_material_format, input_key_material, &pkey);
+        UpdateImportKeyDescription(key_description, input_key_material_format, input_key_material,
+                                   &authorizations, &public_exponent, &key_size);
+    if (error != KM_ERROR_OK)
+        return error;
+    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
+                                   output_key_blob, hw_enforced, sw_enforced);
+}
+
+keymaster_error_t RsaKeyFactory::UpdateImportKeyDescription(const AuthorizationSet& key_description,
+                                                            keymaster_key_format_t key_format,
+                                                            const KeymasterKeyBlob& key_material,
+                                                            AuthorizationSet* updated_description,
+                                                            uint64_t* public_exponent,
+                                                            uint32_t* key_size) {
+    if (!updated_description || !public_exponent || !key_size)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
+    keymaster_error_t error = KeyMaterialToEvpKey(key_format, key_material, &pkey);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -91,44 +111,29 @@ keymaster_error_t RsaKeyFactory::ImportKey(const AuthorizationSet& key_descripti
     if (!rsa_key.get())
         return TranslateLastOpenSslError();
 
-    AuthorizationSet authorizations(key_description);
+    updated_description->Reinitialize(key_description);
 
-    uint64_t public_exponent;
-    if (authorizations.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent)) {
-        // public_exponent specified, make sure it matches the key
-        UniquePtr<BIGNUM, BIGNUM_Delete> public_exponent_bn(BN_new());
-        if (!BN_set_word(public_exponent_bn.get(), public_exponent))
-            return KM_ERROR_UNKNOWN_ERROR;
-        if (BN_cmp(public_exponent_bn.get(), rsa_key->e) != 0)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-    } else {
-        // public_exponent not specified, use the one from the key.
-        public_exponent = BN_get_word(rsa_key->e);
-        if (public_exponent == 0xffffffffL)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-        authorizations.push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
-    }
+    *public_exponent = BN_get_word(rsa_key->e);
+    if (*public_exponent == 0xffffffffL)
+        return KM_ERROR_INVALID_KEY_BLOB;
+    if (!updated_description->GetTagValue(TAG_RSA_PUBLIC_EXPONENT, public_exponent))
+        updated_description->push_back(TAG_RSA_PUBLIC_EXPONENT, *public_exponent);
+    if (*public_exponent != BN_get_word(rsa_key->e))
+        return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
 
-    uint32_t key_size;
-    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
-        // key_size specified, make sure it matches the key.
-        if (RSA_size(rsa_key.get()) * 8 != (openssl_size_t)key_size)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-    } else {
-        key_size = RSA_size(rsa_key.get()) * 8;
-        authorizations.push_back(TAG_KEY_SIZE, key_size);
-    }
+    *key_size = RSA_size(rsa_key.get()) * 8;
+    if (!updated_description->GetTagValue(TAG_KEY_SIZE, key_size))
+        updated_description->push_back(TAG_KEY_SIZE, *key_size);
+    if (RSA_size(rsa_key.get()) * 8 != (openssl_size_t)*key_size)
+        return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
 
-    keymaster_algorithm_t algorithm;
-    if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
-        if (algorithm != KM_ALGORITHM_RSA)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-    } else {
-        authorizations.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-    }
+    keymaster_algorithm_t algorithm = KM_ALGORITHM_RSA;
+    if (!updated_description->GetTagValue(TAG_ALGORITHM, &algorithm))
+        updated_description->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+    if (algorithm != KM_ALGORITHM_RSA)
+        return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
 
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
-                                   output_key_blob, hw_enforced, sw_enforced);
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t RsaKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforced,

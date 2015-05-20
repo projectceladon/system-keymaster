@@ -67,6 +67,8 @@ class AndroidKeymaster {
                                GetKeyCharacteristicsResponse* response);
     void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
     void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
+    keymaster_error_t DeleteKey(const DeleteKeyRequest& request);
+    keymaster_error_t DeleteAllKeys();
     void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);
     void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);

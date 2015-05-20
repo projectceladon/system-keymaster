@@ -370,6 +370,22 @@ bool ExportKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8
     return true;
 }
 
+void DeleteKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
+    set_key_blob(&key_blob, key_material, length);
+}
+
+size_t DeleteKeyRequest::SerializedSize() const {
+    return key_blob_size(key_blob);
+}
+
+uint8_t* DeleteKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
+    return serialize_key_blob(key_blob, buf, end);
+}
+
+bool DeleteKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    return deserialize_key_blob(&key_blob, buf_ptr, end);
+}
+
 size_t GetVersionResponse::NonErrorSerializedSize() const {
     return sizeof(major_ver) + sizeof(minor_ver) + sizeof(subminor_ver);
 }

@@ -56,7 +56,7 @@ namespace keymaster {
 class KeymasterContext {
   public:
     KeymasterContext() {}
-    virtual ~KeymasterContext() {};
+    virtual ~KeymasterContext(){};
 
     /**
      * CreateKeyBlob takes authorization sets and key material and produces a key blob and hardware
@@ -84,6 +84,19 @@ class KeymasterContext {
                                            KeymasterKeyBlob* key_material,
                                            AuthorizationSet* hw_enforced,
                                            AuthorizationSet* sw_enforced) const = 0;
+
+    /**
+     * Take whatever environment-specific action is appropriate (if any) to delete the specified
+     * key.
+     */
+    virtual keymaster_error_t DeleteKey(const KeymasterKeyBlob& /* blob */) const {
+        return KM_ERROR_OK;
+    }
+
+    /**
+     * Take whatever environment-specific action is appropriate to delete all keys.
+     */
+    virtual keymaster_error_t DeleteAllKeys() const { return KM_ERROR_OK; }
 
     /**
      * Adds entropy to the Cryptographic Pseudo Random Number Generator used to generate key

@@ -17,8 +17,10 @@
 #ifndef SYSTEM_KEYMASTER_OPENSSL_UTILS_H_
 #define SYSTEM_KEYMASTER_OPENSSL_UTILS_H_
 
-#include <openssl/evp.h>
 #include <openssl/bn.h>
+#include <openssl/evp.h>
+#include <openssl/ec.h>
+#include <openssl/rsa.h>
 #include <openssl/x509.h>
 
 #include <UniquePtr.h>
@@ -37,6 +39,10 @@ struct BIGNUM_Delete {
 
 struct PKCS8_PRIV_KEY_INFO_Delete {
     void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
+};
+
+struct RSA_Delete {
+    void operator()(RSA* p) { RSA_free(p); }
 };
 
 /**

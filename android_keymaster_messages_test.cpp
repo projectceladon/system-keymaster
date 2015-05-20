@@ -397,6 +397,17 @@ TEST(RoundTrip, ExportKeyResponse) {
     }
 }
 
+TEST(RoundTrip, DeleteKeyRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        DeleteKeyRequest msg(ver);
+        msg.SetKeyMaterial("foo", 3);
+
+        UniquePtr<DeleteKeyRequest> deserialized(round_trip(ver, msg, 7));
+        EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+        EXPECT_EQ(0, memcmp("foo", deserialized->key_blob.key_material, 3));
+    }
+}
+
 TEST(RoundTrip, GetVersionRequest) {
     GetVersionRequest msg;
 
@@ -509,6 +520,7 @@ GARBAGE_TEST(ImportKeyRequest);
 GARBAGE_TEST(ImportKeyResponse);
 GARBAGE_TEST(ExportKeyRequest);
 GARBAGE_TEST(ExportKeyResponse);
+GARBAGE_TEST(DeleteKeyRequest);
 
 // The macro doesn't work on this one.
 TEST(GarbageTest, SupportedResponse) {

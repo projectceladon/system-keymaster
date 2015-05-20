@@ -235,10 +235,6 @@ class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
 
 static OperationFactoryRegistry::Registration<RsaDecryptionOperationFactory> decrypt_registration;
 
-struct RSA_Delete {
-    void operator()(RSA* p) const { RSA_free(p); }
-};
-
 RsaOperation::~RsaOperation() {
     if (rsa_key_ != NULL)
         RSA_free(rsa_key_);
