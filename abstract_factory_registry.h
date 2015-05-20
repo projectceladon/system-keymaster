@@ -93,13 +93,9 @@ template <typename AbstractFactoryType> class AbstractFactoryRegistry {
      */
     template <typename ConcreteFactoryType> class Registration {
       public:
-        Registration() : factory_(new ConcreteFactoryType) {
-            AbstractFactoryRegistry::instance()->Register(factory_.get());
-        }
-
-        template <typename Arg1Type>
-        Registration(Arg1Type arg1)
-            : factory_(new ConcreteFactoryType(arg1)) {
+        template <typename... Args>
+        Registration(Args... args)
+            : factory_(new ConcreteFactoryType(args...)) {
             AbstractFactoryRegistry::instance()->Register(factory_.get());
         }
 
@@ -202,7 +198,6 @@ void AbstractFactoryRegistry<AbstractFactoryType>::Deregister(AbstractFactoryTyp
     // the more general case of out-of-order deregistrations in the code, but these assertions will
     // tell us if something is wrong.
     assert(size_ > 0);
-    assert(entry->registry_key() == entries_[size_ - 1]->registry_key());
 
     for (int i = size_ - 1; i >= 0; --i) {
         if (entries_[i]->registry_key() == entry->registry_key()) {

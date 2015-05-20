@@ -19,9 +19,11 @@
 
 #include <stdlib.h>
 
+#include <hardware/keymaster0.h>
 #include <hardware/keymaster1.h>
 
 #include <keymaster/android_keymaster.h>
+#include <keymaster/keymaster_context.h>
 #include <keymaster/logger.h>
 
 #include <UniquePtr.h>
@@ -31,7 +33,10 @@ namespace keymaster {
 class AuthorizationSet;
 
 /**
- * Software OpenSSL-based Keymaster implementation.
+ * Keymaster1 device implementation.
+ *
+ * This is a hybrid software/hardware implementation which wraps a keymaster0_device_t, forwarding
+ * RSA operations to secure hardware and doing everything else in software.
  *
  * IMPORTANT MAINTAINER NOTE: Pointers to instances of this class must be castable to hw_device_t
  * and keymaster_device. This means it must remain a standard layout class (no virtual functions and
@@ -40,7 +45,7 @@ class AuthorizationSet;
  */
 class SoftKeymasterDevice {
   public:
-    SoftKeymasterDevice();
+    SoftKeymasterDevice(keymaster0_device_t* keymaster0_device = nullptr);
 
     hw_device_t* hw_device();
     keymaster1_device_t* keymaster_device();
@@ -74,6 +79,9 @@ class SoftKeymasterDevice {
     static int get_keypair_public(const keymaster1_device_t* dev, const uint8_t* key_blob,
                                   const size_t key_blob_length, uint8_t** x509_data,
                                   size_t* x509_data_length);
+    static int delete_keypair(const struct keymaster1_device* dev, const uint8_t* key_blob,
+                              const size_t key_blob_length);
+    static int delete_all(const struct keymaster1_device* dev);
     static int sign_data(const keymaster1_device_t* dev, const void* signing_params,
                          const uint8_t* key_blob, const size_t key_blob_length, const uint8_t* data,
                          const size_t data_length, uint8_t** signed_data,
@@ -130,6 +138,9 @@ class SoftKeymasterDevice {
     export_key(const keymaster1_device_t* dev, keymaster_key_format_t export_format,
                const keymaster_key_blob_t* key_to_export, const keymaster_blob_t* client_id,
                const keymaster_blob_t* app_data, uint8_t** export_data, size_t* export_data_length);
+    static keymaster_error_t delete_key(const struct keymaster1_device* dev,
+                                        const keymaster_key_blob_t* key);
+    static keymaster_error_t delete_all_keys(const struct keymaster1_device* dev);
     static keymaster_error_t begin(const keymaster1_device_t* dev, keymaster_purpose_t purpose,
                                    const keymaster_key_blob_t* key,
                                    const keymaster_key_param_t* params, size_t params_count,

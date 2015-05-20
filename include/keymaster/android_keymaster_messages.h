@@ -378,6 +378,25 @@ struct ExportKeyResponse : public KeymasterResponse {
     size_t key_data_length;
 };
 
+struct DeleteKeyRequest : public KeymasterMessage {
+    DeleteKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
+        key_blob.key_material = nullptr;
+        key_blob.key_material_size = 0;
+    }
+    ~DeleteKeyRequest() { delete[] key_blob.key_material; }
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t SerializedSize() const;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end);
+
+    keymaster_key_blob_t key_blob;
+};
+
 struct GetVersionRequest : public KeymasterMessage {
     GetVersionRequest() : KeymasterMessage(0 /* not versionable */) {}
 

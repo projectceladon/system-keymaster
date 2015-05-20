@@ -19,23 +19,26 @@
 
 #include <memory>
 
+#include <hardware/keymaster0.h>
 #include <keymaster/keymaster_context.h>
 
 namespace keymaster {
 
 class SoftKeymasterKeyRegistrations;
+class Keymaster0Engine;
 
 /**
  * SoftKeymasterContext provides the context for a non-secure implementation of AndroidKeymaster.
  */
 class SoftKeymasterContext : public KeymasterContext {
   public:
-    SoftKeymasterContext();
+    SoftKeymasterContext(keymaster0_device_t* keymaster0_device);
 
     keymaster_error_t CreateKeyBlob(const AuthorizationSet& auths, keymaster_key_origin_t origin,
                                     const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
                                     AuthorizationSet* hw_enforced,
                                     AuthorizationSet* sw_enforced) const override;
+
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
                                    KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
@@ -44,6 +47,7 @@ class SoftKeymasterContext : public KeymasterContext {
     keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const override;
 
   private:
+    std::unique_ptr<Keymaster0Engine> engine_;
     std::unique_ptr<SoftKeymasterKeyRegistrations> registrations_;
 };
 

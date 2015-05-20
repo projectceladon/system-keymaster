@@ -31,6 +31,7 @@
 
 #include <gtest/gtest.h>
 
+#include <hardware/keymaster0.h>
 #include <hardware/keymaster1.h>
 #include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
@@ -155,6 +156,10 @@ class Keymaster1TestInstanceCreator {
   public:
     virtual ~Keymaster1TestInstanceCreator(){};
     virtual keymaster1_device_t* CreateDevice() const = 0;
+
+    virtual bool crypto_params_in_hardware(keymaster_algorithm_t algorithm) const = 0;
+    virtual bool expect_keymaster0_calls() const = 0;
+    virtual int keymaster0_calls() const = 0;
 };
 
 // Use a shared_ptr because it's copyable.
@@ -295,6 +300,110 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
 
     keymaster_key_blob_t blob_;
     keymaster_key_characteristics_t* characteristics_;
+};
+
+struct Keymaster0CountingWrapper : public keymaster0_device_t {
+    Keymaster0CountingWrapper(keymaster0_device_t* device) : device_(device), counter_(0) {
+        common = device_->common;
+        common.close = counting_close_device;
+        client_version = device_->client_version;
+        flags = device_->flags;
+        context = this;
+
+        generate_keypair = counting_generate_keypair;
+        import_keypair = counting_import_keypair;
+        get_keypair_public = counting_get_keypair_public;
+        delete_keypair = counting_delete_keypair;
+        delete_all = counting_delete_all;
+        sign_data = counting_sign_data;
+        verify_data = counting_verify_data;
+    }
+
+    int count() { return counter_; }
+
+    static keymaster0_device_t* device(const keymaster0_device_t* dev) {
+        Keymaster0CountingWrapper* wrapper =
+            reinterpret_cast<Keymaster0CountingWrapper*>(dev->context);
+        return wrapper->device_;
+    }
+
+    static void increment(const keymaster0_device_t* dev) {
+        Keymaster0CountingWrapper* wrapper =
+            reinterpret_cast<Keymaster0CountingWrapper*>(dev->context);
+        wrapper->counter_++;
+    }
+
+    static int counting_close_device(hw_device_t* dev) {
+        keymaster0_device_t* k0_dev = reinterpret_cast<keymaster0_device_t*>(dev);
+        increment(k0_dev);
+        Keymaster0CountingWrapper* wrapper =
+            reinterpret_cast<Keymaster0CountingWrapper*>(k0_dev->context);
+        int retval =
+            wrapper->device_->common.close(reinterpret_cast<hw_device_t*>(wrapper->device_));
+        delete wrapper;
+        return retval;
+    }
+
+    static int counting_generate_keypair(const struct keymaster0_device* dev,
+                                         const keymaster_keypair_t key_type, const void* key_params,
+                                         uint8_t** key_blob, size_t* key_blob_length) {
+        increment(dev);
+        return device(dev)
+            ->generate_keypair(device(dev), key_type, key_params, key_blob, key_blob_length);
+    }
+
+    static int counting_import_keypair(const struct keymaster0_device* dev, const uint8_t* key,
+                                       const size_t key_length, uint8_t** key_blob,
+                                       size_t* key_blob_length) {
+        increment(dev);
+        return device(dev)->import_keypair(device(dev), key, key_length, key_blob, key_blob_length);
+    }
+
+    static int counting_get_keypair_public(const struct keymaster0_device* dev,
+                                           const uint8_t* key_blob, const size_t key_blob_length,
+                                           uint8_t** x509_data, size_t* x509_data_length) {
+        increment(dev);
+        return device(dev)->get_keypair_public(device(dev), key_blob, key_blob_length, x509_data,
+                                               x509_data_length);
+    }
+
+    static int counting_delete_keypair(const struct keymaster0_device* dev, const uint8_t* key_blob,
+                                       const size_t key_blob_length) {
+        increment(dev);
+        if (device(dev)->delete_keypair)
+            return device(dev)->delete_keypair(device(dev), key_blob, key_blob_length);
+        return 0;
+    }
+
+    static int counting_delete_all(const struct keymaster0_device* dev) {
+        increment(dev);
+        if (device(dev)->delete_all)
+            return device(dev)->delete_all(device(dev));
+        return 0;
+    }
+
+    static int counting_sign_data(const struct keymaster0_device* dev, const void* signing_params,
+                                  const uint8_t* key_blob, const size_t key_blob_length,
+                                  const uint8_t* data, const size_t data_length,
+                                  uint8_t** signed_data, size_t* signed_data_length) {
+        increment(dev);
+        return device(dev)->sign_data(device(dev), signing_params, key_blob, key_blob_length, data,
+                                      data_length, signed_data, signed_data_length);
+    }
+
+    static int counting_verify_data(const struct keymaster0_device* dev, const void* signing_params,
+                                    const uint8_t* key_blob, const size_t key_blob_length,
+                                    const uint8_t* signed_data, const size_t signed_data_length,
+                                    const uint8_t* signature, const size_t signature_length) {
+        increment(dev);
+        return device(dev)->verify_data(device(dev), signing_params, key_blob, key_blob_length,
+                                        signed_data, signed_data_length, signature,
+                                        signature_length);
+    }
+
+  private:
+    keymaster0_device_t* device_;
+    int counter_;
 };
 
 }  // namespace test
