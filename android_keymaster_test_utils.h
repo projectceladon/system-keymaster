@@ -24,6 +24,7 @@
 #include <stdarg.h>
 
 #include <algorithm>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -144,13 +145,26 @@ template <size_t N> std::string make_string(const uint8_t(&a)[N]) {
     return make_string(a, N);
 }
 
+/**
+ * Keymaster1TestInstance is used to parameterize Keymaster1Tests.  Its main function is to create a
+ * keymaster1_device_t to which test calls can be directed.  It also provides a place to specify
+ * various bits of alternative behavior, in cases where different devices are expected to behave
+ * differently (any such cases are a potential bug, but sometimes they may make sense).
+ */
+class Keymaster1TestInstanceCreator {
+  public:
+    virtual ~Keymaster1TestInstanceCreator(){};
+    virtual keymaster1_device_t* CreateDevice() const = 0;
+};
+
+// Use a shared_ptr because it's copyable.
+typedef std::shared_ptr<Keymaster1TestInstanceCreator> InstanceCreatorPtr;
+
 const uint64_t OP_HANDLE_SENTINEL = 0xFFFFFFFFFFFFFFFF;
-class Keymaster1Test : public testing::Test {
+class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
   protected:
     Keymaster1Test();
     ~Keymaster1Test();
-
-    void init(keymaster1_device_t* device) { device_ = device; }
 
     keymaster1_device_t* device();
 

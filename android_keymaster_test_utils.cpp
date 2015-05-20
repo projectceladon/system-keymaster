@@ -151,11 +151,11 @@ std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set) {
 
 namespace test {
 
-Keymaster1Test::Keymaster1Test()
-    : device_(NULL), op_handle_(OP_HANDLE_SENTINEL), characteristics_(NULL) {
+Keymaster1Test::Keymaster1Test() : op_handle_(OP_HANDLE_SENTINEL), characteristics_(NULL) {
     blob_.key_material = NULL;
     RAND_seed("foobar", 6);
     blob_.key_material = 0;
+    device_ = GetParam()->CreateDevice();
 }
 
 Keymaster1Test::~Keymaster1Test() {
