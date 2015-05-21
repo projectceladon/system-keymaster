@@ -25,29 +25,24 @@
 
 namespace keymaster {
 
-// Rfc5869Sha256Kdf implements the key derivation function specified in RFC 5869 (using
-// SHA256) and outputs key material, as needed by ECIES.
-// See https://tools.ietf.org/html/rfc5869 for details.
+/**
+ * Rfc5869Sha256Kdf implements the key derivation function specified in RFC 5869 (using SHA256) and
+ * outputs key material, as needed by ECIES. See https://tools.ietf.org/html/rfc5869 for details.
+ */
 class Rfc5869Sha256Kdf : public Kdf {
   public:
-    Rfc5869Sha256Kdf() : initalized_(false) {}
     ~Rfc5869Sha256Kdf() {}
-
-    // Kdf interface.
-    bool Init(Buffer& secret, Buffer& salt, Buffer& info, size_t key_bytes_to_generate);
-
-    bool Init(const uint8_t* secret, size_t secret_len, const uint8_t* salt, size_t salt_len,
-              const uint8_t* info, size_t info_len, size_t key_bytes_to_generate);
-
-    bool secret_key(Buffer* buf) const {
-        return initalized_ && buf->Reinitialize(secret_key_.get(), secret_key_len_);
+    bool Init(Buffer& secret, Buffer& salt) {
+        return Init(secret.peek_read(), secret.available_read(), salt.peek_read(),
+                    salt.available_read());
     }
 
-  private:
-    bool initalized_;
-    UniquePtr<uint8_t[]> output_;
-    UniquePtr<uint8_t[]> secret_key_;
-    size_t secret_key_len_;
+    bool Init(const uint8_t* secret, size_t secret_len, const uint8_t* salt, size_t salt_len) {
+        return Kdf::Init(KM_DIGEST_SHA_2_256, secret, secret_len, salt, salt_len);
+    }
+
+    bool GenerateKey(const uint8_t* info, size_t info_len, uint8_t* output,
+                     size_t output_len) override;
 };
 
 }  // namespace keymaster

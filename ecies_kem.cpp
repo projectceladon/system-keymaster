@@ -88,12 +88,12 @@ bool EciesKem::Encrypt(const uint8_t* peer_public_value, size_t peer_public_valu
     }
 
     Buffer shared_secret;
-    if (!key_exchange_.get()->CalculateSharedKey(peer_public_value, peer_public_value_len,
-                                                 &shared_secret)) {
+    if (!key_exchange_->CalculateSharedKey(peer_public_value, peer_public_value_len,
+                                           &shared_secret)) {
         LOG_E("EciesKem: ECDH failed, can't obtain shared secret", 0);
         return false;
     }
-    if (!key_exchange_.get()->public_value(output_encrypted_key)) {
+    if (!key_exchange_->public_value(output_encrypted_key)) {
         LOG_E("EciesKem: Can't obtain public value", 0);
         return false;
     }
@@ -111,16 +111,17 @@ bool EciesKem::Encrypt(const uint8_t* peer_public_value, size_t peer_public_valu
     actual_secret.write(shared_secret.peek_read(), shared_secret.available_read());
 
     if (!kdf_->Init(actual_secret.peek_read(), actual_secret.available_read(), nullptr /* salt */,
-                    0 /* salt_len */, nullptr /* info */, 0 /* info_len */,
-                    key_bytes_to_generate_)) {
+                    0 /* salt_len */)) {
         LOG_E("EciesKem: KDF failed, can't derived keys", 0);
         return false;
     }
-
-    if (!kdf_.get()->secret_key(output_clear_key)) {
+    output_clear_key->Reinitialize(key_bytes_to_generate_);
+    if (!kdf_->GenerateKey(nullptr /* info */, 0 /* info length */, output_clear_key->peek_write(),
+                           key_bytes_to_generate_)) {
         LOG_E("EciesKem: KDF failed, can't derived keys", 0);
         return false;
     }
+    output_clear_key->advance_write(key_bytes_to_generate_);
 
     return true;
 }
@@ -141,14 +142,13 @@ bool EciesKem::Decrypt(EC_KEY* private_key, const uint8_t* encrypted_key, size_t
     }
 
     Buffer shared_secret;
-    if (!key_exchange_.get()->CalculateSharedKey(encrypted_key, encrypted_key_len,
-                                                 &shared_secret)) {
+    if (!key_exchange_->CalculateSharedKey(encrypted_key, encrypted_key_len, &shared_secret)) {
         LOG_E("EciesKem: ECDH failed, can't obtain shared secret", 0);
         return false;
     }
 
     Buffer public_value;
-    if (!key_exchange_.get()->public_value(&public_value)) {
+    if (!key_exchange_->public_value(&public_value)) {
         LOG_E("%s", "EciesKem: Can't obtain public value");
         return false;
     }
@@ -165,17 +165,19 @@ bool EciesKem::Decrypt(EC_KEY* private_key, const uint8_t* encrypted_key, size_t
     actual_secret.write(z.peek_read(), z.available_read());
     actual_secret.write(shared_secret.peek_read(), shared_secret.available_read());
 
-    if (!kdf_.get()->Init(actual_secret.peek_read(), actual_secret.available_read(),
-                          nullptr /* salt */, 0 /* salt_len */, nullptr /* info */,
-                          0 /* info_len */, key_bytes_to_generate_)) {
+    if (!kdf_->Init(actual_secret.peek_read(), actual_secret.available_read(), nullptr /* salt */,
+                    0 /* salt_len */)) {
         LOG_E("%s", "EciesKem: KDF failed, can't derived keys");
         return false;
     }
 
-    if (!kdf_.get()->secret_key(output_key)) {
+    output_key->Reinitialize(key_bytes_to_generate_);
+    if (!kdf_->GenerateKey(nullptr /* info */, 0 /* info_len */, output_key->peek_write(),
+                           key_bytes_to_generate_)) {
         LOG_E("%s", "EciesKem: KDF failed, can't derived keys");
         return false;
     }
+    output_key->advance_write(key_bytes_to_generate_);
 
     return true;
 }
