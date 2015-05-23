@@ -55,24 +55,26 @@ class Logger {
     static Logger* instance_;
 };
 
-#ifdef DEBUG
-
 #define STR(x) #x
 #define STRINGIFY(x) STR(x)
 #define FILE_LINE __FILE__ ", Line " STRINGIFY(__LINE__) ": "
 
-#define LOG_D(fmt, ...) Logger::Debug(FILE_LINE fmt, __VA_ARGS__)
-#define LOG_I(fmt, ...) Logger::Info(FILE_LINE fmt, __VA_ARGS__)
+#ifdef DEBUG
+#define DEBUG_LOGS 1
+#else
+#define DEBUG_LOGS 0
+#endif
 
-#else  // not DEBUG
-
-// For production builds, don't bloat the executable with FILE_LINE strings or DEBUG or INFO log
-// messages.
-#define FILE_LINE
-#define LOG_D(fmt, ...)
-#define LOG_I(fmt, ...)
-
-#endif  // not DEBUG
+#define LOG_D(fmt, ...)                                                                            \
+    do {                                                                                           \
+        if (DEBUG_LOGS)                                                                            \
+            Logger::Debug(FILE_LINE fmt, __VA_ARGS__);                                             \
+    } while (0)
+#define LOG_I(fmt, ...)                                                                            \
+    do {                                                                                           \
+        if (DEBUG_LOGS)                                                                            \
+            Logger::Info(FILE_LINE fmt, __VA_ARGS__);                                              \
+    } while (0)
 
 #define LOG_W(fmt, ...) Logger::Warning(FILE_LINE fmt, __VA_ARGS__)
 #define LOG_E(fmt, ...) Logger::Error(FILE_LINE fmt, __VA_ARGS__)
