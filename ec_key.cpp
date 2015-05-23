@@ -15,44 +15,43 @@
  */
 
 #include "ec_key.h"
-
-#include <keymaster/keymaster_context.h>
-
+#include "operation.h"
 #include "openssl_err.h"
 #include "openssl_utils.h"
-
-#if defined(OPENSSL_IS_BORINGSSL)
-typedef size_t openssl_size_t;
-#else
-typedef int openssl_size_t;
-#endif
+#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
-keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
-                                            KeymasterKeyBlob* key_blob,
-                                            AuthorizationSet* hw_enforced,
-                                            AuthorizationSet* sw_enforced) {
-    if (!key_blob || !hw_enforced || !sw_enforced)
-        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+Key* EcKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+    return new EcKey(blob, error);
+}
+
+Key* EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
+                               keymaster_error_t* error) {
+    if (!error)
+        return NULL;
 
     AuthorizationSet authorizations(key_description);
 
     uint32_t key_size;
+
     if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
         LOG_E("%s", "No key size specified for EC key generation");
-        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
     UniquePtr<EC_KEY, EcKey::EC_Delete> ec_key(EC_KEY_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
-    if (ec_key.get() == NULL || pkey.get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
+    if (ec_key.get() == NULL || pkey.get() == NULL) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return NULL;
+    }
     UniquePtr<EC_GROUP, EC_GROUP_Delete> group(choose_group(key_size));
     if (group.get() == NULL) {
+        // Technically, could also have been a memory allocation problem.
         LOG_E("Unable to get EC group for key of size %d", key_size);
-        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        return NULL;
     }
 
 #if !defined(OPENSSL_IS_BORINGSSL)
@@ -62,52 +61,47 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
 
     if (EC_KEY_set_group(ec_key.get(), group.get()) != 1 ||
         EC_KEY_generate_key(ec_key.get()) != 1 || EC_KEY_check_key(ec_key.get()) < 0) {
-        return TranslateLastOpenSslError();
+        *error = TranslateLastOpenSslError();
+        return NULL;
     }
 
-    if (EVP_PKEY_set1_EC_KEY(pkey.get(), ec_key.get()) != 1)
-        return TranslateLastOpenSslError();
-
-    KeymasterKeyBlob key_material;
-    keymaster_error_t error = EvpKeyToKeyMaterial(pkey.get(), &key_material);
-    if (error != KM_ERROR_OK)
-        return error;
-
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_GENERATED, key_material, key_blob,
-                                   hw_enforced, sw_enforced);
+    EcKey* new_key = new EcKey(ec_key.release(), authorizations);
+    *error = new_key ? KM_ERROR_OK : KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return new_key;
 }
 
-keymaster_error_t EcKeyFactory::ImportKey(const AuthorizationSet& key_description,
-                                          keymaster_key_format_t input_key_material_format,
-                                          const KeymasterKeyBlob& input_key_material,
-                                          KeymasterKeyBlob* output_key_blob,
-                                          AuthorizationSet* hw_enforced,
-                                          AuthorizationSet* sw_enforced) {
-    if (!output_key_blob || !hw_enforced || !sw_enforced)
-        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+Key* EcKeyFactory::ImportKey(const AuthorizationSet& key_description,
+                             keymaster_key_format_t key_format, const uint8_t* key_data,
+                             size_t key_data_length, keymaster_error_t* error) {
+    if (!error)
+        return NULL;
 
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
-    keymaster_error_t error =
-        KeyMaterialToEvpKey(input_key_material_format, input_key_material, &pkey);
-    if (error != KM_ERROR_OK)
-        return error;
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(
+        ExtractEvpKey(key_format, registry_key(), key_data, key_data_length, error));
+    if (*error != KM_ERROR_OK)
+        return NULL;
+    assert(pkey.get());
 
     UniquePtr<EC_KEY, EcKey::EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
-    if (!ec_key.get())
-        return TranslateLastOpenSslError();
-
-    AuthorizationSet authorizations(key_description);
+    if (!ec_key.get()) {
+        *error = TranslateLastOpenSslError();
+        return NULL;
+    }
 
     size_t extracted_key_size_bits;
-    error = get_group_size(*EC_KEY_get0_group(ec_key.get()), &extracted_key_size_bits);
-    if (error != KM_ERROR_OK)
-        return error;
+    *error = get_group_size(*EC_KEY_get0_group(ec_key.get()), &extracted_key_size_bits);
+    if (*error != KM_ERROR_OK)
+        return NULL;
+
+    AuthorizationSet authorizations(key_description);
 
     uint32_t key_size_bits;
     if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
         // key_size_bits specified, make sure it matches the key.
-        if (key_size_bits != extracted_key_size_bits)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+        if (key_size_bits != extracted_key_size_bits) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
     } else {
         // key_size_bits not specified, add it.
         authorizations.push_back(TAG_KEY_SIZE, extracted_key_size_bits);
@@ -115,14 +109,18 @@ keymaster_error_t EcKeyFactory::ImportKey(const AuthorizationSet& key_descriptio
 
     keymaster_algorithm_t algorithm;
     if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
-        if (algorithm != registry_key())
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+        if (algorithm != registry_key()) {
+            *error = KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+            return NULL;
+        }
     } else {
         authorizations.push_back(TAG_ALGORITHM, registry_key());
     }
-
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
-                                   output_key_blob, hw_enforced, sw_enforced);
+    // Don't bother with the other parameters.  If the necessary padding, digest, purpose, etc. are
+    // missing, the error will be diagnosed when the key is used (when auth checking is
+    // implemented).
+    *error = KM_ERROR_OK;
+    return new EcKey(ec_key.release(), authorizations);
 }
 
 /* static */
@@ -166,14 +164,9 @@ keymaster_error_t EcKeyFactory::get_group_size(const EC_GROUP& group, size_t* ke
     return KM_ERROR_OK;
 }
 
-keymaster_error_t EcKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforced,
-                                               const AuthorizationSet& sw_enforced,
-                                               UniquePtr<AsymmetricKey>* key) {
-    keymaster_error_t error;
-    key->reset(new EcKey(hw_enforced, sw_enforced, &error));
-    if (!key->get())
-        error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return error;
+EcKey::EcKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : AsymmetricKey(blob) {
+    if (error)
+        *error = LoadKey(blob);
 }
 
 bool EcKey::EvpToInternal(const EVP_PKEY* pkey) {

@@ -25,9 +25,7 @@
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
 
-#include "android_keymaster_test_utils.h"
-#include "auth_encrypted_key_blob.h"
-#include "ocb_utils.h"
+#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
@@ -38,254 +36,277 @@ const uint8_t key_data[5] = {21, 22, 23, 24, 25};
 
 class KeyBlobTest : public testing::Test {
   protected:
-    KeyBlobTest()
-        : master_key_(master_key_data, array_length(master_key_data)),
-          key_material_(key_data, array_length(key_data)) {
-        hw_enforced_.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-        hw_enforced_.push_back(TAG_KEY_SIZE, 256);
-        hw_enforced_.push_back(TAG_BLOB_USAGE_REQUIREMENTS, KM_BLOB_STANDALONE);
-        hw_enforced_.push_back(TAG_MIN_SECONDS_BETWEEN_OPS, 10);
-        hw_enforced_.push_back(TAG_ALL_USERS);
-        hw_enforced_.push_back(TAG_NO_AUTH_REQUIRED);
-        hw_enforced_.push_back(TAG_ORIGIN, KM_ORIGIN_GENERATED);
+    KeyBlobTest() {
+        enforced_.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        enforced_.push_back(TAG_KEY_SIZE, 256);
+        enforced_.push_back(TAG_BLOB_USAGE_REQUIREMENTS, KM_BLOB_STANDALONE);
+        enforced_.push_back(TAG_MIN_SECONDS_BETWEEN_OPS, 10);
+        enforced_.push_back(TAG_ALL_USERS);
+        enforced_.push_back(TAG_NO_AUTH_REQUIRED);
+        enforced_.push_back(TAG_ORIGIN, KM_ORIGIN_GENERATED);
 
-        sw_enforced_.push_back(TAG_ACTIVE_DATETIME, 10);
-        sw_enforced_.push_back(TAG_ORIGINATION_EXPIRE_DATETIME, 100);
-        sw_enforced_.push_back(TAG_CREATION_DATETIME, 10);
-        sw_enforced_.push_back(TAG_CHUNK_LENGTH, 10);
+        unenforced_.push_back(TAG_ACTIVE_DATETIME, 10);
+        unenforced_.push_back(TAG_ORIGINATION_EXPIRE_DATETIME, 100);
+        unenforced_.push_back(TAG_CREATION_DATETIME, 10);
+        unenforced_.push_back(TAG_CHUNK_LENGTH, 10);
 
         hidden_.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
         hidden_.push_back(TAG_APPLICATION_ID, "my_app", 6);
 
-        nonce_.reserve(OCB_NONCE_LENGTH);
-        EXPECT_EQ(1, RAND_bytes(nonce_.peek_write(), OCB_NONCE_LENGTH));
-        nonce_.advance_write(OCB_NONCE_LENGTH);
+        EXPECT_EQ(1, RAND_bytes(nonce_, array_size(nonce_)));
 
-        tag_.reserve(OCB_TAG_LENGTH);
+        blob_.reset(new UnencryptedKeyBlob(enforced_, unenforced_, hidden_, key_data,
+                                           array_size(key_data), master_key_data,
+                                           array_size(master_key_data), nonce_));
     }
 
-    keymaster_error_t Encrypt() {
-        return OcbEncryptKey(hw_enforced_, sw_enforced_, hidden_, master_key_, key_material_,
-                             nonce_, &ciphertext_, &tag_);
-    }
-
-    keymaster_error_t Decrypt() {
-        return OcbDecryptKey(hw_enforced_, sw_enforced_, hidden_, master_key_, ciphertext_, nonce_,
-                             tag_, &decrypted_plaintext_);
-    }
-
-    keymaster_error_t Serialize() {
-        return SerializeAuthEncryptedBlob(ciphertext_, hw_enforced_, sw_enforced_, nonce_, tag_,
-                                          &serialized_blob_);
-    }
-
-    keymaster_error_t Deserialize() {
-        return DeserializeAuthEncryptedBlob(serialized_blob_, &ciphertext_, &hw_enforced_,
-                                            &sw_enforced_, &nonce_, &tag_);
-    }
-
-    AuthorizationSet hw_enforced_;
-    AuthorizationSet sw_enforced_;
+    AuthorizationSet enforced_;
+    AuthorizationSet unenforced_;
     AuthorizationSet hidden_;
-    Buffer nonce_, tag_;
 
-    KeymasterKeyBlob master_key_;
-    KeymasterKeyBlob key_material_;
-    KeymasterKeyBlob ciphertext_;
-    KeymasterKeyBlob decrypted_plaintext_;
-    KeymasterKeyBlob serialized_blob_;
+    UniquePtr<UnencryptedKeyBlob> blob_;
+    uint8_t nonce_[KeyBlob::NONCE_LENGTH];
 };
 
 TEST_F(KeyBlobTest, EncryptDecrypt) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
-    // key_data shouldn't be anywhere in the blob, ciphertext should.
-    EXPECT_EQ(serialized_blob_.end(), std::search(serialized_blob_.begin(), serialized_blob_.end(),
-                                                  key_material_.begin(), key_material_.end()));
-    EXPECT_NE(serialized_blob_.end(), std::search(serialized_blob_.begin(), serialized_blob_.end(),
-                                                  ciphertext_.begin(), ciphertext_.end()));
+    // key_data shouldn't be anywhere in the blob.
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
+    EXPECT_EQ(end, std::search(begin, end, key_data, key_data + array_size(key_data)));
 
-    ciphertext_.Clear();
-    nonce_.Clear();
-    tag_.Clear();
-    AuthorizationSet hw2;
-    AuthorizationSet sw2;
-
-    ASSERT_EQ(KM_ERROR_OK, DeserializeAuthEncryptedBlob(serialized_blob_, &ciphertext_, &hw2, &sw2,
-                                                        &nonce_, &tag_));
-    KeymasterKeyBlob plaintext;
-    OcbDecryptKey(hw2, sw2, hidden_, master_key_, ciphertext_, nonce_, tag_, &plaintext);
-
-    EXPECT_EQ(hw_enforced_, hw2);
-    EXPECT_EQ(sw_enforced_, sw2);
-
-    ASSERT_EQ(key_material_.key_material_size, plaintext.key_material_size);
-    EXPECT_EQ(0, memcmp(plaintext.begin(), key_material_.begin(), plaintext.key_material_size));
+    // Recover the key material.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_OK, deserialized.error());
+    EXPECT_EQ(0, memcmp(deserialized.unencrypted_key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongKeyLength) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
-    // Modify the key length, shouldn't be able to parse.
-    serialized_blob_.writable_data()[1 /* version */ + 4 /* nonce len */ + 12 /* nonce */ + 3]++;
+    // Modify the key length
+    serialized_blob[UnencryptedKeyBlob::NONCE_LENGTH]++;
 
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Deserialize());
+    // Decrypting with wrong nonce should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
 }
 
 TEST_F(KeyBlobTest, WrongNonce) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     // Find the nonce, then modify it.
-    auto nonce_ptr =
-        std::search(serialized_blob_.begin(), serialized_blob_.end(), nonce_.begin(), nonce_.end());
-    ASSERT_NE(nonce_ptr, serialized_blob_.end());
-    EXPECT_EQ(serialized_blob_.end(),
-              std::search(nonce_ptr + 1, serialized_blob_.end(), nonce_.begin(), nonce_.end()));
-    (*const_cast<uint8_t*>(nonce_ptr))++;
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
+    auto nonce_ptr = std::search(begin, end, nonce_, nonce_ + array_size(nonce_));
+    ASSERT_NE(nonce_ptr, end);
+    EXPECT_EQ(end, std::search(nonce_ptr + 1, end, nonce_, nonce_ + array_size(nonce_)));
+    (*nonce_ptr)++;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Decrypt());
+    // Decrypting with wrong nonce should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+    EXPECT_NE(0, memcmp(deserialized.unencrypted_key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongTag) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     // Find the tag, them modify it.
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
     auto tag_ptr =
-        std::search(serialized_blob_.begin(), serialized_blob_.end(), tag_.begin(), tag_.end());
-    ASSERT_NE(tag_ptr, serialized_blob_.end());
-    EXPECT_EQ(serialized_blob_.end(),
-              std::search(tag_ptr + 1, serialized_blob_.end(), tag_.begin(), tag_.end()));
-    (*const_cast<uint8_t*>(tag_ptr))++;
+        std::search(begin, end, blob_->tag(), blob_->tag() + UnencryptedKeyBlob::TAG_LENGTH);
+    ASSERT_NE(tag_ptr, end);
+    EXPECT_EQ(end, std::search(tag_ptr + 1, end, blob_->tag(),
+                               blob_->tag() + UnencryptedKeyBlob::TAG_LENGTH));
+    (*tag_ptr)++;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Decrypt());
+    // Decrypting with wrong tag should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+    EXPECT_NE(0, memcmp(deserialized.unencrypted_key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongCiphertext) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     // Find the ciphertext, them modify it.
-    auto ciphertext_ptr = std::search(serialized_blob_.begin(), serialized_blob_.end(),
-                                      ciphertext_.begin(), ciphertext_.end());
-    ASSERT_NE(ciphertext_ptr, serialized_blob_.end());
-    EXPECT_EQ(serialized_blob_.end(), std::search(ciphertext_ptr + 1, serialized_blob_.end(),
-                                                  ciphertext_.begin(), ciphertext_.end()));
-    (*const_cast<uint8_t*>(ciphertext_ptr))++;
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
+    auto ciphertext_ptr =
+        std::search(begin, end, blob_->encrypted_key_material(),
+                    blob_->encrypted_key_material() + blob_->key_material_length());
+    ASSERT_NE(ciphertext_ptr, end);
+    EXPECT_EQ(end, std::search(ciphertext_ptr + 1, end, blob_->encrypted_key_material(),
+                               blob_->encrypted_key_material() + blob_->key_material_length()));
+    (*ciphertext_ptr)++;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Decrypt());
+    // Decrypting with wrong tag should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+    EXPECT_NE(0, memcmp(deserialized.unencrypted_key_material(), key_data, array_size(key_data)));
 }
 
 TEST_F(KeyBlobTest, WrongMasterKey) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     uint8_t wrong_master_data[] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    KeymasterKeyBlob wrong_master(wrong_master_data, array_length(wrong_master_data));
 
     // Decrypting with wrong master key should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              OcbDecryptKey(hw_enforced_, sw_enforced_, hidden_, wrong_master, ciphertext_, nonce_,
-                            tag_, &decrypted_plaintext_));
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, wrong_master_data,
+                                    array_size(wrong_master_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+    EXPECT_NE(0, memcmp(deserialized.unencrypted_key_material(), key_data, array_size(key_data)));
 }
 
-TEST_F(KeyBlobTest, WrongHwEnforced) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+TEST_F(KeyBlobTest, WrongEnforced) {
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
 
     // Find enforced serialization data and modify it.
-    size_t hw_enforced_size = hw_enforced_.SerializedSize();
-    UniquePtr<uint8_t[]> hw_enforced_data(new uint8_t[hw_enforced_size]);
-    hw_enforced_.Serialize(hw_enforced_data.get(), hw_enforced_data.get() + hw_enforced_size);
+    size_t enforced_size = enforced_.SerializedSize();
+    UniquePtr<uint8_t[]> enforced_data(new uint8_t[enforced_size]);
+    enforced_.Serialize(enforced_data.get(), enforced_data.get() + enforced_size);
 
-    auto hw_enforced_ptr =
-        std::search(serialized_blob_.begin(), serialized_blob_.end(), hw_enforced_data.get(),
-                    hw_enforced_data.get() + hw_enforced_size);
-    ASSERT_NE(serialized_blob_.end(), hw_enforced_ptr);
-    EXPECT_EQ(serialized_blob_.end(),
-              std::search(hw_enforced_ptr + 1, serialized_blob_.end(), hw_enforced_data.get(),
-                          hw_enforced_data.get() + hw_enforced_size));
-    (*(const_cast<uint8_t*>(hw_enforced_ptr) + hw_enforced_size - 1))++;
+    auto enforced_ptr =
+        std::search(begin, end, enforced_data.get(), enforced_data.get() + enforced_size);
+    ASSERT_NE(end, enforced_ptr);
+    EXPECT_EQ(end, std::search(enforced_ptr + 1, end, enforced_data.get(),
+                               enforced_data.get() + enforced_size));
+    (*(enforced_ptr + enforced_size - 1))++;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Decrypt());
+    // Decrypting with wrong unenforced data should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
 }
 
-TEST_F(KeyBlobTest, WrongSwEnforced) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+TEST_F(KeyBlobTest, WrongUnenforced) {
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
+    uint8_t* begin = serialized_blob.get();
+    uint8_t* end = begin + size;
 
-    // Find enforced serialization data and modify it.
-    size_t sw_enforced_size = sw_enforced_.SerializedSize();
-    UniquePtr<uint8_t[]> sw_enforced_data(new uint8_t[sw_enforced_size]);
-    sw_enforced_.Serialize(sw_enforced_data.get(), sw_enforced_data.get() + sw_enforced_size);
+    // Find unenforced serialization data and modify it.
+    size_t unenforced_size = unenforced_.SerializedSize();
+    UniquePtr<uint8_t[]> unenforced_data(new uint8_t[unenforced_size]);
+    unenforced_.Serialize(unenforced_data.get(), unenforced_data.get() + unenforced_size);
 
-    auto sw_enforced_ptr =
-        std::search(serialized_blob_.begin(), serialized_blob_.end(), sw_enforced_data.get(),
-                    sw_enforced_data.get() + sw_enforced_size);
-    ASSERT_NE(serialized_blob_.end(), sw_enforced_ptr);
-    EXPECT_EQ(serialized_blob_.end(),
-              std::search(sw_enforced_ptr + 1, serialized_blob_.end(), sw_enforced_data.get(),
-                          sw_enforced_data.get() + sw_enforced_size));
-    (*(const_cast<uint8_t*>(sw_enforced_ptr) + sw_enforced_size - 1))++;
+    auto unenforced_ptr =
+        std::search(begin, end, unenforced_data.get(), unenforced_data.get() + unenforced_size);
+    ASSERT_NE(end, unenforced_ptr);
+    EXPECT_EQ(end, std::search(unenforced_ptr + 1, end, unenforced_data.get(),
+                               unenforced_data.get() + unenforced_size));
+    (*(unenforced_ptr + unenforced_size - 1))++;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, Decrypt());
+    // Decrypting with wrong unenforced data should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
 }
 
 TEST_F(KeyBlobTest, EmptyHidden) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     AuthorizationSet wrong_hidden;
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              OcbDecryptKey(hw_enforced_, sw_enforced_, wrong_hidden, master_key_, ciphertext_,
-                            nonce_, tag_, &decrypted_plaintext_));
+    // Decrypting with wrong hidden data should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, wrong_hidden, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
 }
 
 TEST_F(KeyBlobTest, WrongRootOfTrust) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     AuthorizationSet wrong_hidden;
-    wrong_hidden.push_back(TAG_ROOT_OF_TRUST, "bar", 2);
+    wrong_hidden.push_back(TAG_ROOT_OF_TRUST, "bar", 3);
     wrong_hidden.push_back(TAG_APPLICATION_ID, "my_app", 6);
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              OcbDecryptKey(hw_enforced_, sw_enforced_, wrong_hidden, master_key_, ciphertext_,
-                            nonce_, tag_, &decrypted_plaintext_));
+    // Decrypting with wrong hidden data should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, wrong_hidden, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
 }
 
 TEST_F(KeyBlobTest, WrongAppId) {
-    ASSERT_EQ(KM_ERROR_OK, Encrypt());
-    ASSERT_EQ(KM_ERROR_OK, Serialize());
+    size_t size = blob_->SerializedSize();
+    UniquePtr<uint8_t[]> serialized_blob(new uint8_t[size]);
+    blob_->Serialize(serialized_blob.get(), serialized_blob.get() + size);
 
     AuthorizationSet wrong_hidden;
     wrong_hidden.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
     wrong_hidden.push_back(TAG_APPLICATION_ID, "your_app", 7);
 
-    // Deserialization shouldn't be affected, but decryption should fail.
-    ASSERT_EQ(KM_ERROR_OK, Deserialize());
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              OcbDecryptKey(hw_enforced_, sw_enforced_, wrong_hidden, master_key_, ciphertext_,
-                            nonce_, tag_, &decrypted_plaintext_));
+    // Decrypting with wrong hidden data should fail.
+    keymaster_key_blob_t encrypted_blob = {serialized_blob.get(), size};
+    UnencryptedKeyBlob deserialized(encrypted_blob, wrong_hidden, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, deserialized.error());
+}
+
+TEST_F(KeyBlobTest, UnversionedBlob) {
+    // Manually construct an unversioned blob serialization.
+    size_t unversioned_blob_size =
+        KeyBlob::NONCE_LENGTH +                // nonce data
+        sizeof(uint32_t) +                     // length of key material
+        blob_->key_material_length() +         // key material data
+        KeyBlob::TAG_LENGTH +                  // tag data
+        blob_->enforced().SerializedSize() +   // serialization of enforced set
+        blob_->unenforced().SerializedSize();  // serialization of unenforced set
+    UniquePtr<uint8_t[]> unversioned_serialized_blob(new uint8_t[unversioned_blob_size]);
+    uint8_t* buf = unversioned_serialized_blob.get();
+    const uint8_t* end = buf + unversioned_blob_size;
+    buf = append_to_buf(buf, end, blob_->nonce(), KeyBlob::NONCE_LENGTH);
+    buf = append_size_and_data_to_buf(buf, end, blob_->encrypted_key_material(),
+                                      blob_->key_material_length());
+    buf = append_to_buf(buf, end, blob_->tag(), KeyBlob::TAG_LENGTH);
+    buf = blob_->enforced().Serialize(buf, end);
+    buf = blob_->unenforced().Serialize(buf, end);
+    EXPECT_EQ(buf, end);
+
+    keymaster_key_blob_t unversioned_blob = {unversioned_serialized_blob.get(),
+                                             unversioned_blob_size};
+    UnencryptedKeyBlob deserialized(unversioned_blob, hidden_, master_key_data,
+                                    array_size(master_key_data));
+    EXPECT_EQ(KM_ERROR_OK, deserialized.error());
 }
 
 }  // namespace test

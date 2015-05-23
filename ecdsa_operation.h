@@ -21,6 +21,8 @@
 
 #include <UniquePtr.h>
 
+#include <keymaster/key_blob.h>
+
 #include "operation.h"
 
 namespace keymaster {

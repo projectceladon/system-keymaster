@@ -19,29 +19,21 @@
 
 #include "ae.h"
 
-#include <hardware/keymaster_defs.h>
-
-#include <keymaster/serializable.h>
-
 namespace keymaster {
 
-class AuthorizationSet;
-struct KeymasterKeyBlob;
+class AeCtx {
+  public:
+    AeCtx() : ctx_(ae_allocate(NULL)) {}
+    ~AeCtx() {
+        ae_clear(ctx_);
+        ae_free(ctx_);
+    }
 
-static const int OCB_NONCE_LENGTH = 12;
-static const int OCB_TAG_LENGTH = 16;
+    ae_ctx* get() { return ctx_; }
 
-keymaster_error_t OcbEncryptKey(const AuthorizationSet& hw_enforced,
-                                const AuthorizationSet& sw_enforced, const AuthorizationSet& hidden,
-                                const KeymasterKeyBlob& master_key,
-                                const KeymasterKeyBlob& plaintext, const Buffer& nonce,
-                                KeymasterKeyBlob* ciphertext, Buffer* tag);
-
-keymaster_error_t OcbDecryptKey(const AuthorizationSet& hw_enforced,
-                                const AuthorizationSet& sw_enforced, const AuthorizationSet& hidden,
-                                const KeymasterKeyBlob& master_key,
-                                const KeymasterKeyBlob& ciphertext, const Buffer& nonce,
-                                const Buffer& tag, KeymasterKeyBlob* plaintext);
+  private:
+    ae_ctx* ctx_;
+};
 
 }  // namespace keymaster
 

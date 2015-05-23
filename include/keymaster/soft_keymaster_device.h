@@ -51,8 +51,7 @@ class SoftKeymasterDevice {
     }
 
   private:
-    static keymaster_error_t ExtractSigningParams(const keymaster1_device_t* dev,
-                                                  const void* signing_params,
+    static keymaster_error_t ExtractSigningParams(const void* signing_params,
                                                   const uint8_t* key_blob, size_t key_blob_length,
                                                   AuthorizationSet* auth_set);
     static void StoreDefaultNewKeyParams(AuthorizationSet* auth_set);
