@@ -18,11 +18,11 @@
 
 #include <gtest/gtest.h>
 
-#include <keymaster/android_keymaster.h>
-#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
+#include <keymaster/android_keymaster_utils.h>
 
 #include "android_keymaster_test_utils.h"
+#include "android_softkeymaster.h"
 
 namespace keymaster {
 namespace test {

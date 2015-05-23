@@ -24,6 +24,7 @@ LOCAL_SRC_FILES:= \
 		android_keymaster_messages.cpp \
 		android_keymaster_utils.cpp \
 		authorization_set.cpp \
+		key_blob.cpp \
 		logger.cpp \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
@@ -36,19 +37,19 @@ include $(BUILD_SHARED_LIBRARY)
 
 ###
 # libkeymaster1 contains almost everything needed for a keymaster1
-# implementation, lacking only a subclass of the (abstract) KeymasterContext
+# implementation, lacking only a subclass of the (abstract) AndroidKeymaster
 # class to provide environment-specific services and a wrapper to translate from
 # the function-based keymaster HAL API to the message-based AndroidKeymaster API.
 ###
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster1
 LOCAL_SRC_FILES:= \
+		aead_mode_operation.cpp \
 		aes_key.cpp \
 		aes_operation.cpp \
 		android_keymaster.cpp \
 		android_keymaster_messages.cpp \
 		android_keymaster_utils.cpp \
-		auth_encrypted_key_blob.cpp \
 		asymmetric_key.cpp \
 		ec_key.cpp \
 		ecdsa_operation.cpp \
@@ -58,14 +59,14 @@ LOCAL_SRC_FILES:= \
 		hmac_operation.cpp \
 		key.cpp \
 		ocb.c \
-		ocb_utils.cpp \
 		openssl_err.cpp \
 		openssl_utils.cpp \
 		operation.cpp \
 		operation_table.cpp \
 		rsa_key.cpp \
 		rsa_operation.cpp \
-		symmetric_key.cpp
+		symmetric_key.cpp \
+		unencrypted_key_blob.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_SHARED_LIBRARIES := libcrypto libkeymaster_messages
@@ -86,7 +87,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := libsoftkeymasterdevice
 LOCAL_SRC_FILES := \
-	soft_keymaster_context.cpp \
 	soft_keymaster_device.cpp \
 	soft_keymaster_logger.cpp
 LOCAL_C_INCLUDES := \

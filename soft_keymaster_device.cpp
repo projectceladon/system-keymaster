@@ -33,13 +33,16 @@
 #define LOG_TAG "SoftKeymasterDevice"
 #include <cutils/log.h>
 
-#include <keymaster/android_keymaster.h>
-#include <keymaster/android_keymaster_messages.h>
 #include <keymaster/authorization_set.h>
+#include <keymaster/android_keymaster_messages.h>
+#include <keymaster/key_blob.h>
 #include <keymaster/soft_keymaster_logger.h>
 
-#include "soft_keymaster_context.h"
-#include "openssl_utils.h"
+#include "aes_key.h"
+#include "ec_key.h"
+#include "android_softkeymaster.h"
+#include "hmac_key.h"
+#include "rsa_key.h"
 
 struct keystore_module soft_keymaster_device_module = {
     .common =
@@ -58,8 +61,12 @@ struct keystore_module soft_keymaster_device_module = {
 
 namespace keymaster {
 
-SoftKeymasterDevice::SoftKeymasterDevice()
-    : impl_(new AndroidKeymaster(new SoftKeymasterContext, 16)) {
+static KeyFactoryRegistry::Registration<AesKeyFactory> aes_registration;
+static KeyFactoryRegistry::Registration<EcdsaKeyFactory> ec_registration;
+static KeyFactoryRegistry::Registration<HmacKeyFactory> hmac_registration;
+static KeyFactoryRegistry::Registration<RsaKeyFactory> rsa_registration;
+
+SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new AndroidSoftKeymaster(16)) {
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
     static_assert(std::is_standard_layout<SoftKeymasterDevice>::value,
                   "SoftKeymasterDevice must be standard layout");
@@ -258,6 +265,14 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
     return KM_ERROR_OK;
 }
 
+struct EVP_PKEY_Delete {
+    void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
+};
+
+struct PKCS8_PRIV_KEY_INFO_Delete {
+    void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
+};
+
 /* static */
 keymaster_error_t SoftKeymasterDevice::GetPkcs8KeyAlgorithm(const uint8_t* key, size_t key_length,
                                                             keymaster_algorithm_t* algorithm) {
@@ -345,8 +360,8 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_SIGN;
     begin_request.SetKeyMaterial(key_blob, key_blob_length);
-    keymaster_error_t err = ExtractSigningParams(dev, params, key_blob, key_blob_length,
-                                                 &begin_request.additional_params);
+    keymaster_error_t err =
+        ExtractSigningParams(params, key_blob, key_blob_length, &begin_request.additional_params);
     if (err != KM_ERROR_OK)
         return err;
 
@@ -398,10 +413,12 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_VERIFY;
     begin_request.SetKeyMaterial(key_blob, key_blob_length);
-    keymaster_error_t err = ExtractSigningParams(dev, params, key_blob, key_blob_length,
-                                                 &begin_request.additional_params);
-    if (err != KM_ERROR_OK)
-        return err;
+    {
+        keymaster_error_t err = ExtractSigningParams(params, key_blob, key_blob_length,
+                                                     &begin_request.additional_params);
+        if (err != KM_ERROR_OK)
+            return err;
+    }
 
     BeginOperationResponse begin_response;
     convert_device(dev)->impl_->BeginOperation(begin_request, &begin_response);
@@ -842,28 +859,15 @@ keymaster_error_t SoftKeymasterDevice::abort(const keymaster1_device_t* dev,
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const keymaster1_device_t* dev,
-                                                            const void* signing_params,
+keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const void* signing_params,
                                                             const uint8_t* key_blob,
                                                             size_t key_blob_length,
                                                             AuthorizationSet* auth_set) {
-    const keymaster_blob_t client_id = {nullptr, 0};
-    const keymaster_blob_t app_data = {nullptr, 0};
-    const keymaster_key_blob_t blob = {key_blob, key_blob_length};
-    keymaster_key_characteristics_t* characteristics;
-    keymaster_error_t error =
-        get_key_characteristics(dev, &blob, &client_id, &app_data, &characteristics);
+    KeyBlob blob(key_blob, key_blob_length);
+    if (blob.error() != KM_ERROR_OK)
+        return blob.error();
 
-    if (error != KM_ERROR_OK)
-        return error;
-
-    AuthorizationSet auths(characteristics->hw_enforced);
-    auths.push_back(AuthorizationSet(characteristics->sw_enforced));
-    keymaster_algorithm_t algorithm;
-    if (!auths.GetTagValue(TAG_ALGORITHM, &algorithm))
-        return KM_ERROR_INVALID_KEY_BLOB;
-
-    switch (algorithm) {
+    switch (blob.algorithm()) {
     case KM_ALGORITHM_RSA: {
         const keymaster_rsa_sign_params_t* rsa_params =
             reinterpret_cast<const keymaster_rsa_sign_params_t*>(signing_params);

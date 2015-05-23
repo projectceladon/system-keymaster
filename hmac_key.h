@@ -23,26 +23,21 @@ namespace keymaster {
 
 class HmacKeyFactory : public SymmetricKeyFactory {
   public:
-    HmacKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
-
     keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_HMAC; }
 
-    keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
-                              const AuthorizationSet& hw_enforced,
-                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
-
-  private:
-    bool key_size_supported(size_t key_size_bits) const override {
-        return key_size_bits > 0 && key_size_bits % 8 == 00 &&
-               key_size_bits <= 2048 /* Some RFC test cases require >1024-bit keys */;
-    }
+    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
+    SymmetricKey* CreateKey(const AuthorizationSet& auths) override;
 };
 
 class HmacKey : public SymmetricKey {
+    static const size_t MAX_HMAC_KEY_SIZE = 256; /* Arbitrary limit, for DoS prevention */
+
   public:
-    HmacKey(const KeymasterKeyBlob& key_material, const AuthorizationSet& hw_enforced,
-            const AuthorizationSet& sw_enforced, keymaster_error_t* error)
-        : SymmetricKey(key_material, hw_enforced, sw_enforced, error) {}
+    HmacKey(const AuthorizationSet& auths) : SymmetricKey(auths) {}
+    HmacKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) : SymmetricKey(blob, error) {}
+
+  private:
+    bool size_supported(size_t key_size) const override { return key_size < MAX_HMAC_KEY_SIZE; }
 };
 
 }  // namespace keymaster

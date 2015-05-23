@@ -22,19 +22,18 @@
 #include <keymaster/logger.h>
 
 #include "abstract_factory_registry.h"
+#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
 class Key;
-class KeymasterContext;
 
 /**
- * KeyFactory is a abstraction whose subclasses know how to construct a specific subclass of Key.
+ * KeyFactory is a pure interface whose subclasses know how to construct a specific subclass of Key.
  * There is a one to one correspondence between Key subclasses and KeyFactory subclasses.
  */
 class KeyFactory {
   public:
-    KeyFactory(const KeymasterContext* context) : context_(context) {}
     virtual ~KeyFactory() {}
 
     // Required for registry
@@ -42,27 +41,15 @@ class KeyFactory {
     virtual keymaster_algorithm_t registry_key() const = 0;
 
     // Factory methods.
-    virtual keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                          KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
-                                          AuthorizationSet* sw_enforced) = 0;
-
-    virtual keymaster_error_t ImportKey(const AuthorizationSet& key_description,
-                                        keymaster_key_format_t input_key_material_format,
-                                        const KeymasterKeyBlob& input_key_material,
-                                        KeymasterKeyBlob* output_key_blob,
-                                        AuthorizationSet* hw_enforced,
-                                        AuthorizationSet* sw_enforced) = 0;
-
-    virtual keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
-                                      const AuthorizationSet& hw_enforced,
-                                      const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) = 0;
+    virtual Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) = 0;
+    virtual Key* ImportKey(const AuthorizationSet& key_description,
+                           keymaster_key_format_t key_format, const uint8_t* key_data,
+                           size_t key_data_length, keymaster_error_t* error) = 0;
+    virtual Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) = 0;
 
     // Informational methods.
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) = 0;
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) = 0;
-
-  protected:
-    const KeymasterContext* context_;
 };
 
 typedef AbstractFactoryRegistry<KeyFactory> KeyFactoryRegistry;
@@ -90,8 +77,8 @@ class Key {
     const AuthorizationSet& authorizations() const { return authorizations_; }
 
   protected:
-    Key(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
-        keymaster_error_t* error);
+    Key(const KeyBlob& blob);
+    Key(const AuthorizationSet& authorizations) : authorizations_(authorizations) {}
 
   private:
     AuthorizationSet authorizations_;

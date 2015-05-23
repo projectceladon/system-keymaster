@@ -23,18 +23,12 @@
 
 namespace keymaster {
 
-keymaster_error_t HmacKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
-                                          const AuthorizationSet& hw_enforced,
-                                          const AuthorizationSet& sw_enforced,
-                                          UniquePtr<Key>* key) {
-    if (!key)
-        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+Key* HmacKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
+    return new HmacKey(blob, error);
+}
 
-    keymaster_error_t error;
-    key->reset(new HmacKey(key_material, hw_enforced, sw_enforced, &error));
-    if (!key->get())
-        error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return error;
+SymmetricKey* HmacKeyFactory::CreateKey(const AuthorizationSet& auths) {
+    return new HmacKey(auths);
 }
 
 }  // namespace keymaster
