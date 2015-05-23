@@ -16,14 +16,14 @@ LOCAL_PATH := $(call my-dir)
 
 ###
 # libkeymaster_messages contains just the code necessary to communicate with a
-# GoogleKeymaster implementation, e.g. one running in TrustZone.
+# AndroidKeymaster implementation, e.g. one running in TrustZone.
 ##
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster_messages
 LOCAL_SRC_FILES:= \
+		android_keymaster_messages.cpp \
+		android_keymaster_utils.cpp \
 		authorization_set.cpp \
-		google_keymaster_messages.cpp \
-		google_keymaster_utils.cpp \
 		key_blob.cpp \
 		logger.cpp \
 		serializable.cpp
@@ -37,9 +37,9 @@ include $(BUILD_SHARED_LIBRARY)
 
 ###
 # libkeymaster1 contains almost everything needed for a keymaster1
-# implementation, lacking only a subclass of the (abstract) GoogleKeymaster
+# implementation, lacking only a subclass of the (abstract) AndroidKeymaster
 # class to provide environment-specific services and a wrapper to translate from
-# the function-based keymaster HAL API to the message-based GoogleKeymaster API.
+# the function-based keymaster HAL API to the message-based AndroidKeymaster API.
 ###
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libkeymaster1
@@ -47,12 +47,12 @@ LOCAL_SRC_FILES:= \
 		aead_mode_operation.cpp \
 		aes_key.cpp \
 		aes_operation.cpp \
+		android_keymaster.cpp \
+		android_keymaster_messages.cpp \
+		android_keymaster_utils.cpp \
 		asymmetric_key.cpp \
 		ec_key.cpp \
 		ecdsa_operation.cpp \
-		google_keymaster.cpp \
-		google_keymaster_messages.cpp \
-		google_keymaster_utils.cpp \
 		hkdf.cpp \
 		hmac.cpp \
 		hmac_key.cpp \
@@ -105,10 +105,10 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := keymaster_tests
 LOCAL_SRC_FILES := \
 	abstract_factory_registry_test.cpp \
+	android_keymaster_messages_test.cpp \
+	android_keymaster_test.cpp \
+	android_keymaster_test_utils.cpp \
 	authorization_set_test.cpp \
-	google_keymaster_messages_test.cpp \
-	google_keymaster_test.cpp \
-	google_keymaster_test_utils.cpp \
 	hkdf_test.cpp \
 	hmac_test.cpp \
 	key_blob_test.cpp \

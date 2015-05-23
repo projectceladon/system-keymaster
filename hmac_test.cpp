@@ -19,7 +19,7 @@
 #include <gtest/gtest.h>
 #include <string.h>
 
-#include "google_keymaster_test_utils.h"
+#include "android_keymaster_test_utils.h"
 
 using std::string;
 

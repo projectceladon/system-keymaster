@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "google_keymaster_test_utils.h"
+#include "android_keymaster_test_utils.h"
 #include "keymaster_enforcement.h"
 
 namespace keymaster {

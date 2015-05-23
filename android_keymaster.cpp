@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <keymaster/google_keymaster.h>
+#include <keymaster/android_keymaster.h>
 
 #include <assert.h>
 #include <string.h>
@@ -26,7 +26,7 @@
 
 #include <UniquePtr.h>
 
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 
 #include "ae.h"
 #include "key.h"
@@ -41,11 +41,11 @@ const uint8_t MAJOR_VER = 1;
 const uint8_t MINOR_VER = 0;
 const uint8_t SUBMINOR_VER = 0;
 
-GoogleKeymaster::GoogleKeymaster(size_t operation_table_size)
+AndroidKeymaster::AndroidKeymaster(size_t operation_table_size)
     : operation_table_(new OperationTable(operation_table_size)) {
 }
 
-GoogleKeymaster::~GoogleKeymaster() {
+AndroidKeymaster::~AndroidKeymaster() {
 }
 
 struct AE_CTX_Delete {
@@ -54,9 +54,9 @@ struct AE_CTX_Delete {
 typedef UniquePtr<ae_ctx, AE_CTX_Delete> Unique_ae_ctx;
 
 // TODO(swillden): Unify support analysis.  Right now, we have per-keytype methods that determine if
-// specific modes, padding, etc. are supported for that key type, and GoogleKeymaster also has
+// specific modes, padding, etc. are supported for that key type, and AndroidKeymaster also has
 // methods that return the same information.  They'll get out of sync.  Best to put the knowledge in
-// the keytypes and provide some mechanism for GoogleKeymaster to query the keytypes for the
+// the keytypes and provide some mechanism for AndroidKeymaster to query the keytypes for the
 // information.
 
 template <typename T>
@@ -68,7 +68,7 @@ bool check_supported(keymaster_algorithm_t algorithm, SupportedResponse<T>* resp
     return true;
 }
 
-void GoogleKeymaster::GetVersion(const GetVersionRequest&, GetVersionResponse* rsp) {
+void AndroidKeymaster::GetVersion(const GetVersionRequest&, GetVersionResponse* rsp) {
     if (rsp == NULL)
         return;
 
@@ -78,7 +78,7 @@ void GoogleKeymaster::GetVersion(const GetVersionRequest&, GetVersionResponse* r
     rsp->error = KM_ERROR_OK;
 }
 
-void GoogleKeymaster::SupportedAlgorithms(
+void AndroidKeymaster::SupportedAlgorithms(
     SupportedResponse<keymaster_algorithm_t>* response) const {
     if (response == NULL)
         return;
@@ -135,24 +135,25 @@ void GetSupported(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
     response->SetResults(supported, count);
 }
 
-void GoogleKeymaster::SupportedBlockModes(
+void AndroidKeymaster::SupportedBlockModes(
     keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
     SupportedResponse<keymaster_block_mode_t>* response) const {
     GetSupported(algorithm, purpose, &OperationFactory::SupportedBlockModes, response);
 }
 
-void GoogleKeymaster::SupportedPaddingModes(
+void AndroidKeymaster::SupportedPaddingModes(
     keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
     SupportedResponse<keymaster_padding_t>* response) const {
     GetSupported(algorithm, purpose, &OperationFactory::SupportedPaddingModes, response);
 }
 
-void GoogleKeymaster::SupportedDigests(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-                                       SupportedResponse<keymaster_digest_t>* response) const {
+void AndroidKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
+                                        keymaster_purpose_t purpose,
+                                        SupportedResponse<keymaster_digest_t>* response) const {
     GetSupported(algorithm, purpose, &OperationFactory::SupportedDigests, response);
 }
 
-void GoogleKeymaster::SupportedImportFormats(
+void AndroidKeymaster::SupportedImportFormats(
     keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
@@ -163,7 +164,7 @@ void GoogleKeymaster::SupportedImportFormats(
     response->SetResults(formats, count);
 }
 
-void GoogleKeymaster::SupportedExportFormats(
+void AndroidKeymaster::SupportedExportFormats(
     keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
     if (response == NULL || !check_supported(algorithm, response))
         return;
@@ -174,8 +175,8 @@ void GoogleKeymaster::SupportedExportFormats(
     response->SetResults(formats, count);
 }
 
-void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
-                                  GenerateKeyResponse* response) {
+void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
+                                   GenerateKeyResponse* response) {
     if (response == NULL)
         return;
 
@@ -195,8 +196,8 @@ void GoogleKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                    &response->enforced, &response->unenforced);
 }
 
-void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
-                                            GetKeyCharacteristicsResponse* response) {
+void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
+                                             GetKeyCharacteristicsResponse* response) {
     if (response == NULL)
         return;
 
@@ -209,8 +210,8 @@ void GoogleKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& 
     response->unenforced.Reinitialize(blob->unenforced());
 }
 
-void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
-                                     BeginOperationResponse* response) {
+void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
+                                      BeginOperationResponse* response) {
     if (response == NULL)
         return;
     response->op_handle = 0;
@@ -248,8 +249,8 @@ void GoogleKeymaster::BeginOperation(const BeginOperationRequest& request,
     response->error = operation_table_->Add(operation.release(), &response->op_handle);
 }
 
-void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
-                                      UpdateOperationResponse* response) {
+void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
+                                       UpdateOperationResponse* response) {
     if (response == NULL)
         return;
 
@@ -266,8 +267,8 @@ void GoogleKeymaster::UpdateOperation(const UpdateOperationRequest& request,
     }
 }
 
-void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
-                                      FinishOperationResponse* response) {
+void AndroidKeymaster::FinishOperation(const FinishOperationRequest& request,
+                                       FinishOperationResponse* response) {
     if (response == NULL)
         return;
 
@@ -281,7 +282,7 @@ void GoogleKeymaster::FinishOperation(const FinishOperationRequest& request,
     operation_table_->Delete(request.op_handle);
 }
 
-keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_handle_t op_handle) {
+keymaster_error_t AndroidKeymaster::AbortOperation(const keymaster_operation_handle_t op_handle) {
     Operation* operation = operation_table_->Find(op_handle);
     if (operation == NULL)
         return KM_ERROR_INVALID_OPERATION_HANDLE;
@@ -293,7 +294,7 @@ keymaster_error_t GoogleKeymaster::AbortOperation(const keymaster_operation_hand
     return KM_ERROR_OK;
 }
 
-void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response) {
+void AndroidKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response) {
     if (response == NULL)
         return;
 
@@ -312,7 +313,7 @@ void GoogleKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespon
     }
 }
 
-void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
+void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
     if (response == NULL)
         return;
 
@@ -333,10 +334,10 @@ void GoogleKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespon
                                    &response->enforced, &response->unenforced);
 }
 
-keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_origin_t origin,
-                                                keymaster_key_blob_t* keymaster_blob,
-                                                AuthorizationSet* enforced,
-                                                AuthorizationSet* unenforced) {
+keymaster_error_t AndroidKeymaster::SerializeKey(const Key* key, keymaster_key_origin_t origin,
+                                                 keymaster_key_blob_t* keymaster_blob,
+                                                 AuthorizationSet* enforced,
+                                                 AuthorizationSet* unenforced) {
     keymaster_error_t error;
 
     error = SetAuthorizations(key->authorizations(), origin, enforced, unenforced);
@@ -378,9 +379,9 @@ keymaster_error_t GoogleKeymaster::SerializeKey(const Key* key, keymaster_key_or
     return KM_ERROR_OK;
 }
 
-Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
-                              const AuthorizationSet& client_params,
-                              keymaster_algorithm_t* algorithm, keymaster_error_t* error) {
+Key* AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key,
+                               const AuthorizationSet& client_params,
+                               keymaster_algorithm_t* algorithm, keymaster_error_t* error) {
     UniquePtr<UnencryptedKeyBlob> blob(LoadKeyBlob(key, client_params, error));
     if (*error != KM_ERROR_OK)
         return NULL;
@@ -394,9 +395,9 @@ Key* GoogleKeymaster::LoadKey(const keymaster_key_blob_t& key,
     return NULL;
 }
 
-UnencryptedKeyBlob* GoogleKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
-                                                 const AuthorizationSet& client_params,
-                                                 keymaster_error_t* error) {
+UnencryptedKeyBlob* AndroidKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
+                                                  const AuthorizationSet& client_params,
+                                                  keymaster_error_t* error) {
     AuthorizationSet hidden;
     BuildHiddenAuthorizations(client_params, &hidden);
     keymaster_key_blob_t master_key = MasterKey();
@@ -425,10 +426,10 @@ static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error 
     return KM_ERROR_OK;
 }
 
-keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key_description,
-                                                     keymaster_key_origin_t origin,
-                                                     AuthorizationSet* enforced,
-                                                     AuthorizationSet* unenforced) {
+keymaster_error_t AndroidKeymaster::SetAuthorizations(const AuthorizationSet& key_description,
+                                                      keymaster_key_origin_t origin,
+                                                      AuthorizationSet* enforced,
+                                                      AuthorizationSet* unenforced) {
     enforced->Clear();
     unenforced->Clear();
     for (size_t i = 0; i < key_description.size(); ++i) {
@@ -466,8 +467,8 @@ keymaster_error_t GoogleKeymaster::SetAuthorizations(const AuthorizationSet& key
     return TranslateAuthorizationSetError(unenforced->is_valid());
 }
 
-keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                             AuthorizationSet* hidden) {
+keymaster_error_t AndroidKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                              AuthorizationSet* hidden) {
     keymaster_blob_t entry;
     if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
         hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
@@ -478,8 +479,8 @@ keymaster_error_t GoogleKeymaster::BuildHiddenAuthorizations(const Authorization
     return TranslateAuthorizationSetError(hidden->is_valid());
 }
 
-void GoogleKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
-                                       AuthorizationSet* enforced, AuthorizationSet* unenforced) {
+void AndroidKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
+                                        AuthorizationSet* enforced, AuthorizationSet* unenforced) {
     if (is_enforced(auth.tag))
         enforced->push_back(auth);
     else

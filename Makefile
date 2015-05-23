@@ -59,17 +59,17 @@ CPPSRCS=\
 	aead_mode_operation.cpp \
 	aes_key.cpp \
 	aes_operation.cpp \
+	android_keymaster.cpp \
+	android_keymaster_messages.cpp \
+	android_keymaster_messages_test.cpp \
+	android_keymaster_test.cpp \
+	android_keymaster_test_utils.cpp \
+	android_keymaster_utils.cpp \
 	asymmetric_key.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	ec_key.cpp \
 	ecdsa_operation.cpp \
-	google_keymaster.cpp \
-	google_keymaster_messages.cpp \
-	google_keymaster_messages_test.cpp \
-	google_keymaster_test.cpp \
-	google_keymaster_test_utils.cpp \
-	google_keymaster_utils.cpp \
 	gtest_main.cpp \
 	hkdf.cpp \
 	hkdf_test.cpp \
@@ -100,9 +100,9 @@ OBJS=$(CPPSRCS:.cpp=.o) $(CCSRCS:.cc=.o) $(CSRCS:.c=.o)
 DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
 
 BINARIES = abstract_factory_registry_test \
+	android_keymaster_messages_test \
+	android_keymaster_test \
 	authorization_set_test \
-	google_keymaster_test \
-	google_keymaster_messages_test \
 	hkdf_test \
 	hmac_test \
 	key_blob_test \
@@ -156,16 +156,16 @@ massif: $(BINARIES:=.massif)
 GTEST_OBJS = $(GTEST)/src/gtest-all.o gtest_main.o
 
 hmac_test: hmac_test.o \
+	android_keymaster_test_utils.o \
 	authorization_set.o \
-	google_keymaster_test_utils.o \
 	hmac.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
 
 hkdf_test: hkdf_test.o \
+	android_keymaster_test_utils.o \
 	authorization_set.o \
-	google_keymaster_test_utils.o \
 	hkdf.o \
 	hmac.o \
 	logger.o \
@@ -173,15 +173,15 @@ hkdf_test: hkdf_test.o \
 	$(GTEST_OBJS)
 
 authorization_set_test: authorization_set_test.o \
+	android_keymaster_test_utils.o \
 	authorization_set.o \
-	google_keymaster_test_utils.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
 
 key_blob_test: key_blob_test.o \
+	android_keymaster_test_utils.o \
 	authorization_set.o \
-	google_keymaster_test_utils.o \
 	key_blob.o \
 	logger.o \
 	ocb.o \
@@ -190,27 +190,27 @@ key_blob_test: key_blob_test.o \
 	unencrypted_key_blob.o \
 	$(GTEST_OBJS)
 
-google_keymaster_messages_test: google_keymaster_messages_test.o \
+android_keymaster_messages_test: android_keymaster_messages_test.o \
+	android_keymaster_messages.o \
+	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	authorization_set.o \
-	google_keymaster_messages.o \
-	google_keymaster_test_utils.o \
-	google_keymaster_utils.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
 
-google_keymaster_test: google_keymaster_test.o \
+android_keymaster_test: android_keymaster_test.o \
 	aead_mode_operation.o \
 	aes_key.o \
 	aes_operation.o \
+	android_keymaster.o \
+	android_keymaster_messages.o \
+	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	asymmetric_key.o \
 	authorization_set.o \
 	ec_key.o \
 	ecdsa_operation.o \
-	google_keymaster.o \
-	google_keymaster_messages.o \
-	google_keymaster_test_utils.o \
-	google_keymaster_utils.o \
 	hmac_key.o \
 	hmac_operation.o \
 	key.o \
@@ -234,11 +234,11 @@ abstract_factory_registry_test: abstract_factory_registry_test.o \
 	$(GTEST_OBJS)
 
 keymaster_enforcement_test: keymaster_enforcement_test.o \
-	keymaster_enforcement.o \
+	android_keymaster_messages.o \
+	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	authorization_set.o \
-	google_keymaster_utils.o \
-	google_keymaster_messages.o \
-	google_keymaster_test_utils.o \
+	keymaster_enforcement.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)

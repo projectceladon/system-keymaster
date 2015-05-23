@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
-#define SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
+#ifndef SYSTEM_KEYMASTER_ANDROID_KEYMASTER_MESSAGES_H_
+#define SYSTEM_KEYMASTER_ANDROID_KEYMASTER_MESSAGES_H_
 
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 
 namespace keymaster {
 
@@ -49,7 +49,7 @@ const uint32_t ADD_RNG_ENTROPY = 8;
  *
  * Because message version selection is purely a client-side issue, all messages default to using
  * the latest version (MAX_MESSAGE_VERSION).  Client code must take care to check versions and pass
- * correct version values to message constructors.  The GoogleKeymaster implementation always uses
+ * correct version values to message constructors.  The AndroidKeymaster implementation always uses
  * the default, latest.
  *
  * Note that this approach implies that GetVersionRequest and GetVersionResponse cannot be
@@ -401,4 +401,4 @@ struct GetVersionResponse : public KeymasterResponse {
 
 }  // namespace keymaster
 
-#endif  // SYSTEM_KEYMASTER_GOOGLE_KEYMASTER_MESSAGES_H_
+#endif  // SYSTEM_KEYMASTER_ANDROID_KEYMASTER_MESSAGES_H_

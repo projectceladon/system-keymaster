@@ -22,7 +22,7 @@
 #include <openssl/rand.h>
 
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster_utils.h>
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/keymaster_tags.h>
 
 #include "unencrypted_key_blob.h"

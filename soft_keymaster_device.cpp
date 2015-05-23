@@ -34,11 +34,11 @@
 #include <cutils/log.h>
 
 #include <keymaster/authorization_set.h>
-#include <keymaster/google_keymaster_messages.h>
+#include <keymaster/android_keymaster_messages.h>
 #include <keymaster/key_blob.h>
 #include <keymaster/soft_keymaster_logger.h>
 
-#include "google_softkeymaster.h"
+#include "android_softkeymaster.h"
 
 struct keystore_module soft_keymaster_device_module = {
     .common =
@@ -57,7 +57,7 @@ struct keystore_module soft_keymaster_device_module = {
 
 namespace keymaster {
 
-SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new GoogleSoftKeymaster(16)) {
+SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new AndroidSoftKeymaster(16)) {
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
     static_assert(std::is_standard_layout<SoftKeymasterDevice>::value,
                   "SoftKeymasterDevice must be standard layout");
