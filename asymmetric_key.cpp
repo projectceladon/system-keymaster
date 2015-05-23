@@ -20,28 +20,36 @@
 
 #include <hardware/keymaster_defs.h>
 
-#include "ec_key.h"
 #include "openssl_err.h"
 #include "openssl_utils.h"
-#include "rsa_key.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
-EVP_PKEY* AsymmetricKeyFactory::ExtractEvpKey(keymaster_key_format_t key_format,
-                                              keymaster_algorithm_t expected_algorithm,
-                                              const uint8_t* key_data, size_t key_data_length,
-                                              keymaster_error_t* error) {
-    *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+keymaster_error_t
+AsymmetricKeyFactory::KeyMaterialToEvpKey(keymaster_key_format_t key_format,
+                                          const KeymasterKeyBlob& key_material,
+                                          UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey) {
     if (key_format != KM_KEY_FORMAT_PKCS8)
-        return NULL;
+        return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
 
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
-    *error = convert_pkcs8_blob_to_evp(key_data, key_data_length, expected_algorithm, &pkey);
-    if (*error != KM_ERROR_OK)
-        return NULL;
+    return convert_pkcs8_blob_to_evp(key_material.key_material, key_material.key_material_size,
+                                     registry_key(), pkey);
+}
 
-    return pkey.release();
+keymaster_error_t AsymmetricKeyFactory::EvpKeyToKeyMaterial(const EVP_PKEY* pkey,
+                                                            KeymasterKeyBlob* key_blob) {
+    int key_data_size = i2d_PrivateKey(pkey, NULL /* key_data*/);
+    if (key_data_size <= 0)
+        return TranslateLastOpenSslError();
+
+    key_blob->Reset(key_data_size);
+    if (!key_blob->key_material)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    uint8_t* tmp = key_blob->writable_data();
+    i2d_PrivateKey(pkey, &tmp);
+
+    return KM_ERROR_OK;
 }
 
 static const keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
@@ -56,20 +64,28 @@ const keymaster_key_format_t* AsymmetricKeyFactory::SupportedExportFormats(size_
     return supported_export_formats;
 }
 
-keymaster_error_t AsymmetricKey::LoadKey(const UnencryptedKeyBlob& blob) {
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> evp_key(EVP_PKEY_new());
-    if (evp_key.get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+keymaster_error_t AsymmetricKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
+                                                const AuthorizationSet& hw_enforced,
+                                                const AuthorizationSet& sw_enforced,
+                                                UniquePtr<Key>* key) {
+    UniquePtr<AsymmetricKey> asymmetric_key;
+    keymaster_error_t error = CreateEmptyKey(hw_enforced, sw_enforced, &asymmetric_key);
+    if (error != KM_ERROR_OK)
+        return error;
 
-    EVP_PKEY* tmp_pkey = evp_key.get();
-    const uint8_t* key_material = blob.unencrypted_key_material();
-    if (d2i_PrivateKey(evp_key_type(), &tmp_pkey, &key_material, blob.key_material_length()) ==
-        NULL)
+    const uint8_t* tmp = key_material.key_material;
+    EVP_PKEY* pkey =
+        d2i_PrivateKey(evp_key_type(), NULL /* pkey */, &tmp, key_material.key_material_size);
+    if (!pkey)
         return TranslateLastOpenSslError();
-    if (!EvpToInternal(evp_key.get()))
-        return TranslateLastOpenSslError();
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey_deleter(pkey);
 
-    return KM_ERROR_OK;
+    if (!asymmetric_key->EvpToInternal(pkey))
+        error = TranslateLastOpenSslError();
+    else
+        key->reset(asymmetric_key.release());
+
+    return error;
 }
 
 keymaster_error_t AsymmetricKey::key_material(UniquePtr<uint8_t[]>* material, size_t* size) const {

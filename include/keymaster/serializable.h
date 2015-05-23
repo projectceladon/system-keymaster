@@ -194,6 +194,9 @@ class Buffer : public Serializable {
         return Reinitialize(buffer.peek_read(), buffer.available_read());
     }
 
+    const uint8_t* begin() const { return peek_read(); }
+    const uint8_t* end() const { return peek_read() + available_read(); }
+
     void Clear();
 
     size_t available_write() const;

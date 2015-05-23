@@ -22,53 +22,73 @@
 #include <openssl/rand.h>
 
 #include <keymaster/logger.h>
+#include <keymaster/keymaster_context.h>
 
 #include "aes_key.h"
 #include "hmac_key.h"
 #include "openssl_err.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
-Key* SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
-                                      keymaster_error_t* error) {
-    UniquePtr<SymmetricKey> key(CreateKeyAndValidateSize(key_description, error));
-    if (!key.get())
-        return NULL;
+keymaster_error_t SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
+                                                   KeymasterKeyBlob* key_blob,
+                                                   AuthorizationSet* hw_enforced,
+                                                   AuthorizationSet* sw_enforced) {
+    if (!key_blob || !hw_enforced || !sw_enforced)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    if (RAND_bytes(key->key_data_.get(), key->key_data_size_) != 1) {
-        LOG_E("Error %ul generating %d bit AES key", ERR_get_error(), key->key_data_size_ * 8);
-        *error = TranslateLastOpenSslError();
-        return NULL;
+    uint32_t key_size_bits;
+    if (!key_description.GetTagValue(TAG_KEY_SIZE, &key_size_bits) ||
+        !key_size_supported(key_size_bits))
+        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+
+    size_t key_data_size = key_size_bits / 8;
+    KeymasterKeyBlob key_material(key_data_size);
+    if (!key_material.key_material)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    keymaster_error_t error = context_->GenerateRandom(key_material.writable_data(), key_data_size);
+    if (error != KM_ERROR_OK) {
+        LOG_E("Error generating %d bit symmetric key", key_size_bits);
+        return error;
     }
 
-    if (*error != KM_ERROR_OK)
-        return NULL;
-    return key.release();
+    return context_->CreateKeyBlob(key_description, KM_ORIGIN_GENERATED, key_material, key_blob,
+                                   hw_enforced, sw_enforced);
 }
 
-Key* SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_description,
-                                    keymaster_key_format_t format, const uint8_t* key_material,
-                                    size_t key_material_length, keymaster_error_t* error) {
-    UniquePtr<SymmetricKey> key(CreateKeyAndValidateSize(key_description, error));
-    if (!key.get())
-        return NULL;
+keymaster_error_t SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_description,
+                                                 keymaster_key_format_t input_key_material_format,
+                                                 const KeymasterKeyBlob& input_key_material,
+                                                 KeymasterKeyBlob* output_key_blob,
+                                                 AuthorizationSet* hw_enforced,
+                                                 AuthorizationSet* sw_enforced) {
+    if (!output_key_blob || !hw_enforced || !sw_enforced)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    if (format != KM_KEY_FORMAT_RAW) {
-        *error = KM_ERROR_UNSUPPORTED_KEY_FORMAT;
-        return NULL;
+    AuthorizationSet authorizations(key_description);
+
+    uint32_t key_size_bits;
+    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
+        // Default key size if not specified.
+        key_size_bits = input_key_material.key_material_size * 8;
+        authorizations.push_back(TAG_KEY_SIZE, key_size_bits);
     }
 
-    if (key->key_data_size_ != key_material_length) {
-        LOG_E("Expected %d byte key data but got %d bytes", key->key_data_size_,
-              key_material_length);
-        *error = KM_ERROR_INVALID_KEY_BLOB;
-        return NULL;
+    if (!key_size_supported(key_size_bits))
+        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+
+    if (input_key_material_format != KM_KEY_FORMAT_RAW)
+        return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+
+    if (key_size_bits != input_key_material.key_material_size * 8) {
+        LOG_E("Expected %d-bit key data but got %d bits", key_size_bits,
+              input_key_material.key_material_size * 8);
+        return KM_ERROR_INVALID_KEY_BLOB;
     }
 
-    key->key_data_size_ = key_material_length;
-    memcpy(key->key_data_.get(), key_material, key_material_length);
-    return key.release();
+    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
+                                   output_key_blob, hw_enforced, sw_enforced);
 }
 
 static const keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_RAW};
@@ -77,40 +97,21 @@ const keymaster_key_format_t* SymmetricKeyFactory::SupportedImportFormats(size_t
     return supported_import_formats;
 }
 
-SymmetricKey* SymmetricKeyFactory::CreateKeyAndValidateSize(const AuthorizationSet& key_description,
-                                                            keymaster_error_t* error) {
-    if (!error)
-        return NULL;
-    *error = KM_ERROR_OK;
-
-    UniquePtr<SymmetricKey> key(CreateKey(key_description));
-
-    uint32_t key_size_bits;
-    if (!key_description.GetTagValue(TAG_KEY_SIZE, &key_size_bits) || key_size_bits % 8 != 0) {
-        *error = KM_ERROR_UNSUPPORTED_KEY_SIZE;
-        return NULL;
-    }
-
-    *error = key->set_size(key_size_bits / 8);
+SymmetricKey::SymmetricKey(const KeymasterKeyBlob& key_material,
+                           const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+                           keymaster_error_t* error)
+    : Key(hw_enforced, sw_enforced, error) {
     if (*error != KM_ERROR_OK)
-        return NULL;
-
-    return key.release();
-}
-
-SymmetricKey::SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error)
-    : Key(blob), key_data_size_(blob.unencrypted_key_material_length()) {
-    key_data_.reset(new uint8_t[key_data_size_]);
-    if (!key_data_.get()) {
-        if (error)
-            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        key_data_size_ = 0;
         return;
-    }
 
-    memcpy(key_data_.get(), blob.unencrypted_key_material(), key_data_size_);
-    if (error)
+    uint8_t* tmp = dup_buffer(key_material.key_material, key_material.key_material_size);
+    if (tmp) {
+        key_data_.reset(tmp);
+        key_data_size_ = key_material.key_material_size;
         *error = KM_ERROR_OK;
+    } else {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
 }
 
 SymmetricKey::~SymmetricKey() {
@@ -124,18 +125,6 @@ keymaster_error_t SymmetricKey::key_material(UniquePtr<uint8_t[]>* key_material,
     if (!key_material->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memcpy(key_material->get(), key_data_.get(), *size);
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t SymmetricKey::set_size(size_t key_size) {
-    if (!size_supported(key_size))
-        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
-
-    key_data_.reset(new uint8_t[key_size]);
-    if (!key_data_.get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    key_data_size_ = key_size;
-
     return KM_ERROR_OK;
 }
 
