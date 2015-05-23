@@ -38,7 +38,11 @@
 #include <keymaster/key_blob.h>
 #include <keymaster/soft_keymaster_logger.h>
 
+#include "aes_key.h"
+#include "ec_key.h"
 #include "android_softkeymaster.h"
+#include "hmac_key.h"
+#include "rsa_key.h"
 
 struct keystore_module soft_keymaster_device_module = {
     .common =
@@ -56,6 +60,11 @@ struct keystore_module soft_keymaster_device_module = {
 };
 
 namespace keymaster {
+
+static KeyFactoryRegistry::Registration<AesKeyFactory> aes_registration;
+static KeyFactoryRegistry::Registration<EcdsaKeyFactory> ec_registration;
+static KeyFactoryRegistry::Registration<HmacKeyFactory> hmac_registration;
+static KeyFactoryRegistry::Registration<RsaKeyFactory> rsa_registration;
 
 SoftKeymasterDevice::SoftKeymasterDevice() : impl_(new AndroidSoftKeymaster(16)) {
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)

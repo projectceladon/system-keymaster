@@ -65,7 +65,7 @@ class SoftKeymasterDevice {
      * keymaster_device.
      */
 
-    // Version 0.3 and below APIs
+    // keymaster0 APIs
     static int generate_keypair(const keymaster1_device_t* dev, const keymaster_keypair_t key_type,
                                 const void* key_params, uint8_t** keyBlob, size_t* keyBlobLength);
     static int import_keypair(const struct keymaster1_device* dev, const uint8_t* key,
@@ -82,7 +82,7 @@ class SoftKeymasterDevice {
                            const uint8_t* signed_data, const size_t signed_data_length,
                            const uint8_t* signature, const size_t signature_length);
 
-    // Version 0.4 APIs.
+    // keymaster1 APIs.
     static keymaster_error_t get_supported_algorithms(const keymaster1_device_t* dev,
                                                       keymaster_algorithm_t** algorithms,
                                                       size_t* algorithms_length);

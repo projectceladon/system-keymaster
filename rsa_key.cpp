@@ -29,8 +29,6 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
-static KeyFactoryRegistry::Registration<RsaKeyFactory> registration;
-
 Key* RsaKeyFactory::LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) {
     return new RsaKey(blob, error);
 }
