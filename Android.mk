@@ -87,6 +87,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := libsoftkeymasterdevice
 LOCAL_SRC_FILES := \
+	ec_keymaster0_key.cpp \
 	keymaster0_engine.cpp \
 	rsa_keymaster0_key.cpp \
 	soft_keymaster_context.cpp \

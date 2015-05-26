@@ -28,13 +28,13 @@
 
 #include "aes_key.h"
 #include "auth_encrypted_key_blob.h"
-#include "ec_key.h"
+#include "ec_keymaster0_key.h"
 #include "hmac_key.h"
+#include "integrity_assured_key_blob.h"
 #include "keymaster0_engine.h"
 #include "ocb_utils.h"
 #include "openssl_err.h"
 #include "rsa_keymaster0_key.h"
-#include "integrity_assured_key_blob.h"
 
 using std::unique_ptr;
 
@@ -50,10 +50,10 @@ const KeymasterKeyBlob MASTER_KEY(master_key_bytes, array_length(master_key_byte
 class SoftKeymasterKeyRegistrations {
   public:
     SoftKeymasterKeyRegistrations(SoftKeymasterContext* context, Keymaster0Engine* engine)
-        : rsa_(context, engine), ec_(context), hmac_(context), aes_(context) {}
+        : rsa_(context, engine), ec_(context, engine), hmac_(context), aes_(context) {}
 
     KeyFactoryRegistry::Registration<RsaKeymaster0KeyFactory> rsa_;
-    KeyFactoryRegistry::Registration<EcdsaKeyFactory> ec_;
+    KeyFactoryRegistry::Registration<EcdsaKeymaster0KeyFactory> ec_;
     KeyFactoryRegistry::Registration<HmacKeyFactory> hmac_;
     KeyFactoryRegistry::Registration<AesKeyFactory> aes_;
 };
