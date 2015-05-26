@@ -66,6 +66,7 @@ CPPSRCS=\
 	android_keymaster_test_utils.cpp \
 	android_keymaster_utils.cpp \
 	asymmetric_key.cpp \
+	auth_encrypted_key_blob.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	ec_key.cpp \
@@ -78,11 +79,11 @@ CPPSRCS=\
 	hmac_operation.cpp \
 	hmac_test.cpp \
 	key.cpp \
-	key_blob.cpp \
 	key_blob_test.cpp \
 	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp \
 	logger.cpp \
+	ocb_utils.cpp \
 	openssl_err.cpp \
 	openssl_utils.cpp \
 	operation.cpp \
@@ -90,9 +91,9 @@ CPPSRCS=\
 	rsa_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
+	soft_keymaster_context.cpp \
 	soft_keymaster_device.cpp \
 	symmetric_key.cpp \
-	unencrypted_key_blob.cpp
 CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -181,13 +182,14 @@ authorization_set_test: authorization_set_test.o \
 
 key_blob_test: key_blob_test.o \
 	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
+	auth_encrypted_key_blob.o \
 	authorization_set.o \
-	key_blob.o \
 	logger.o \
 	ocb.o \
+	ocb_utils.o \
 	openssl_err.o \
 	serializable.o \
-	unencrypted_key_blob.o \
 	$(GTEST_OBJS)
 
 android_keymaster_messages_test: android_keymaster_messages_test.o \
@@ -200,7 +202,6 @@ android_keymaster_messages_test: android_keymaster_messages_test.o \
 	$(GTEST_OBJS)
 
 android_keymaster_test: android_keymaster_test.o \
-	aead_mode_operation.o \
 	aes_key.o \
 	aes_operation.o \
 	android_keymaster.o \
@@ -208,15 +209,16 @@ android_keymaster_test: android_keymaster_test.o \
 	android_keymaster_test_utils.o \
 	android_keymaster_utils.o \
 	asymmetric_key.o \
+	auth_encrypted_key_blob.o \
 	authorization_set.o \
 	ec_key.o \
 	ecdsa_operation.o \
 	hmac_key.o \
 	hmac_operation.o \
 	key.o \
-	key_blob.o \
 	logger.o \
 	ocb.o \
+	ocb_utils.o \
 	openssl_err.o \
 	openssl_utils.o \
 	operation.o \
@@ -224,12 +226,13 @@ android_keymaster_test: android_keymaster_test.o \
 	rsa_key.o \
 	rsa_operation.o \
 	serializable.o \
+	soft_keymaster_context.o \
 	soft_keymaster_device.o \
 	symmetric_key.o \
-	unencrypted_key_blob.o \
 	$(GTEST_OBJS)
 
 abstract_factory_registry_test: abstract_factory_registry_test.o \
+	android_keymaster_utils.o \
 	logger.o \
 	$(GTEST_OBJS)
 

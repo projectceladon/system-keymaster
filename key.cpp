@@ -19,16 +19,19 @@
 #include <openssl/x509.h>
 
 #include "openssl_utils.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
 /* static */
 template <> KeyFactoryRegistry* KeyFactoryRegistry::instance_ptr = 0;
 
-Key::Key(const KeyBlob& blob) {
-    authorizations_.push_back(blob.unenforced());
-    authorizations_.push_back(blob.enforced());
+Key::Key(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+         keymaster_error_t* error) {
+    assert(error);
+    authorizations_.push_back(hw_enforced);
+    authorizations_.push_back(sw_enforced);
+    *error = KM_ERROR_OK;
+    if (authorizations_.is_valid() != AuthorizationSet::OK)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 }
-
 }  // namespace keymaster

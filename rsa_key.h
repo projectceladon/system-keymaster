@@ -25,25 +25,33 @@ namespace keymaster {
 
 class RsaKeyFactory : public AsymmetricKeyFactory {
   public:
+    RsaKeyFactory(const KeymasterContext* context) : AsymmetricKeyFactory(context) {}
+
     keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_RSA; }
-    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error);
-    Key* ImportKey(const AuthorizationSet& key_description, keymaster_key_format_t key_format,
-                   const uint8_t* key_data, size_t key_data_length,
-                   keymaster_error_t* error) override;
-    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
+    int evp_key_type() override { return EVP_PKEY_RSA; }
+
+    keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
+                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                  AuthorizationSet* sw_enforced) override;
+    keymaster_error_t ImportKey(const AuthorizationSet& key_description,
+                                keymaster_key_format_t input_key_material_format,
+                                const KeymasterKeyBlob& input_key_material,
+                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
+                                AuthorizationSet* sw_enforced) override;
+
+    keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
+                                     const AuthorizationSet& sw_enforced,
+                                     UniquePtr<AsymmetricKey>* key) override;
 };
 
 class RsaOperationFactory;
 
 class RsaKey : public AsymmetricKey {
-  private:
-    friend class RsaKeyFactory;
-    friend class RsaOperationFactory;
+  public:
+    RsaKey(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+           keymaster_error_t* error)
+        : AsymmetricKey(hw_enforced, sw_enforced, error) {}
 
-    RsaKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
-    RsaKey(RSA* rsa_key, const AuthorizationSet& auths) : AsymmetricKey(auths), rsa_key_(rsa_key) {}
-
-    int evp_key_type() override { return EVP_PKEY_RSA; }
     bool InternalToEvp(EVP_PKEY* pkey) const override;
     bool EvpToInternal(const EVP_PKEY* pkey) override;
 
@@ -54,9 +62,10 @@ class RsaKey : public AsymmetricKey {
         void operator()(RSA* p) { RSA_free(p); }
     };
 
-    RSA* key() const;
+    RSA* key() const { return rsa_key_.get(); }
 
-    mutable UniquePtr<RSA, RSA_Delete> rsa_key_;
+  private:
+    UniquePtr<RSA, RSA_Delete> rsa_key_;
 };
 
 }  // namespace keymaster
