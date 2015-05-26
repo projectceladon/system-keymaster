@@ -20,6 +20,7 @@
 
 #include "openssl_err.h"
 #include "openssl_utils.h"
+#include "rsa_operation.h"
 
 #if defined(OPENSSL_IS_BORINGSSL)
 typedef size_t openssl_size_t;
@@ -29,10 +30,30 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
+static RsaSigningOperationFactory sign_factory;
+static RsaVerificationOperationFactory verify_factory;
+static RsaEncryptionOperationFactory encrypt_factory;
+static RsaDecryptionOperationFactory decrypt_factory;
+
+OperationFactory* RsaKeyFactory::GetOperationFactory(keymaster_purpose_t purpose) const {
+    switch (purpose) {
+    case KM_PURPOSE_SIGN:
+        return &sign_factory;
+    case KM_PURPOSE_VERIFY:
+        return &verify_factory;
+    case KM_PURPOSE_ENCRYPT:
+        return &encrypt_factory;
+    case KM_PURPOSE_DECRYPT:
+        return &decrypt_factory;
+    default:
+        return nullptr;
+    }
+}
+
 keymaster_error_t RsaKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                              KeymasterKeyBlob* key_blob,
                                              AuthorizationSet* hw_enforced,
-                                             AuthorizationSet* sw_enforced) {
+                                             AuthorizationSet* sw_enforced) const {
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -77,7 +98,7 @@ keymaster_error_t RsaKeyFactory::ImportKey(const AuthorizationSet& key_descripti
                                            const KeymasterKeyBlob& input_key_material,
                                            KeymasterKeyBlob* output_key_blob,
                                            AuthorizationSet* hw_enforced,
-                                           AuthorizationSet* sw_enforced) {
+                                           AuthorizationSet* sw_enforced) const {
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -98,7 +119,7 @@ keymaster_error_t RsaKeyFactory::UpdateImportKeyDescription(const AuthorizationS
                                                             const KeymasterKeyBlob& key_material,
                                                             AuthorizationSet* updated_description,
                                                             uint64_t* public_exponent,
-                                                            uint32_t* key_size) {
+                                                            uint32_t* key_size) const {
     if (!updated_description || !public_exponent || !key_size)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -138,7 +159,7 @@ keymaster_error_t RsaKeyFactory::UpdateImportKeyDescription(const AuthorizationS
 
 keymaster_error_t RsaKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforced,
                                                 const AuthorizationSet& sw_enforced,
-                                                UniquePtr<AsymmetricKey>* key) {
+                                                UniquePtr<AsymmetricKey>* key) const {
     keymaster_error_t error;
     key->reset(new RsaKey(hw_enforced, sw_enforced, &error));
     if (!key->get())

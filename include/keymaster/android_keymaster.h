@@ -23,6 +23,7 @@
 namespace keymaster {
 
 class Key;
+class KeyFactory;
 class KeymasterContext;
 class OperationTable;
 
@@ -79,7 +80,7 @@ class AndroidKeymaster {
     keymaster_error_t LoadKey(const keymaster_key_blob_t& key_blob,
                               const AuthorizationSet& additional_params,
                               AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced,
-                              keymaster_algorithm_t* algorithm, UniquePtr<Key>* key);
+                              const KeyFactory** factory, UniquePtr<Key>* key);
 
     UniquePtr<KeymasterContext> context_;
     UniquePtr<OperationTable> operation_table_;

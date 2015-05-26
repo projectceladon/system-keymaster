@@ -31,7 +31,10 @@ class AesKeyFactory : public SymmetricKeyFactory {
 
     keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
                               const AuthorizationSet& hw_enforced,
-                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
+                              const AuthorizationSet& sw_enforced,
+                              UniquePtr<Key>* key) const override;
+
+    OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const override;
 
   private:
     bool key_size_supported(size_t key_size_bits) const override {

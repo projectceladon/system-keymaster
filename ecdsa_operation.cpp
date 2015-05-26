@@ -25,17 +25,6 @@ namespace keymaster {
 
 static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE};
 
-class EcdsaOperationFactory : public OperationFactory {
-  private:
-    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_EC, purpose()); }
-    Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
-                               keymaster_error_t* error) override;
-    const keymaster_digest_t* SupportedDigests(size_t* digest_count) const override;
-
-    virtual keymaster_purpose_t purpose() const = 0;
-    virtual Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) = 0;
-};
-
 Operation* EcdsaOperationFactory::CreateOperation(const Key& key,
                                                   const AuthorizationSet& begin_params,
                                                   keymaster_error_t* error) {
@@ -71,25 +60,6 @@ const keymaster_digest_t* EcdsaOperationFactory::SupportedDigests(size_t* digest
     *digest_count = array_length(supported_digests);
     return supported_digests;
 }
-
-class EcdsaSignOperationFactory : public EcdsaOperationFactory {
-  private:
-    keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
-    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
-        return new EcdsaSignOperation(purpose(), digest, key);
-    }
-};
-
-static OperationFactoryRegistry::Registration<EcdsaSignOperationFactory> sign_registration;
-
-class EcdsaVerifyOperationFactory : public EcdsaOperationFactory {
-  public:
-    keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
-    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
-        return new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, key);
-    }
-};
-static OperationFactoryRegistry::Registration<EcdsaVerifyOperationFactory> verify_registration;
 
 EcdsaOperation::~EcdsaOperation() {
     if (ecdsa_key_ != NULL)

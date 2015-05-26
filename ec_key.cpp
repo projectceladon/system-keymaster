@@ -18,6 +18,7 @@
 
 #include <keymaster/keymaster_context.h>
 
+#include "ecdsa_operation.h"
 #include "openssl_err.h"
 #include "openssl_utils.h"
 
@@ -29,10 +30,24 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
+static EcdsaSignOperationFactory sign_factory;
+static EcdsaVerifyOperationFactory verify_factory;
+
+OperationFactory* EcdsaKeyFactory::GetOperationFactory(keymaster_purpose_t purpose) const {
+    switch (purpose) {
+    case KM_PURPOSE_SIGN:
+        return &sign_factory;
+    case KM_PURPOSE_VERIFY:
+        return &verify_factory;
+    default:
+        return nullptr;
+    }
+}
+
 keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                             KeymasterKeyBlob* key_blob,
                                             AuthorizationSet* hw_enforced,
-                                            AuthorizationSet* sw_enforced) {
+                                            AuthorizationSet* sw_enforced) const {
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -82,7 +97,7 @@ keymaster_error_t EcKeyFactory::ImportKey(const AuthorizationSet& key_descriptio
                                           const KeymasterKeyBlob& input_key_material,
                                           KeymasterKeyBlob* output_key_blob,
                                           AuthorizationSet* hw_enforced,
-                                          AuthorizationSet* sw_enforced) {
+                                          AuthorizationSet* sw_enforced) const {
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -101,7 +116,7 @@ keymaster_error_t EcKeyFactory::UpdateImportKeyDescription(const AuthorizationSe
                                                            keymaster_key_format_t key_format,
                                                            const KeymasterKeyBlob& key_material,
                                                            AuthorizationSet* updated_description,
-                                                           uint32_t* key_size_bits) {
+                                                           uint32_t* key_size_bits) const {
     if (!updated_description || !key_size_bits)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -179,7 +194,7 @@ keymaster_error_t EcKeyFactory::get_group_size(const EC_GROUP& group, size_t* ke
 
 keymaster_error_t EcKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforced,
                                                const AuthorizationSet& sw_enforced,
-                                               UniquePtr<AsymmetricKey>* key) {
+                                               UniquePtr<AsymmetricKey>* key) const {
     keymaster_error_t error;
     key->reset(new EcKey(hw_enforced, sw_enforced, &error));
     if (!key->get())
