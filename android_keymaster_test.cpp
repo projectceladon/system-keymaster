@@ -1379,7 +1379,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
 TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
-    string message = "12345678901234567890123456789012345678901234567890123";
+    string message = "123456789012345678901234567890123456789012345678901234";
     string result;
     size_t input_consumed;
 

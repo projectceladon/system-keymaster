@@ -483,7 +483,7 @@ keymaster_error_t RsaVerifyOperation::DecryptAndMatch(const Buffer& signature,
     return KM_ERROR_VERIFICATION_FAILED;
 }
 
-const int OAEP_PADDING_OVERHEAD = 41;
+const int OAEP_PADDING_OVERHEAD = 42;
 const int PKCS1_PADDING_OVERHEAD = 11;
 
 keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additional_params */,
@@ -501,7 +501,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     switch (padding_) {
     case KM_PAD_RSA_OAEP:
         openssl_padding = RSA_PKCS1_OAEP_PADDING;
-        if (message_size + OAEP_PADDING_OVERHEAD >= key_len) {
+        if (message_size + OAEP_PADDING_OVERHEAD > key_len) {
             LOG_E("Cannot encrypt %d bytes with %d-byte key and OAEP padding",
                   data_.available_read(), key_len);
             return KM_ERROR_INVALID_INPUT_LENGTH;
@@ -509,7 +509,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
         break;
     case KM_PAD_RSA_PKCS1_1_5_ENCRYPT:
         openssl_padding = RSA_PKCS1_PADDING;
-        if (message_size + PKCS1_PADDING_OVERHEAD >= key_len) {
+        if (message_size + PKCS1_PADDING_OVERHEAD > key_len) {
             LOG_E("Cannot encrypt %d bytes with %d-byte key and PKCS1 padding",
                   data_.available_read(), key_len);
             return KM_ERROR_INVALID_INPUT_LENGTH;
