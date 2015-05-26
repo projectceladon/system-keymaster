@@ -24,9 +24,17 @@ namespace keymaster {
 class SymmetricKey;
 
 class SymmetricKeyFactory : public KeyFactory {
-    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) override;
-    Key* ImportKey(const AuthorizationSet&, keymaster_key_format_t, const uint8_t*, size_t,
-                   keymaster_error_t* error) override;
+  public:
+    SymmetricKeyFactory(const KeymasterContext* context) : KeyFactory(context) {}
+
+    keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
+                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                  AuthorizationSet* sw_enforced) override;
+    keymaster_error_t ImportKey(const AuthorizationSet& key_description,
+                                keymaster_key_format_t input_key_material_format,
+                                const KeymasterKeyBlob& input_key_material,
+                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
+                                AuthorizationSet* sw_enforced) override;
 
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) {
@@ -34,10 +42,8 @@ class SymmetricKeyFactory : public KeyFactory {
     };
 
   private:
-    SymmetricKey* CreateKeyAndValidateSize(const AuthorizationSet& key_description,
-                                           keymaster_error_t* error);
+    virtual bool key_size_supported(size_t key_size_bits) const = 0;
 
-    virtual SymmetricKey* CreateKey(const AuthorizationSet& auths) = 0;
     const keymaster_key_format_t* NoFormats(size_t* format_count) {
         *format_count = 0;
         return NULL;
@@ -46,10 +52,6 @@ class SymmetricKeyFactory : public KeyFactory {
 
 class SymmetricKey : public Key {
   public:
-    static const int MAX_KEY_SIZE = 32;
-    static const int MAX_MAC_LENGTH = 32;
-    static const uint32_t MAX_CHUNK_LENGTH = 64 * 1024;
-
     ~SymmetricKey();
 
     virtual keymaster_error_t key_material(UniquePtr<uint8_t[]>* key_material, size_t* size) const;
@@ -62,15 +64,11 @@ class SymmetricKey : public Key {
     size_t key_data_size() const { return key_data_size_; }
 
   protected:
-    SymmetricKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
-    SymmetricKey(const AuthorizationSet& auths) : Key(auths) {}
+    SymmetricKey(const KeymasterKeyBlob& key_material, const AuthorizationSet& hw_enforced,
+                 const AuthorizationSet& sw_enforced, keymaster_error_t* error);
 
   private:
     friend SymmetricKeyFactory;
-
-    keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
-    keymaster_error_t set_size(size_t key_size);
-    virtual bool size_supported(size_t key_size) const = 0;
 
     size_t key_data_size_;
     UniquePtr<uint8_t[]> key_data_;

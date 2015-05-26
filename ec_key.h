@@ -25,11 +25,20 @@ namespace keymaster {
 
 class EcKeyFactory : public AsymmetricKeyFactory {
   public:
-    Key* GenerateKey(const AuthorizationSet& key_description, keymaster_error_t* error) override;
-    Key* ImportKey(const AuthorizationSet& key_description, keymaster_key_format_t key_format,
-                   const uint8_t* key_data, size_t key_data_length,
-                   keymaster_error_t* error) override;
-    Key* LoadKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error) override;
+    EcKeyFactory(const KeymasterContext* context) : AsymmetricKeyFactory(context) {}
+
+    keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
+                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                  AuthorizationSet* sw_enforced) override;
+    keymaster_error_t ImportKey(const AuthorizationSet& key_description,
+                                keymaster_key_format_t input_key_material_format,
+                                const KeymasterKeyBlob& input_key_material,
+                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
+                                AuthorizationSet* sw_enforced) override;
+
+    keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
+                                     const AuthorizationSet& sw_enforced,
+                                     UniquePtr<AsymmetricKey>* key) override;
 
   private:
     static EC_GROUP* choose_group(size_t key_size_bits);
@@ -42,23 +51,22 @@ class EcKeyFactory : public AsymmetricKeyFactory {
 
 class EcdsaKeyFactory : public EcKeyFactory {
   public:
-    virtual keymaster_algorithm_t registry_key() const { return KM_ALGORITHM_EC; }
+    EcdsaKeyFactory(const KeymasterContext* context) : EcKeyFactory(context) {}
+
+    keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_EC; }
+    int evp_key_type() override { return EVP_PKEY_EC; }
 };
 
 class EcdsaOperationFactory;
 
 class EcKey : public AsymmetricKey {
-  private:
-    friend EcKeyFactory;
-    friend EcdsaKeyFactory;
-    friend EcdsaOperationFactory;
+  public:
+    EcKey(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+          keymaster_error_t* error)
+        : AsymmetricKey(hw_enforced, sw_enforced, error) {}
 
-    EcKey(const UnencryptedKeyBlob& blob, keymaster_error_t* error);
-    EcKey(EC_KEY* ec_key, const AuthorizationSet auths) : AsymmetricKey(auths), ec_key_(ec_key) {}
-
-    virtual int evp_key_type() { return EVP_PKEY_EC; }
-    virtual bool InternalToEvp(EVP_PKEY* pkey) const;
-    virtual bool EvpToInternal(const EVP_PKEY* pkey);
+    bool InternalToEvp(EVP_PKEY* pkey) const override;
+    bool EvpToInternal(const EVP_PKEY* pkey) override;
 
     struct EC_Delete {
         void operator()(EC_KEY* p) { EC_KEY_free(p); }

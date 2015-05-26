@@ -78,7 +78,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
 
     size_t len;
     keymaster_block_mode_t* modes;
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
     EXPECT_EQ(0U, len);
     free(modes);
@@ -87,7 +87,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
               device()->get_supported_block_modes(device(), KM_ALGORITHM_EC, KM_PURPOSE_ENCRYPT,
                                                   &modes, &len));
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_block_modes(device(), KM_ALGORITHM_AES,
                                                                KM_PURPOSE_ENCRYPT, &modes, &len));
     EXPECT_TRUE(ResponseContains({KM_MODE_ECB, KM_MODE_CBC, KM_MODE_CTR}, modes, len));
     free(modes);
@@ -100,18 +100,18 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
 
     size_t len;
     keymaster_padding_t* modes;
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
     EXPECT_TRUE(
         ResponseContains({KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN, KM_PAD_RSA_PSS}, modes, len));
     free(modes);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_ENCRYPT, &modes, &len));
     EXPECT_TRUE(ResponseContains({KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT}, modes, len));
     free(modes);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_EC,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_EC,
                                                                  KM_PURPOSE_SIGN, &modes, &len));
     EXPECT_EQ(0U, len);
     free(modes);
@@ -128,12 +128,12 @@ TEST_F(CheckSupported, SupportedDigests) {
 
     size_t len;
     keymaster_digest_t* digests;
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
     EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE, KM_DIGEST_SHA_2_256}, digests, len));
     free(digests);
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
     EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
     free(digests);
@@ -142,7 +142,7 @@ TEST_F(CheckSupported, SupportedDigests) {
               device()->get_supported_digests(device(), KM_ALGORITHM_AES, KM_PURPOSE_SIGN, &digests,
                                               &len));
 
-    EXPECT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
     EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
                                   KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1},
@@ -156,17 +156,17 @@ TEST_F(CheckSupported, SupportedImportFormats) {
 
     size_t len;
     keymaster_key_format_t* formats;
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_PKCS8, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_AES, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_RAW, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_HMAC, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_RAW, formats, len));
     free(formats);
@@ -178,27 +178,27 @@ TEST_F(CheckSupported, SupportedExportFormats) {
 
     size_t len;
     keymaster_key_format_t* formats;
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_RSA, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_EC, &formats, &len));
     EXPECT_TRUE(ResponseContains(KM_KEY_FORMAT_X509, formats, len));
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
     EXPECT_EQ(0U, len);
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_AES, &formats, &len));
     EXPECT_EQ(0U, len);
     free(formats);
 
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_HMAC, &formats, &len));
     EXPECT_EQ(0U, len);
     free(formats);
@@ -950,13 +950,13 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
     // Get all supported digests and padding modes.
     size_t digests_len;
     keymaster_digest_t* digests;
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_digests(device(), KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, &digests,
                                               &digests_len));
 
     size_t padding_modes_len;
     keymaster_padding_t* padding_modes;
-    EXPECT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_OK,
               device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_SIGN,
                                                     &padding_modes, &padding_modes_len));
 

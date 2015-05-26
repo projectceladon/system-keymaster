@@ -25,6 +25,8 @@
 
 namespace keymaster {
 
+static const size_t MAX_EVP_KEY_SIZE = 32;
+
 class AesEvpOperation : public Operation {
   public:
     AesEvpOperation(keymaster_purpose_t purpose, keymaster_block_mode_t block_mode,
@@ -54,7 +56,7 @@ class AesEvpOperation : public Operation {
     const keymaster_padding_t padding_;
     const bool caller_iv_;
     UniquePtr<uint8_t[]> iv_;
-    uint8_t key_[SymmetricKey::MAX_KEY_SIZE];
+    uint8_t key_[MAX_EVP_KEY_SIZE];
 };
 
 class AesEvpEncryptOperation : public AesEvpOperation {

@@ -23,6 +23,7 @@
 
 #include <UniquePtr.h>
 
+#include <hardware/keymaster_defs.h>
 #include <keymaster/serializable.h>
 
 namespace keymaster {
@@ -49,14 +50,14 @@ inline int64_t java_time(time_t time) {
 /**
  * Return the size in bytes of the array \p a.
  */
-template <typename T, size_t N> inline size_t array_size(const T (&a)[N]) {
+template <typename T, size_t N> inline size_t array_size(const T(&a)[N]) {
     return sizeof(a);
 }
 
 /**
  * Return the number of elements in array \p a.
  */
-template <typename T, size_t N> inline size_t array_length(const T (&)[N]) {
+template <typename T, size_t N> inline size_t array_length(const T(&)[N]) {
     return N;
 }
 
@@ -77,7 +78,7 @@ template <typename T> inline T* dup_array(const T* a, size_t n) {
  * responsibility.  Note that the dup is necessarily returned as a pointer, so size is lost.  Call
  * array_length() on the original array to discover the size.
  */
-template <typename T, size_t N> inline T* dup_array(const T (&a)[N]) {
+template <typename T, size_t N> inline T* dup_array(const T(&a)[N]) {
     return dup_array(a, N);
 }
 
@@ -90,7 +91,7 @@ uint8_t* dup_buffer(const void* buf, size_t size);
 /**
  * Copy the contents of array \p arr to \p dest.
  */
-template <typename T, size_t N> inline void copy_array(const T (&arr)[N], T* dest) {
+template <typename T, size_t N> inline void copy_array(const T(&arr)[N], T* dest) {
     for (size_t i = 0; i < N; ++i)
         dest[i] = arr[i];
 }
@@ -100,7 +101,7 @@ template <typename T, size_t N> inline void copy_array(const T (&arr)[N], T* des
  * early-exit, meaning that it should not be used in contexts where timing analysis attacks could be
  * a concern.
  */
-template <typename T, size_t N> inline bool array_contains(const T (&a)[N], T val) {
+template <typename T, size_t N> inline bool array_contains(const T(&a)[N], T val) {
     for (size_t i = 0; i < N; ++i) {
         if (a[i] == val) {
             return true;
@@ -144,9 +145,9 @@ class Eraser {
 
     template <typename T>
     explicit Eraser(T& t)
-        : buf_(reinterpret_cast<uint8_t*> (&t)), size_(sizeof(t)) {}
+        : buf_(reinterpret_cast<uint8_t*>(&t)), size_(sizeof(t)) {}
 
-    template <size_t N> explicit Eraser(uint8_t (&arr)[N]) : buf_(arr), size_(N) {}
+    template <size_t N> explicit Eraser(uint8_t(&arr)[N]) : buf_(arr), size_(N) {}
 
     Eraser(void* buf, size_t size) : buf_(static_cast<uint8_t*>(buf)), size_(size) {}
     ~Eraser() { memset_s(buf_, 0, size_); }
@@ -205,6 +206,85 @@ template <typename T> T hton(T t) {
     }
     return retval;
 }
+
+/**
+ * KeymasterKeyBlob is a very simple extension of the C struct keymaster_key_blob_t.  It manages its
+ * own memory, which makes avoiding memory leaks much easier.
+ */
+struct KeymasterKeyBlob : public keymaster_key_blob_t {
+    KeymasterKeyBlob() {
+        key_material = nullptr;
+        key_material_size = 0;
+    }
+
+    KeymasterKeyBlob(const uint8_t* data, size_t size) {
+        key_material = dup_buffer(data, size);
+        key_material_size = size;
+    }
+
+    explicit KeymasterKeyBlob(size_t size) {
+        key_material = new uint8_t[size];
+        key_material_size = size;
+    }
+
+    explicit KeymasterKeyBlob(const keymaster_key_blob_t& blob) {
+        key_material = dup_buffer(blob.key_material, blob.key_material_size);
+        key_material_size = blob.key_material_size;
+    }
+
+    KeymasterKeyBlob(const KeymasterKeyBlob& blob) {
+        key_material = dup_buffer(blob.key_material, blob.key_material_size);
+        key_material_size = blob.key_material_size;
+    }
+
+    ~KeymasterKeyBlob() { Clear(); }
+
+    const uint8_t* begin() const { return key_material; }
+    const uint8_t* end() const { return key_material + key_material_size; }
+
+    void Clear() {
+        memset_s(const_cast<uint8_t*>(key_material), 0, key_material_size);
+        delete[] key_material;
+        key_material = nullptr;
+        key_material_size = 0;
+    }
+
+    const uint8_t* Reset(size_t new_size) {
+        Clear();
+        key_material = new uint8_t[new_size];
+        key_material_size = new_size;
+        return key_material;
+    }
+
+    // The key_material in keymaster_key_blob_t is const, which is the right thing in most
+    // circumstances, but occasionally we do need to write into it.  This method exposes a non-const
+    // version of the pointer.  Use sparingly.
+    uint8_t* writable_data() { return const_cast<uint8_t*>(key_material); }
+
+    keymaster_key_blob_t release() {
+        keymaster_key_blob_t tmp = {key_material, key_material_size};
+        key_material = nullptr;
+        key_material_size = 0;
+        return tmp;
+    }
+
+    size_t SerializedSize() const { return sizeof(uint32_t) + key_material_size; }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const {
+        return append_size_and_data_to_buf(buf, end, key_material, key_material_size);
+    }
+
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        Clear();
+        UniquePtr<uint8_t[]> tmp;
+        if (!copy_size_and_data_from_buf(buf_ptr, end, &key_material_size, &tmp)) {
+            key_material = nullptr;
+            key_material_size = 0;
+            return false;
+        }
+        key_material = tmp.release();
+        return true;
+    }
+};
 
 }  // namespace keymaster
 
