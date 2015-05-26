@@ -31,22 +31,6 @@ typedef int openssl_size_t;
 
 namespace keymaster {
 
-/**
- * Abstract base for HMAC operation factories.  This class does all of the work to create
- * HMAC operations.
- */
-class HmacOperationFactory : public OperationFactory {
-  public:
-    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_HMAC, purpose()); }
-
-    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
-                                       keymaster_error_t* error);
-
-    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const;
-
-    virtual keymaster_purpose_t purpose() const = 0;
-};
-
 Operation* HmacOperationFactory::CreateOperation(const Key& key,
                                                  const AuthorizationSet& begin_params,
                                                  keymaster_error_t* error) {
@@ -91,22 +75,6 @@ const keymaster_digest_t* HmacOperationFactory::SupportedDigests(size_t* digest_
     *digest_count = array_length(supported_digests);
     return supported_digests;
 }
-
-/**
- * Concrete factory for creating HMAC signing operations.
- */
-class HmacSignOperationFactory : public HmacOperationFactory {
-    keymaster_purpose_t purpose() const { return KM_PURPOSE_SIGN; }
-};
-static OperationFactoryRegistry::Registration<HmacSignOperationFactory> sign_registration;
-
-/**
- * Concrete factory for creating HMAC verification operations.
- */
-class HmacVerifyOperationFactory : public HmacOperationFactory {
-    keymaster_purpose_t purpose() const { return KM_PURPOSE_VERIFY; }
-};
-static OperationFactoryRegistry::Registration<HmacVerifyOperationFactory> verify_registration;
 
 HmacOperation::HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_data,
                              size_t key_data_size, keymaster_digest_t digest, size_t tag_length)

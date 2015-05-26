@@ -21,6 +21,7 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/logger.h>
 #include <keymaster/keymaster_context.h>
 
@@ -33,7 +34,7 @@ namespace keymaster {
 keymaster_error_t SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                                    KeymasterKeyBlob* key_blob,
                                                    AuthorizationSet* hw_enforced,
-                                                   AuthorizationSet* sw_enforced) {
+                                                   AuthorizationSet* sw_enforced) const {
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -62,7 +63,7 @@ keymaster_error_t SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_des
                                                  const KeymasterKeyBlob& input_key_material,
                                                  KeymasterKeyBlob* output_key_blob,
                                                  AuthorizationSet* hw_enforced,
-                                                 AuthorizationSet* sw_enforced) {
+                                                 AuthorizationSet* sw_enforced) const {
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -92,7 +93,8 @@ keymaster_error_t SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_des
 }
 
 static const keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_RAW};
-const keymaster_key_format_t* SymmetricKeyFactory::SupportedImportFormats(size_t* format_count) {
+const keymaster_key_format_t*
+SymmetricKeyFactory::SupportedImportFormats(size_t* format_count) const {
     *format_count = array_length(supported_import_formats);
     return supported_import_formats;
 }

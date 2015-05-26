@@ -55,7 +55,6 @@ CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-paramete
 LDLIBS=-L$(BASE)/../boringssl/build/crypto -lcrypto -lpthread -lstdc++ -lgcov
 
 CPPSRCS=\
-	abstract_factory_registry_test.cpp \
 	aead_mode_operation.cpp \
 	aes_key.cpp \
 	aes_operation.cpp \
@@ -104,7 +103,7 @@ CSRCS=ocb.c
 OBJS=$(CPPSRCS:.cpp=.o) $(CCSRCS:.cc=.o) $(CSRCS:.c=.o)
 DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
 
-BINARIES = abstract_factory_registry_test \
+BINARIES = \
 	android_keymaster_messages_test \
 	android_keymaster_test \
 	authorization_set_test \
@@ -239,11 +238,6 @@ android_keymaster_test: android_keymaster_test.o \
 	symmetric_key.o \
 	$(BASE)/system/security/softkeymaster/keymaster_openssl.o \
 	$(BASE)/system/security/keystore/keyblob_utils.o \
-	$(GTEST_OBJS)
-
-abstract_factory_registry_test: abstract_factory_registry_test.o \
-	android_keymaster_utils.o \
-	logger.o \
 	$(GTEST_OBJS)
 
 keymaster_enforcement_test: keymaster_enforcement_test.o \

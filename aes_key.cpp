@@ -25,9 +25,24 @@
 
 namespace keymaster {
 
+AesEncryptionOperationFactory encrypt_factory;
+AesDecryptionOperationFactory decrypt_factory;
+
+OperationFactory* AesKeyFactory::GetOperationFactory(keymaster_purpose_t purpose) const {
+    switch (purpose) {
+    case KM_PURPOSE_ENCRYPT:
+        return &encrypt_factory;
+    case KM_PURPOSE_DECRYPT:
+        return &decrypt_factory;
+    default:
+        return nullptr;
+    }
+}
+
 keymaster_error_t AesKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
                                          const AuthorizationSet& hw_enforced,
-                                         const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) {
+                                         const AuthorizationSet& sw_enforced,
+                                         UniquePtr<Key>* key) const {
     if (!key)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 

@@ -21,6 +21,8 @@
 #define LOG_TAG "RsaKeymaster0Key"
 #include <cutils/log.h>
 
+#include <keymaster/android_keymaster_utils.h>
+#include <keymaster/logger.h>
 #include <keymaster/soft_keymaster_context.h>
 
 #include "keymaster0_engine.h"
@@ -38,7 +40,7 @@ RsaKeymaster0KeyFactory::RsaKeymaster0KeyFactory(const SoftKeymasterContext* con
 keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                                        KeymasterKeyBlob* key_blob,
                                                        AuthorizationSet* hw_enforced,
-                                                       AuthorizationSet* sw_enforced) {
+                                                       AuthorizationSet* sw_enforced) const {
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -74,7 +76,7 @@ keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& k
 keymaster_error_t RsaKeymaster0KeyFactory::ImportKey(
     const AuthorizationSet& key_description, keymaster_key_format_t input_key_material_format,
     const KeymasterKeyBlob& input_key_material, KeymasterKeyBlob* output_key_blob,
-    AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced) {
+    AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced) const {
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -108,7 +110,7 @@ keymaster_error_t RsaKeymaster0KeyFactory::ImportKey(
 keymaster_error_t RsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
                                                    const AuthorizationSet& hw_enforced,
                                                    const AuthorizationSet& sw_enforced,
-                                                   UniquePtr<Key>* key) {
+                                                   UniquePtr<Key>* key) const {
     if (!key)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 

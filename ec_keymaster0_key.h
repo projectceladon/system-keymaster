@@ -38,17 +38,18 @@ class EcdsaKeymaster0KeyFactory : public EcdsaKeyFactory {
 
     keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
                                   KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
-                                  AuthorizationSet* sw_enforced) override;
+                                  AuthorizationSet* sw_enforced) const override;
 
     keymaster_error_t ImportKey(const AuthorizationSet& key_description,
                                 keymaster_key_format_t input_key_material_format,
                                 const KeymasterKeyBlob& input_key_material,
                                 KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
-                                AuthorizationSet* sw_enforced) override;
+                                AuthorizationSet* sw_enforced) const override;
 
     keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
                               const AuthorizationSet& hw_enforced,
-                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
+                              const AuthorizationSet& sw_enforced,
+                              UniquePtr<Key>* key) const override;
 
   private:
     const Keymaster0Engine* engine_;

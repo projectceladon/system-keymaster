@@ -25,11 +25,12 @@ class HmacKeyFactory : public SymmetricKeyFactory {
   public:
     HmacKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
 
-    keymaster_algorithm_t registry_key() const override { return KM_ALGORITHM_HMAC; }
-
     keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
                               const AuthorizationSet& hw_enforced,
-                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
+                              const AuthorizationSet& sw_enforced,
+                              UniquePtr<Key>* key) const override;
+
+    OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const override;
 
   private:
     bool key_size_supported(size_t key_size_bits) const override {

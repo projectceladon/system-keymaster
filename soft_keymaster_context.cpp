@@ -47,21 +47,45 @@ const int TAG_LENGTH = 16;
 const KeymasterKeyBlob MASTER_KEY(master_key_bytes, array_length(master_key_bytes));
 }  // anonymous namespace
 
-class SoftKeymasterKeyRegistrations {
-  public:
-    SoftKeymasterKeyRegistrations(SoftKeymasterContext* context, Keymaster0Engine* engine)
-        : rsa_(context, engine), ec_(context, engine), hmac_(context), aes_(context) {}
-
-    KeyFactoryRegistry::Registration<RsaKeymaster0KeyFactory> rsa_;
-    KeyFactoryRegistry::Registration<EcdsaKeymaster0KeyFactory> ec_;
-    KeyFactoryRegistry::Registration<HmacKeyFactory> hmac_;
-    KeyFactoryRegistry::Registration<AesKeyFactory> aes_;
-};
-
 SoftKeymasterContext::SoftKeymasterContext(keymaster0_device_t* keymaster0_device) {
     if (keymaster0_device && (keymaster0_device->flags & KEYMASTER_SOFTWARE_ONLY) == 0)
         engine_.reset(new Keymaster0Engine(keymaster0_device));
-    registrations_.reset(new SoftKeymasterKeyRegistrations(this, engine_.get()));
+    rsa_factory_.reset(new RsaKeymaster0KeyFactory(this, engine_.get()));
+    ec_factory_.reset(new EcdsaKeymaster0KeyFactory(this, engine_.get()));
+    aes_factory_.reset(new AesKeyFactory(this));
+    hmac_factory_.reset(new HmacKeyFactory(this));
+}
+
+KeyFactory* SoftKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        return rsa_factory_.get();
+    case KM_ALGORITHM_EC:
+        return ec_factory_.get();
+    case KM_ALGORITHM_AES:
+        return aes_factory_.get();
+    case KM_ALGORITHM_HMAC:
+        return hmac_factory_.get();
+    default:
+        return nullptr;
+    }
+}
+
+static keymaster_algorithm_t supported_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC,
+                                                       KM_ALGORITHM_AES, KM_ALGORITHM_HMAC};
+
+keymaster_algorithm_t*
+SoftKeymasterContext::GetSupportedAlgorithms(size_t* algorithms_count) const {
+    *algorithms_count = array_length(supported_algorithms);
+    return supported_algorithms;
+}
+
+OperationFactory* SoftKeymasterContext::GetOperationFactory(keymaster_algorithm_t algorithm,
+                                                            keymaster_purpose_t purpose) const {
+    KeyFactory* key_factory = GetKeyFactory(algorithm);
+    if (!key_factory)
+        return nullptr;
+    return key_factory->GetOperationFactory(purpose);
 }
 
 static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
@@ -137,7 +161,6 @@ keymaster_error_t SoftKeymasterContext::CreateKeyBlob(const AuthorizationSet& ke
                                                       KeymasterKeyBlob* blob,
                                                       AuthorizationSet* hw_enforced,
                                                       AuthorizationSet* sw_enforced) const {
-
     keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
     if (error != KM_ERROR_OK)
         return error;

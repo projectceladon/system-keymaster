@@ -18,8 +18,6 @@
 
 namespace keymaster {
 
-DEFINE_ABSTRACT_FACTORY_REGISTRY_INSTANCE(OperationFactory);
-
 bool OperationFactory::supported(keymaster_padding_t padding) const {
     size_t padding_count;
     const keymaster_padding_t* supported_paddings = SupportedPaddingModes(&padding_count);
