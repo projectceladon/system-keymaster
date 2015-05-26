@@ -44,7 +44,7 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
-    UniquePtr<EC_KEY, EcKey::EC_Delete> ec_key(EC_KEY_new());
+    UniquePtr<EC_KEY, EC_Delete> ec_key(EC_KEY_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (ec_key.get() == NULL || pkey.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -86,43 +86,54 @@ keymaster_error_t EcKeyFactory::ImportKey(const AuthorizationSet& key_descriptio
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
-    keymaster_error_t error =
-        KeyMaterialToEvpKey(input_key_material_format, input_key_material, &pkey);
+    AuthorizationSet authorizations;
+    uint32_t key_size;
+    keymaster_error_t error = UpdateImportKeyDescription(
+        key_description, input_key_material_format, input_key_material, &authorizations, &key_size);
     if (error != KM_ERROR_OK)
         return error;
 
-    UniquePtr<EC_KEY, EcKey::EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
+    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
+                                   output_key_blob, hw_enforced, sw_enforced);
+}
+
+keymaster_error_t EcKeyFactory::UpdateImportKeyDescription(const AuthorizationSet& key_description,
+                                                           keymaster_key_format_t key_format,
+                                                           const KeymasterKeyBlob& key_material,
+                                                           AuthorizationSet* updated_description,
+                                                           uint32_t* key_size_bits) {
+    if (!updated_description || !key_size_bits)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
+    keymaster_error_t error = KeyMaterialToEvpKey(key_format, key_material, &pkey);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
     if (!ec_key.get())
         return TranslateLastOpenSslError();
 
-    AuthorizationSet authorizations(key_description);
+    updated_description->Reinitialize(key_description);
 
     size_t extracted_key_size_bits;
     error = get_group_size(*EC_KEY_get0_group(ec_key.get()), &extracted_key_size_bits);
     if (error != KM_ERROR_OK)
         return error;
 
-    uint32_t key_size_bits;
-    if (authorizations.GetTagValue(TAG_KEY_SIZE, &key_size_bits)) {
-        // key_size_bits specified, make sure it matches the key.
-        if (key_size_bits != extracted_key_size_bits)
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-    } else {
-        // key_size_bits not specified, add it.
-        authorizations.push_back(TAG_KEY_SIZE, extracted_key_size_bits);
-    }
+    *key_size_bits = extracted_key_size_bits;
+    if (!updated_description->GetTagValue(TAG_KEY_SIZE, key_size_bits))
+        updated_description->push_back(TAG_KEY_SIZE, extracted_key_size_bits);
+    if (*key_size_bits != extracted_key_size_bits)
+        return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
 
-    keymaster_algorithm_t algorithm;
-    if (authorizations.GetTagValue(TAG_ALGORITHM, &algorithm)) {
-        if (algorithm != registry_key())
-            return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
-    } else {
-        authorizations.push_back(TAG_ALGORITHM, registry_key());
-    }
+    keymaster_algorithm_t algorithm = KM_ALGORITHM_EC;
+    if (!updated_description->GetTagValue(TAG_ALGORITHM, &algorithm))
+        updated_description->push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
+    if (algorithm != KM_ALGORITHM_EC)
+        return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
 
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, input_key_material,
-                                   output_key_blob, hw_enforced, sw_enforced);
+    return KM_ERROR_OK;
 }
 
 /* static */

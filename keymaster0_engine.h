@@ -42,14 +42,20 @@ class Keymaster0Engine {
     Keymaster0Engine(const keymaster0_device_t* keymaster0_device);
     ~Keymaster0Engine();
 
+    bool supports_ec() const { return supports_ec_; }
+
     bool GenerateRsaKey(uint64_t public_exponent, uint32_t public_modulus,
                         KeymasterKeyBlob* key_material) const;
-    bool ImportRsaKey(keymaster_key_format_t key_format, const KeymasterKeyBlob& to_import,
-                      KeymasterKeyBlob* imported_key_material) const;
+    bool GenerateEcKey(uint32_t key_size, KeymasterKeyBlob* key_material) const;
+
+    bool ImportKey(keymaster_key_format_t key_format, const KeymasterKeyBlob& to_import,
+                   KeymasterKeyBlob* imported_key_material) const;
 
     RSA* BlobToRsaKey(const KeymasterKeyBlob& blob) const;
+    EC_KEY* BlobToEcKey(const KeymasterKeyBlob& blob) const;
 
-    const keymaster_key_blob_t* rsa_get_blob(const RSA* rsa) const;
+    const keymaster_key_blob_t* RsaKeyToBlob(const RSA* rsa) const;
+    const keymaster_key_blob_t* EcKeyToBlob(const EC_KEY* rsa) const;
 
     EVP_PKEY* GetKeymaster0PublicKey(const KeymasterKeyBlob& blob) const;
 
@@ -62,6 +68,8 @@ class Keymaster0Engine {
     static void keyblob_free(void* parent, void* ptr, CRYPTO_EX_DATA* data, int index, long argl,
                              void* argp);
     static int rsa_private_transform(RSA* rsa, uint8_t* out, const uint8_t* in, size_t len);
+    static int ecdsa_sign(const uint8_t* digest, size_t digest_len, uint8_t* sig,
+                          unsigned int* sig_len, EC_KEY* ec_key);
 
     struct Malloc_Delete {
         void operator()(void* p) { free(p); }
@@ -73,12 +81,16 @@ class Keymaster0Engine {
                         size_t* signature_length) const;
 
     int RsaPrivateTransform(RSA* rsa, uint8_t* out, const uint8_t* in, size_t len) const;
+    int EcdsaSign(const uint8_t* digest, size_t digest_len, uint8_t* sig, unsigned int* sig_len,
+                  EC_KEY* ec_key) const;
 
     const keymaster0_device_t* keymaster0_device_;
     ENGINE* const engine_;
-    int rsa_index_;
+    int rsa_index_, ec_key_index_;
+    bool supports_ec_;
 
     static const RSA_METHOD rsa_method_;
+    static const ECDSA_METHOD ecdsa_method_;
     static Keymaster0Engine* instance_;
 };
 

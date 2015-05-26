@@ -40,13 +40,15 @@ class EcKeyFactory : public AsymmetricKeyFactory {
                                      const AuthorizationSet& sw_enforced,
                                      UniquePtr<AsymmetricKey>* key) override;
 
+    keymaster_error_t UpdateImportKeyDescription(const AuthorizationSet& key_description,
+                                                 keymaster_key_format_t key_format,
+                                                 const KeymasterKeyBlob& key_material,
+                                                 AuthorizationSet* updated_description,
+                                                 uint32_t* key_size);
+
   private:
     static EC_GROUP* choose_group(size_t key_size_bits);
     static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
-
-    struct EC_GROUP_Delete {
-        void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
-    };
 };
 
 class EcdsaKeyFactory : public EcKeyFactory {
@@ -68,12 +70,14 @@ class EcKey : public AsymmetricKey {
     bool InternalToEvp(EVP_PKEY* pkey) const override;
     bool EvpToInternal(const EVP_PKEY* pkey) override;
 
-    struct EC_Delete {
-        void operator()(EC_KEY* p) { EC_KEY_free(p); }
-    };
-
     EC_KEY* key() const { return EC_KEY_dup(ec_key_.get()); }
 
+  protected:
+    EcKey(EC_KEY* ec_key, const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+          keymaster_error_t* error)
+        : AsymmetricKey(hw_enforced, sw_enforced, error), ec_key_(ec_key) {}
+
+  private:
     UniquePtr<EC_KEY, EC_Delete> ec_key_;
 };
 

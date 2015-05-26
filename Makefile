@@ -70,6 +70,7 @@ CPPSRCS=\
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	ec_key.cpp \
+	ec_keymaster0_key.cpp \
 	ecdsa_operation.cpp \
 	gtest_main.cpp \
 	hkdf.cpp \
@@ -215,6 +216,7 @@ android_keymaster_test: android_keymaster_test.o \
 	auth_encrypted_key_blob.o \
 	authorization_set.o \
 	ec_key.o \
+	ec_keymaster0_key.o \
 	ecdsa_operation.o \
 	hmac_key.o \
 	hmac_operation.o \
