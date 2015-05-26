@@ -340,15 +340,11 @@ TEST_P(NewKeyGeneration, Ecdsa) {
 }
 
 TEST_P(NewKeyGeneration, EcdsaDefaultSize) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
-    CheckBaseParams();
-
-    // Check specified tags are all present in unenforced characteristics
-    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_EC));
-
-    // Now check that unspecified, defaulted tags are correct.
-    EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 224));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
+              GenerateKey(AuthorizationSetBuilder()
+                              .Authorization(TAG_ALGORITHM, KM_ALGORITHM_EC)
+                              .SigningKey()
+                              .Digest(KM_DIGEST_NONE)));
 
     if (GetParam()->expect_keymaster0_calls())
         EXPECT_EQ(0, GetParam()->keymaster0_calls());
