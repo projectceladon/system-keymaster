@@ -20,14 +20,29 @@
 #include <openssl/evp.h>
 
 #include "key.h"
+#include "openssl_utils.h"
 
 namespace keymaster {
 
+class AsymmetricKey;
+
 class AsymmetricKeyFactory : public KeyFactory {
-  protected:
-    EVP_PKEY* ExtractEvpKey(keymaster_key_format_t key_format,
-                            keymaster_algorithm_t expected_algorithm, const uint8_t* key_data,
-                            size_t key_data_length, keymaster_error_t* error);
+  public:
+    AsymmetricKeyFactory(const KeymasterContext* context) : KeyFactory(context) {}
+
+    keymaster_error_t KeyMaterialToEvpKey(keymaster_key_format_t key_format,
+                                          const KeymasterKeyBlob& key_material,
+                                          UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* evp_pkey);
+    keymaster_error_t EvpKeyToKeyMaterial(const EVP_PKEY* evp_pkey, KeymasterKeyBlob* key_blob);
+
+    keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
+                              const AuthorizationSet& hw_enforced,
+                              const AuthorizationSet& sw_enforced, UniquePtr<Key>* key) override;
+
+    virtual keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
+                                             const AuthorizationSet& sw_enforced,
+                                             UniquePtr<AsymmetricKey>* key) = 0;
+    virtual int evp_key_type() = 0;
 
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count);
@@ -35,27 +50,15 @@ class AsymmetricKeyFactory : public KeyFactory {
 
 class AsymmetricKey : public Key {
   public:
-  protected:
-    AsymmetricKey(const KeyBlob& blob) : Key(blob) {}
-    keymaster_error_t LoadKey(const UnencryptedKeyBlob& blob);
+    AsymmetricKey(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+                  keymaster_error_t* error)
+        : Key(hw_enforced, sw_enforced, error) {}
 
-    /**
-     * Return a copy of raw key material, in the key's preferred binary format.
-     */
-    virtual keymaster_error_t key_material(UniquePtr<uint8_t[]>* material, size_t* size) const;
+    keymaster_error_t key_material(UniquePtr<uint8_t[]>* material, size_t* size) const override;
+    keymaster_error_t formatted_key_material(keymaster_key_format_t format,
+                                             UniquePtr<uint8_t[]>* material,
+                                             size_t* size) const override;
 
-    /**
-     * Return a copy of raw key material, in the specified format.
-     */
-    virtual keymaster_error_t formatted_key_material(keymaster_key_format_t format,
-                                                     UniquePtr<uint8_t[]>* material,
-                                                     size_t* size) const;
-
-  protected:
-    AsymmetricKey(const AuthorizationSet& auths) : Key(auths) {}
-
-  private:
-    virtual int evp_key_type() = 0;
     virtual bool InternalToEvp(EVP_PKEY* pkey) const = 0;
     virtual bool EvpToInternal(const EVP_PKEY* pkey) = 0;
 };

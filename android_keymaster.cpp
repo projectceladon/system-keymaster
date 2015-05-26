@@ -27,13 +27,13 @@
 #include <UniquePtr.h>
 
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/keymaster_context.h>
 
 #include "ae.h"
 #include "key.h"
 #include "openssl_err.h"
 #include "operation.h"
 #include "operation_table.h"
-#include "unencrypted_key_blob.h"
 
 namespace keymaster {
 
@@ -41,8 +41,8 @@ const uint8_t MAJOR_VER = 1;
 const uint8_t MINOR_VER = 0;
 const uint8_t SUBMINOR_VER = 0;
 
-AndroidKeymaster::AndroidKeymaster(size_t operation_table_size)
-    : operation_table_(new OperationTable(operation_table_size)) {
+AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size)
+    : context_(context), operation_table_(new OperationTable(operation_table_size)) {
 }
 
 AndroidKeymaster::~AndroidKeymaster() {
@@ -175,6 +175,11 @@ void AndroidKeymaster::SupportedExportFormats(
     response->SetResults(formats, count);
 }
 
+keymaster_error_t AndroidKeymaster::AddRngEntropy(const AddEntropyRequest& request) {
+    return context_->AddRngEntropy(request.random_data.peek_read(),
+                                   request.random_data.available_read());
+}
+
 void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                    GenerateKeyResponse* response) {
     if (response == NULL)
@@ -186,14 +191,13 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
     if (!request.key_description.GetTagValue(TAG_ALGORITHM, &algorithm) ||
         !(factory = KeyFactoryRegistry::Get(algorithm)))
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-    else
-        key.reset(factory->GenerateKey(request.key_description, &response->error));
-
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    response->error = SerializeKey(key.get(), KM_ORIGIN_GENERATED, &response->key_blob,
-                                   &response->enforced, &response->unenforced);
+    else {
+        KeymasterKeyBlob key_blob;
+        response->error = factory->GenerateKey(request.key_description, &key_blob,
+                                               &response->enforced, &response->unenforced);
+        if (response->error == KM_ERROR_OK)
+            response->key_blob = key_blob.release();
+    }
 }
 
 void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
@@ -201,13 +205,25 @@ void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest&
     if (response == NULL)
         return;
 
-    UniquePtr<KeyBlob> blob(
-        LoadKeyBlob(request.key_blob, request.additional_params, &(response->error)));
-    if (blob.get() == NULL)
+    KeymasterKeyBlob key_material;
+    response->error =
+        context_->ParseKeyBlob(KeymasterKeyBlob(request.key_blob), request.additional_params,
+                               &key_material, &response->enforced, &response->unenforced);
+    if (response->error != KM_ERROR_OK)
         return;
+}
 
-    response->enforced.Reinitialize(blob->enforced());
-    response->unenforced.Reinitialize(blob->unenforced());
+static KeyFactory* GetKeyFactory(const AuthorizationSet& hw_enforced,
+                                 const AuthorizationSet& sw_enforced,
+                                 keymaster_algorithm_t* algorithm, keymaster_error_t* error) {
+    *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+    if (!hw_enforced.GetTagValue(TAG_ALGORITHM, algorithm) &&
+        !sw_enforced.GetTagValue(TAG_ALGORITHM, algorithm))
+        return nullptr;
+    KeyFactory* factory = KeyFactoryRegistry::Get(*algorithm);
+    if (factory)
+        *error = KM_ERROR_OK;
+    return factory;
 }
 
 void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
@@ -216,25 +232,24 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
     response->op_handle = 0;
 
+    AuthorizationSet hw_enforced;
+    AuthorizationSet sw_enforced;
     keymaster_algorithm_t algorithm;
-    UniquePtr<Key> key(
-        LoadKey(request.key_blob, request.additional_params, &algorithm, &response->error));
-    if (key.get() == NULL)
-        return;
+    UniquePtr<Key> key;
+    response->error = LoadKey(request.key_blob, request.additional_params, &hw_enforced,
+                              &sw_enforced, &algorithm, &key);
 
     // TODO(swillden): Move this check to a general authorization checker.
-    if (!key->authorizations().Contains(TAG_PURPOSE, request.purpose)) {
-        // TODO(swillden): Consider introducing error codes for unauthorized usages.
-        response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
+    // TODO(swillden): Consider introducing error codes for unauthorized usages.
+    response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
+    if (!hw_enforced.Contains(TAG_PURPOSE, request.purpose) &&
+        !sw_enforced.Contains(TAG_PURPOSE, request.purpose))
         return;
-    }
 
-    OperationFactory::KeyType op_type(algorithm, request.purpose);
-    OperationFactory* factory = OperationFactoryRegistry::Get(op_type);
-    if (!factory) {
-        response->error = KM_ERROR_UNSUPPORTED_PURPOSE;
+    response->error = KM_ERROR_UNSUPPORTED_PURPOSE;
+    OperationFactory* factory = OperationFactoryRegistry::Get({algorithm, request.purpose});
+    if (!factory)
         return;
-    }
 
     UniquePtr<Operation> operation(
         factory->CreateOperation(*key, request.additional_params, &response->error));
@@ -298,15 +313,28 @@ void AndroidKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyRespo
     if (response == NULL)
         return;
 
+    AuthorizationSet hw_enforced;
+    AuthorizationSet sw_enforced;
+    KeymasterKeyBlob key_material;
+    response->error =
+        context_->ParseKeyBlob(KeymasterKeyBlob(request.key_blob), request.additional_params,
+                               &key_material, &hw_enforced, &sw_enforced);
+    if (response->error != KM_ERROR_OK)
+        return;
+
     keymaster_algorithm_t algorithm;
-    UniquePtr<Key> to_export(
-        LoadKey(request.key_blob, request.additional_params, &algorithm, &response->error));
-    if (to_export.get() == NULL)
+    KeyFactory* key_factory = GetKeyFactory(hw_enforced, sw_enforced, &algorithm, &response->error);
+    if (!key_factory)
+        return;
+
+    UniquePtr<Key> key;
+    response->error = key_factory->LoadKey(key_material, hw_enforced, sw_enforced, &key);
+    if (response->error != KM_ERROR_OK)
         return;
 
     UniquePtr<uint8_t[]> out_key;
     size_t size;
-    response->error = to_export->formatted_key_material(request.key_format, &out_key, &size);
+    response->error = key->formatted_key_material(request.key_format, &out_key, &size);
     if (response->error == KM_ERROR_OK) {
         response->key_data = out_key.release();
         response->key_data_length = size;
@@ -323,168 +351,35 @@ void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespo
     if (!request.key_description.GetTagValue(TAG_ALGORITHM, &algorithm) ||
         !(factory = KeyFactoryRegistry::Get(algorithm)))
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-    else
-        key.reset(factory->ImportKey(request.key_description, request.key_format, request.key_data,
-                                     request.key_data_length, &response->error));
-
-    if (response->error != KM_ERROR_OK)
-        return;
-
-    response->error = SerializeKey(key.get(), KM_ORIGIN_IMPORTED, &response->key_blob,
-                                   &response->enforced, &response->unenforced);
+    else {
+        keymaster_key_blob_t key_material = {request.key_data, request.key_data_length};
+        KeymasterKeyBlob key_blob;
+        response->error = factory->ImportKey(request.key_description, request.key_format,
+                                             KeymasterKeyBlob(key_material), &key_blob,
+                                             &response->enforced, &response->unenforced);
+        if (response->error == KM_ERROR_OK)
+            response->key_blob = key_blob.release();
+    }
 }
 
-keymaster_error_t AndroidKeymaster::SerializeKey(const Key* key, keymaster_key_origin_t origin,
-                                                 keymaster_key_blob_t* keymaster_blob,
-                                                 AuthorizationSet* enforced,
-                                                 AuthorizationSet* unenforced) {
-    keymaster_error_t error;
-
-    error = SetAuthorizations(key->authorizations(), origin, enforced, unenforced);
+keymaster_error_t AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key_blob,
+                                            const AuthorizationSet& additional_params,
+                                            AuthorizationSet* hw_enforced,
+                                            AuthorizationSet* sw_enforced,
+                                            keymaster_algorithm_t* algorithm, UniquePtr<Key>* key) {
+    KeymasterKeyBlob key_material;
+    keymaster_error_t error = context_->ParseKeyBlob(KeymasterKeyBlob(key_blob), additional_params,
+                                                     &key_material, hw_enforced, sw_enforced);
     if (error != KM_ERROR_OK)
         return error;
 
-    AuthorizationSet hidden_auths;
-    error = BuildHiddenAuthorizations(key->authorizations(), &hidden_auths);
-    if (error != KM_ERROR_OK)
+    KeyFactory* key_factory = GetKeyFactory(*hw_enforced, *sw_enforced, algorithm, &error);
+    if (error != KM_ERROR_OK) {
+        assert(!key_factory);
         return error;
-
-    UniquePtr<uint8_t[]> key_material;
-    size_t key_material_size;
-    error = key->key_material(&key_material, &key_material_size);
-    if (error != KM_ERROR_OK)
-        return error;
-
-    uint8_t nonce[KeyBlob::NONCE_LENGTH];
-    GenerateNonce(nonce, array_size(nonce));
-
-    keymaster_key_blob_t master_key = MasterKey();
-    UniquePtr<KeyBlob> blob(new UnencryptedKeyBlob(
-        *enforced, *unenforced, hidden_auths, key_material.get(), key_material_size,
-        master_key.key_material, master_key.key_material_size, nonce));
-    if (blob.get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    if (blob->error() != KM_ERROR_OK)
-        return blob->error();
-
-    size_t size = blob->SerializedSize();
-    UniquePtr<uint8_t[]> blob_bytes(new uint8_t[size]);
-    if (blob_bytes.get() == NULL)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    blob->Serialize(blob_bytes.get(), blob_bytes.get() + size);
-    keymaster_blob->key_material_size = size;
-    keymaster_blob->key_material = blob_bytes.release();
-
-    return KM_ERROR_OK;
-}
-
-Key* AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key,
-                               const AuthorizationSet& client_params,
-                               keymaster_algorithm_t* algorithm, keymaster_error_t* error) {
-    UniquePtr<UnencryptedKeyBlob> blob(LoadKeyBlob(key, client_params, error));
-    if (*error != KM_ERROR_OK)
-        return NULL;
-
-    *algorithm = blob->algorithm();
-
-    KeyFactory* factory = 0;
-    if ((factory = KeyFactoryRegistry::Get(*algorithm)))
-        return factory->LoadKey(*blob, error);
-    *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-    return NULL;
-}
-
-UnencryptedKeyBlob* AndroidKeymaster::LoadKeyBlob(const keymaster_key_blob_t& key,
-                                                  const AuthorizationSet& client_params,
-                                                  keymaster_error_t* error) {
-    AuthorizationSet hidden;
-    BuildHiddenAuthorizations(client_params, &hidden);
-    keymaster_key_blob_t master_key = MasterKey();
-    UniquePtr<UnencryptedKeyBlob> blob(
-        new UnencryptedKeyBlob(key, hidden, master_key.key_material, master_key.key_material_size));
-    if (blob.get() == NULL) {
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return NULL;
-    } else if (blob->error() != KM_ERROR_OK) {
-        *error = blob->error();
-        return NULL;
-    }
-    *error = KM_ERROR_OK;
-    return blob.release();
-}
-
-static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
-    switch (err) {
-    case AuthorizationSet::OK:
-        return KM_ERROR_OK;
-    case AuthorizationSet::ALLOCATION_FAILURE:
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    case AuthorizationSet::MALFORMED_DATA:
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t AndroidKeymaster::SetAuthorizations(const AuthorizationSet& key_description,
-                                                      keymaster_key_origin_t origin,
-                                                      AuthorizationSet* enforced,
-                                                      AuthorizationSet* unenforced) {
-    enforced->Clear();
-    unenforced->Clear();
-    for (size_t i = 0; i < key_description.size(); ++i) {
-        switch (key_description[i].tag) {
-        // These cannot be specified by the client.
-        case KM_TAG_ROOT_OF_TRUST:
-        case KM_TAG_ORIGIN:
-            LOG_E("Root of trust and origin tags may not be specified", 0);
-            return KM_ERROR_INVALID_TAG;
-
-        // These don't work.
-        case KM_TAG_ROLLBACK_RESISTANT:
-            LOG_E("KM_TAG_ROLLBACK_RESISTANT not supported", 0);
-            return KM_ERROR_UNSUPPORTED_TAG;
-
-        // These are hidden.
-        case KM_TAG_APPLICATION_ID:
-        case KM_TAG_APPLICATION_DATA:
-            break;
-
-        // Everything else we just copy into the appropriate set.
-        default:
-            AddAuthorization(key_description[i], enforced, unenforced);
-            break;
-        }
     }
 
-    AddAuthorization(Authorization(TAG_CREATION_DATETIME, java_time(time(NULL))), enforced,
-                     unenforced);
-    AddAuthorization(Authorization(TAG_ORIGIN, origin), enforced, unenforced);
-
-    if (enforced->is_valid() != AuthorizationSet::OK)
-        return TranslateAuthorizationSetError(enforced->is_valid());
-
-    return TranslateAuthorizationSetError(unenforced->is_valid());
-}
-
-keymaster_error_t AndroidKeymaster::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                              AuthorizationSet* hidden) {
-    keymaster_blob_t entry;
-    if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
-        hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
-    if (input_set.GetTagValue(TAG_APPLICATION_DATA, &entry))
-        hidden->push_back(TAG_APPLICATION_DATA, entry.data, entry.data_length);
-    hidden->push_back(RootOfTrustTag());
-
-    return TranslateAuthorizationSetError(hidden->is_valid());
-}
-
-void AndroidKeymaster::AddAuthorization(const keymaster_key_param_t& auth,
-                                        AuthorizationSet* enforced, AuthorizationSet* unenforced) {
-    if (is_enforced(auth.tag))
-        enforced->push_back(auth);
-    else
-        unenforced->push_back(auth);
+    return key_factory->LoadKey(key_material, *hw_enforced, *sw_enforced, key);
 }
 
 }  // namespace keymaster
