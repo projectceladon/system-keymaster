@@ -27,6 +27,7 @@
 #include <UniquePtr.h>
 
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/key_factory.h>
 #include <keymaster/keymaster_context.h>
 
 #include "ae.h"

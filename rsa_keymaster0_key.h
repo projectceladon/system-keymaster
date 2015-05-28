@@ -19,6 +19,8 @@
 
 #include <openssl/rsa.h>
 
+#include <keymaster/rsa_key_factory.h>
+
 #include "rsa_key.h"
 
 namespace keymaster {

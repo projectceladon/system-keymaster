@@ -49,8 +49,10 @@ LOCAL_SRC_FILES:= \
 		android_keymaster_messages.cpp \
 		android_keymaster_utils.cpp \
 		asymmetric_key.cpp \
+		asymmetric_key_factory.cpp \
 		auth_encrypted_key_blob.cpp \
 		ec_key.cpp \
+		ec_key_factory.cpp \
 		ecdsa_operation.cpp \
 		hkdf.cpp \
 		hmac.cpp \
@@ -65,6 +67,7 @@ LOCAL_SRC_FILES:= \
 		operation.cpp \
 		operation_table.cpp \
 		rsa_key.cpp \
+		rsa_key_factory.cpp \
 		rsa_operation.cpp \
 		symmetric_key.cpp
 LOCAL_C_INCLUDES := \
