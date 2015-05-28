@@ -17,6 +17,8 @@
 #ifndef SYSTEM_KEYMASTER_SYMMETRIC_KEY_H_
 #define SYSTEM_KEYMASTER_SYMMETRIC_KEY_H_
 
+#include <keymaster/key_factory.h>
+
 #include "key.h"
 
 namespace keymaster {
@@ -68,8 +70,6 @@ class SymmetricKey : public Key {
                  const AuthorizationSet& sw_enforced, keymaster_error_t* error);
 
   private:
-    friend SymmetricKeyFactory;
-
     size_t key_data_size_;
     UniquePtr<uint8_t[]> key_data_;
 };

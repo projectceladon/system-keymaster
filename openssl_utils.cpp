@@ -16,6 +16,8 @@
 
 #include "openssl_utils.h"
 
+#include <keymaster/android_keymaster_utils.h>
+
 #include "openssl_err.h"
 
 namespace keymaster {
@@ -57,6 +59,32 @@ keymaster_error_t convert_pkcs8_blob_to_evp(const uint8_t* key_data, size_t key_
               convert_to_evp(expected_algorithm));
         return KM_ERROR_INVALID_KEY_BLOB;
     }
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t KeyMaterialToEvpKey(keymaster_key_format_t key_format,
+                                      const KeymasterKeyBlob& key_material,
+                                      keymaster_algorithm_t expected_algorithm,
+                                      UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey) {
+    if (key_format != KM_KEY_FORMAT_PKCS8)
+        return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
+
+    return convert_pkcs8_blob_to_evp(key_material.key_material, key_material.key_material_size,
+                                     expected_algorithm, pkey);
+}
+
+keymaster_error_t EvpKeyToKeyMaterial(const EVP_PKEY* pkey, KeymasterKeyBlob* key_blob) {
+    int key_data_size = i2d_PrivateKey(pkey, NULL /* key_data*/);
+    if (key_data_size <= 0)
+        return TranslateLastOpenSslError();
+
+    key_blob->Reset(key_data_size);
+    if (!key_blob->key_material)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    uint8_t* tmp = key_blob->writable_data();
+    i2d_PrivateKey(pkey, &tmp);
 
     return KM_ERROR_OK;
 }

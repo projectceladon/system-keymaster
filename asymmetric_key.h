@@ -20,37 +20,8 @@
 #include <openssl/evp.h>
 
 #include "key.h"
-#include "openssl_utils.h"
 
 namespace keymaster {
-
-class AsymmetricKey;
-
-class AsymmetricKeyFactory : public KeyFactory {
-  public:
-    AsymmetricKeyFactory(const KeymasterContext* context) : KeyFactory(context) {}
-
-    keymaster_error_t KeyMaterialToEvpKey(keymaster_key_format_t key_format,
-                                          const KeymasterKeyBlob& key_material,
-                                          UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* evp_pkey) const;
-    keymaster_error_t EvpKeyToKeyMaterial(const EVP_PKEY* evp_pkey,
-                                          KeymasterKeyBlob* key_blob) const;
-
-    keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
-                              const AuthorizationSet& hw_enforced,
-                              const AuthorizationSet& sw_enforced,
-                              UniquePtr<Key>* key) const override;
-
-    virtual keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
-                                             const AuthorizationSet& sw_enforced,
-                                             UniquePtr<AsymmetricKey>* key) const = 0;
-
-    virtual keymaster_algorithm_t keymaster_key_type() const = 0;
-    virtual int evp_key_type() const = 0;
-
-    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) const;
-    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) const;
-};
 
 class AsymmetricKey : public Key {
   public:

@@ -65,10 +65,12 @@ CPPSRCS=\
 	android_keymaster_test_utils.cpp \
 	android_keymaster_utils.cpp \
 	asymmetric_key.cpp \
+	asymmetric_key_factory.cpp \
 	auth_encrypted_key_blob.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
 	ec_key.cpp \
+	ec_key_factory.cpp \
 	ec_keymaster0_key.cpp \
 	ecdsa_operation.cpp \
 	gtest_main.cpp \
@@ -91,12 +93,14 @@ CPPSRCS=\
 	operation.cpp \
 	operation_table.cpp \
 	rsa_key.cpp \
+	rsa_key_factory.cpp \
 	rsa_keymaster0_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
 	soft_keymaster_context.cpp \
 	soft_keymaster_device.cpp \
-	symmetric_key.cpp \
+	symmetric_key.cpp
+
 CCSRCS=$(GTEST)/src/gtest-all.cc
 CSRCS=ocb.c
 
@@ -212,9 +216,11 @@ android_keymaster_test: android_keymaster_test.o \
 	android_keymaster_test_utils.o \
 	android_keymaster_utils.o \
 	asymmetric_key.o \
+	asymmetric_key_factory.o \
 	auth_encrypted_key_blob.o \
 	authorization_set.o \
 	ec_key.o \
+	ec_key_factory.o \
 	ec_keymaster0_key.o \
 	ecdsa_operation.o \
 	hmac_key.o \
@@ -230,8 +236,9 @@ android_keymaster_test: android_keymaster_test.o \
 	operation.o \
 	operation_table.o \
 	rsa_key.o \
-	rsa_operation.o \
+	rsa_key_factory.o \
 	rsa_keymaster0_key.o \
+	rsa_operation.o \
 	serializable.o \
 	soft_keymaster_context.o \
 	soft_keymaster_device.o \

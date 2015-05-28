@@ -24,51 +24,6 @@
 
 namespace keymaster {
 
-class Key;
-class KeymasterContext;
-class OperationFactory;
-struct KeymasterKeyBlob;
-
-/**
- * KeyFactory is a abstraction whose subclasses know how to construct a specific subclass of Key.
- * There is a one to one correspondence between Key subclasses and KeyFactory subclasses.
- */
-class KeyFactory {
-  public:
-    KeyFactory(const KeymasterContext* context) : context_(context) {}
-    virtual ~KeyFactory() {}
-
-    // Factory methods.
-    virtual keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                          KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
-                                          AuthorizationSet* sw_enforced) const = 0;
-
-    virtual keymaster_error_t ImportKey(const AuthorizationSet& key_description,
-                                        keymaster_key_format_t input_key_material_format,
-                                        const KeymasterKeyBlob& input_key_material,
-                                        KeymasterKeyBlob* output_key_blob,
-                                        AuthorizationSet* hw_enforced,
-                                        AuthorizationSet* sw_enforced) const = 0;
-
-    virtual keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
-                                      const AuthorizationSet& hw_enforced,
-                                      const AuthorizationSet& sw_enforced,
-                                      UniquePtr<Key>* key) const = 0;
-
-    virtual OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const = 0;
-
-    // Informational methods.
-    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) const = 0;
-    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) const = 0;
-
-  protected:
-    const KeymasterContext* context_;
-};
-
-class KeyBlob;
-class Operation;
-class UnencryptedKeyBlob;
-
 class Key {
   public:
     virtual ~Key() {}
