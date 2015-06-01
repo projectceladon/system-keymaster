@@ -123,8 +123,8 @@ keymaster_error_t HmacOperation::Begin(const AuthorizationSet& /* input_params *
 }
 
 keymaster_error_t HmacOperation::Update(const AuthorizationSet& /* additional_params */,
-                                        const Buffer& input, Buffer* /* output */,
-                                        size_t* input_consumed) {
+                                        const Buffer& input, AuthorizationSet* /* output_params */,
+                                        Buffer* /* output */, size_t* input_consumed) {
     if (!HMAC_Update(&ctx_, input.peek_read(), input.available_read()))
         return TranslateLastOpenSslError();
     *input_consumed = input.available_read();
@@ -136,7 +136,8 @@ keymaster_error_t HmacOperation::Abort() {
 }
 
 keymaster_error_t HmacOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                        const Buffer& signature, Buffer* output) {
+                                        const Buffer& signature,
+                                        AuthorizationSet* /* output_params */, Buffer* output) {
     uint8_t digest[EVP_MAX_MD_SIZE];
     unsigned int digest_len;
     if (!HMAC_Final(&ctx_, digest, &digest_len))

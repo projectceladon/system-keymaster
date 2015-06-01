@@ -32,10 +32,12 @@ class HmacOperation : public Operation {
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
                                     AuthorizationSet* output_params);
     virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                                     Buffer* output, size_t* input_consumed);
+                                     AuthorizationSet* output_params, Buffer* output,
+                                     size_t* input_consumed);
     virtual keymaster_error_t Abort();
     virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, Buffer* output);
+                                     const Buffer& signature, AuthorizationSet* output_params,
+                                     Buffer* output);
 
     keymaster_error_t error() { return error_; }
 
