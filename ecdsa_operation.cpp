@@ -117,8 +117,9 @@ keymaster_error_t EcdsaSignOperation::Begin(const AuthorizationSet& /* input_par
 }
 
 keymaster_error_t EcdsaSignOperation::Update(const AuthorizationSet& /* additional_params */,
-                                             const Buffer& input, Buffer* /* output */,
-                                             size_t* input_consumed) {
+                                             const Buffer& input,
+                                             AuthorizationSet* /* output_params */,
+                                             Buffer* /* output */, size_t* input_consumed) {
     if (digest_ == KM_DIGEST_NONE)
         return StoreData(input, input_consumed);
 
@@ -129,7 +130,9 @@ keymaster_error_t EcdsaSignOperation::Update(const AuthorizationSet& /* addition
 }
 
 keymaster_error_t EcdsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                             const Buffer& /* signature */, Buffer* output) {
+                                             const Buffer& /* signature */,
+                                             AuthorizationSet* /* output_params */,
+                                             Buffer* output) {
     if (!output)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
@@ -174,8 +177,9 @@ keymaster_error_t EcdsaVerifyOperation::Begin(const AuthorizationSet& /* input_p
 }
 
 keymaster_error_t EcdsaVerifyOperation::Update(const AuthorizationSet& /* additional_params */,
-                                               const Buffer& input, Buffer* /* output */,
-                                               size_t* input_consumed) {
+                                               const Buffer& input,
+                                               AuthorizationSet* /* output_params */,
+                                               Buffer* /* output */, size_t* input_consumed) {
     if (digest_ == KM_DIGEST_NONE)
         return StoreData(input, input_consumed);
 
@@ -186,7 +190,9 @@ keymaster_error_t EcdsaVerifyOperation::Update(const AuthorizationSet& /* additi
 }
 
 keymaster_error_t EcdsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                               const Buffer& signature, Buffer* /* output */) {
+                                               const Buffer& signature,
+                                               AuthorizationSet* /* output_params */,
+                                               Buffer* /* output */) {
     if (digest_ == KM_DIGEST_NONE) {
         UniquePtr<EC_KEY, EC_Delete> ecdsa(EVP_PKEY_get1_EC_KEY(ecdsa_key_));
         if (!ecdsa.get())

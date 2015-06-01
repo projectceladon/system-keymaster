@@ -63,8 +63,7 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
 
     keymaster_padding_t padding;
     if (!begin_params.GetTagValue(TAG_PADDING, &padding)) {
-        LOG_E("%d padding modes specified in begin params",
-              begin_params.GetTagCount(TAG_PADDING));
+        LOG_E("%d padding modes specified in begin params", begin_params.GetTagCount(TAG_PADDING));
         *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
         return nullptr;
     } else if (!supported(padding)) {
@@ -303,7 +302,8 @@ inline size_t min(size_t a, size_t b) {
 }
 
 keymaster_error_t AesEvpOperation::Update(const AuthorizationSet& /* additional_params */,
-                                          const Buffer& input, Buffer* output,
+                                          const Buffer& input,
+                                          AuthorizationSet* /* output_params */, Buffer* output,
                                           size_t* input_consumed) {
     output->reserve(input.available_read() + AES_BLOCK_SIZE);
 
@@ -323,7 +323,8 @@ keymaster_error_t AesEvpOperation::Update(const AuthorizationSet& /* additional_
 }
 
 keymaster_error_t AesEvpOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                          const Buffer& /* signature */, Buffer* output) {
+                                          const Buffer& /* signature */,
+                                          AuthorizationSet* /* output_params */, Buffer* output) {
     output->reserve(AES_BLOCK_SIZE);
 
     int output_written = -1;

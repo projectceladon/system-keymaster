@@ -122,8 +122,8 @@ RsaOperation::~RsaOperation() {
 }
 
 keymaster_error_t RsaOperation::Update(const AuthorizationSet& /* additional_params */,
-                                       const Buffer& input, Buffer* /* output */,
-                                       size_t* input_consumed) {
+                                       const Buffer& input, AuthorizationSet* /* output_params */,
+                                       Buffer* /* output */, size_t* input_consumed) {
     assert(input_consumed);
     switch (purpose()) {
     default:
@@ -242,11 +242,12 @@ keymaster_error_t RsaSignOperation::Begin(const AuthorizationSet& /* input_param
 }
 
 keymaster_error_t RsaSignOperation::Update(const AuthorizationSet& additional_params,
-                                           const Buffer& input, Buffer* output,
-                                           size_t* input_consumed) {
+                                           const Buffer& input, AuthorizationSet* output_params,
+                                           Buffer* output, size_t* input_consumed) {
     if (digest_ == KM_DIGEST_NONE)
         // Just buffer the data.
-        return RsaOperation::Update(additional_params, input, output, input_consumed);
+        return RsaOperation::Update(additional_params, input, output_params, output,
+                                    input_consumed);
 
     if (EVP_DigestSignUpdate(&digest_ctx_, input.peek_read(), input.available_read()) != 1)
         return TranslateLastOpenSslError();
@@ -255,7 +256,8 @@ keymaster_error_t RsaSignOperation::Update(const AuthorizationSet& additional_pa
 }
 
 keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                           const Buffer& /* signature */, Buffer* output) {
+                                           const Buffer& /* signature */,
+                                           AuthorizationSet* /* output_params */, Buffer* output) {
     assert(output);
 
     if (digest_ == KM_DIGEST_NONE)
@@ -324,11 +326,12 @@ keymaster_error_t RsaVerifyOperation::Begin(const AuthorizationSet& /* input_par
 }
 
 keymaster_error_t RsaVerifyOperation::Update(const AuthorizationSet& additional_params,
-                                             const Buffer& input, Buffer* output,
-                                             size_t* input_consumed) {
+                                             const Buffer& input, AuthorizationSet* output_params,
+                                             Buffer* output, size_t* input_consumed) {
     if (digest_ == KM_DIGEST_NONE)
         // Just buffer the data.
-        return RsaOperation::Update(additional_params, input, output, input_consumed);
+        return RsaOperation::Update(additional_params, input, output_params, output,
+                                    input_consumed);
 
     if (EVP_DigestVerifyUpdate(&digest_ctx_, input.peek_read(), input.available_read()) != 1)
         return TranslateLastOpenSslError();
@@ -337,7 +340,9 @@ keymaster_error_t RsaVerifyOperation::Update(const AuthorizationSet& additional_
 }
 
 keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                             const Buffer& signature, Buffer* /* output */) {
+                                             const Buffer& signature,
+                                             AuthorizationSet* /* output_params */,
+                                             Buffer* /* output */) {
     if (digest_ == KM_DIGEST_NONE)
         return VerifyUndigested(signature);
     else
@@ -402,7 +407,9 @@ struct EVP_PKEY_CTX_Delete {
 };
 
 keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                              const Buffer& /* signature */, Buffer* output) {
+                                              const Buffer& /* signature */,
+                                              AuthorizationSet* /* output_params */,
+                                              Buffer* output) {
     assert(output);
 
     UniquePtr<EVP_PKEY_CTX, EVP_PKEY_CTX_Delete> ctx(
@@ -434,7 +441,9 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
 }
 
 keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                              const Buffer& /* signature */, Buffer* output) {
+                                              const Buffer& /* signature */,
+                                              AuthorizationSet* /* output_params */,
+                                              Buffer* output) {
     assert(output);
 
     UniquePtr<EVP_PKEY_CTX, EVP_PKEY_CTX_Delete> ctx(

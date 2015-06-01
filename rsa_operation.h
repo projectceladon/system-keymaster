@@ -42,7 +42,8 @@ class RsaOperation : public Operation {
         return KM_ERROR_OK;
     }
     keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                             Buffer* output, size_t* input_consumed) override;
+                             AuthorizationSet* output_params, Buffer* output,
+                             size_t* input_consumed) override;
     keymaster_error_t Abort() override { return KM_ERROR_OK; }
 
   protected:
@@ -90,9 +91,10 @@ class RsaSignOperation : public RsaDigestingOperation {
     keymaster_error_t Begin(const AuthorizationSet& input_params,
                             AuthorizationSet* output_params) override;
     keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                             Buffer* output, size_t* input_consumed) override;
+                             AuthorizationSet* output_params, Buffer* output,
+                             size_t* input_consumed) override;
     keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
-                             Buffer* output) override;
+                             AuthorizationSet* output_params, Buffer* output) override;
 
   private:
     keymaster_error_t SignUndigested(Buffer* output);
@@ -110,9 +112,10 @@ class RsaVerifyOperation : public RsaDigestingOperation {
     keymaster_error_t Begin(const AuthorizationSet& input_params,
                             AuthorizationSet* output_params) override;
     keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                             Buffer* output, size_t* input_consumed) override;
+                             AuthorizationSet* output_params, Buffer* output,
+                             size_t* input_consumed) override;
     keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
-                             Buffer* output) override;
+                             AuthorizationSet* output_params, Buffer* output) override;
 
   private:
     keymaster_error_t VerifyUndigested(const Buffer& signature);
@@ -139,7 +142,7 @@ class RsaEncryptOperation : public RsaCryptOperation {
     RsaEncryptOperation(keymaster_padding_t padding, EVP_PKEY* key)
         : RsaCryptOperation(KM_PURPOSE_ENCRYPT, padding, key) {}
     keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
-                             Buffer* output) override;
+                             AuthorizationSet* output_params, Buffer* output) override;
 };
 
 /**
@@ -150,7 +153,7 @@ class RsaDecryptOperation : public RsaCryptOperation {
     RsaDecryptOperation(keymaster_padding_t padding, EVP_PKEY* key)
         : RsaCryptOperation(KM_PURPOSE_DECRYPT, padding, key) {}
     keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
-                             Buffer* output) override;
+                             AuthorizationSet* output_params, Buffer* output) override;
 };
 
 /**
