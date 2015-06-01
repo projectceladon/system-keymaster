@@ -84,7 +84,7 @@ Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
     return op;
 }
 
-static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_RSA_OAEP,
+static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_NONE, KM_PAD_RSA_OAEP,
                                                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
 
 Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
@@ -386,6 +386,8 @@ keymaster_error_t RsaVerifyOperation::VerifyDigested(const Buffer& signature) {
 int RsaCryptOperation::GetOpensslPadding(keymaster_error_t* error) {
     *error = KM_ERROR_OK;
     switch (padding_) {
+    case KM_PAD_NONE:
+        return RSA_NO_PADDING;
     case KM_PAD_RSA_PKCS1_1_5_ENCRYPT:
         return RSA_PKCS1_PADDING;
     case KM_PAD_RSA_OAEP:
