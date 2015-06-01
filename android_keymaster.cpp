@@ -39,7 +39,7 @@
 namespace keymaster {
 
 const uint8_t MAJOR_VER = 1;
-const uint8_t MINOR_VER = 0;
+const uint8_t MINOR_VER = 1;
 const uint8_t SUBMINOR_VER = 0;
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size)

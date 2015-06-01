@@ -210,16 +210,25 @@ bool UpdateOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t*
 }
 
 size_t UpdateOperationResponse::NonErrorSerializedSize() const {
-    if (message_version == 0)
+    switch (message_version) {
+    case 0:
         return output.SerializedSize();
-    else
+    case 1:
         return output.SerializedSize() + sizeof(uint32_t);
+    case 2:
+        return output.SerializedSize() + sizeof(uint32_t) + output_params.SerializedSize();
+    default:
+        assert(false);
+        return 0;
+    }
 }
 
 uint8_t* UpdateOperationResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
     buf = output.Serialize(buf, end);
     if (message_version > 0)
         buf = append_uint32_to_buf(buf, end, input_consumed);
+    if (message_version > 1)
+        buf = output_params.Serialize(buf, end);
     return buf;
 }
 
@@ -227,6 +236,8 @@ bool UpdateOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const
     bool retval = output.Deserialize(buf_ptr, end);
     if (retval && message_version > 0)
         retval = copy_uint32_from_buf(buf_ptr, end, &input_consumed);
+    if (retval && message_version > 1)
+        retval = output_params.Deserialize(buf_ptr, end);
     return retval;
 }
 
@@ -254,15 +265,24 @@ bool FinishOperationRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t*
 }
 
 size_t FinishOperationResponse::NonErrorSerializedSize() const {
-    return output.SerializedSize();
+    if (message_version < 2)
+        return output.SerializedSize();
+    else
+        return output.SerializedSize() + output_params.SerializedSize();
 }
 
 uint8_t* FinishOperationResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    return output.Serialize(buf, end);
+    buf = output.Serialize(buf, end);
+    if (message_version > 1)
+        buf = output_params.Serialize(buf, end);
+    return buf;
 }
 
 bool FinishOperationResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    return output.Deserialize(buf_ptr, end);
+    bool retval = output.Deserialize(buf_ptr, end);
+    if (retval && message_version > 1)
+        retval = output_params.Deserialize(buf_ptr, end);
+    return retval;
 }
 
 size_t AddEntropyRequest::SerializedSize() const {
