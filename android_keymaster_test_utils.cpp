@@ -175,8 +175,7 @@ keymaster_error_t Keymaster1Test::GenerateKey(const AuthorizationSetBuilder& bui
 
     FreeKeyBlob();
     FreeCharacteristics();
-    return device()->generate_key(device(), params.data(), params.size(), &blob_,
-                                  &characteristics_);
+    return device()->generate_key(device(), &params, &blob_, &characteristics_);
 }
 
 keymaster_error_t Keymaster1Test::ImportKey(const AuthorizationSetBuilder& builder,
@@ -188,9 +187,9 @@ keymaster_error_t Keymaster1Test::ImportKey(const AuthorizationSetBuilder& build
 
     FreeKeyBlob();
     FreeCharacteristics();
-    return device()->import_key(device(), params.data(), params.size(), format,
-                                reinterpret_cast<const uint8_t*>(key_material.c_str()),
-                                key_material.length(), &blob_, &characteristics_);
+    keymaster_blob_t key = {reinterpret_cast<const uint8_t*>(key_material.c_str()),
+                            key_material.length()};
+    return device()->import_key(device(), &params, format, &key, &blob_, &characteristics_);
 }
 
 AuthorizationSet Keymaster1Test::UserAuthParams() {
@@ -208,65 +207,59 @@ AuthorizationSet Keymaster1Test::ClientParams() {
 }
 
 keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose) {
-    keymaster_key_param_t* out_params = NULL;
-    size_t out_params_count = 0;
+    AuthorizationSet in_params(client_params());
+    keymaster_key_param_set_t out_params;
     keymaster_error_t error =
-        device()->begin(device(), purpose, &blob_, client_params_, array_length(client_params_),
-                        &out_params, &out_params_count, &op_handle_);
-    EXPECT_EQ(0U, out_params_count);
-    EXPECT_TRUE(out_params == NULL);
+        device()->begin(device(), purpose, &blob_, &in_params, &out_params, &op_handle_);
+    EXPECT_EQ(0U, out_params.length);
+    EXPECT_TRUE(out_params.params == nullptr);
     return error;
 }
 
 keymaster_error_t Keymaster1Test::BeginOperation(keymaster_purpose_t purpose,
                                                  const AuthorizationSet& input_set,
                                                  AuthorizationSet* output_set) {
-    keymaster_key_param_t* out_params;
-    size_t out_params_count;
+    keymaster_key_param_set_t out_params;
     keymaster_error_t error =
-        device()->begin(device(), purpose, &blob_, input_set.data(), input_set.size(), &out_params,
-                        &out_params_count, &op_handle_);
+        device()->begin(device(), purpose, &blob_, &input_set, &out_params, &op_handle_);
     if (error == KM_ERROR_OK) {
         if (output_set) {
-            output_set->Reinitialize(out_params, out_params_count);
+            output_set->Reinitialize(out_params);
         } else {
-            EXPECT_EQ(0U, out_params_count);
-            EXPECT_TRUE(out_params == NULL);
+            EXPECT_EQ(0U, out_params.length);
+            EXPECT_TRUE(out_params.params == nullptr);
         }
-        keymaster_free_param_values(out_params, out_params_count);
-        free(out_params);
+        keymaster_free_param_set(&out_params);
     }
     return error;
 }
 
 keymaster_error_t Keymaster1Test::UpdateOperation(const string& message, string* output,
                                                   size_t* input_consumed) {
-    uint8_t* out_tmp = NULL;
-    size_t out_length;
     EXPECT_NE(op_handle_, OP_HANDLE_SENTINEL);
-    keymaster_error_t error =
-        device()->update(device(), op_handle_, NULL /* params */, 0 /* params_count */,
-                         reinterpret_cast<const uint8_t*>(message.c_str()), message.length(),
-                         input_consumed, &out_tmp, &out_length);
-    if (error == KM_ERROR_OK && out_tmp)
-        output->append(reinterpret_cast<char*>(out_tmp), out_length);
-    free(out_tmp);
+    keymaster_blob_t input = {reinterpret_cast<const uint8_t*>(message.c_str()), message.length()};
+    keymaster_blob_t out_tmp;
+    keymaster_key_param_set_t out_params;
+    keymaster_error_t error = device()->update(device(), op_handle_, nullptr /* params */, &input,
+                                               input_consumed, &out_params, &out_tmp);
+    if (error == KM_ERROR_OK && out_tmp.data)
+        output->append(reinterpret_cast<const char*>(out_tmp.data), out_tmp.data_length);
+    free(const_cast<uint8_t*>(out_tmp.data));
     return error;
 }
 
 keymaster_error_t Keymaster1Test::UpdateOperation(const AuthorizationSet& additional_params,
                                                   const string& message, string* output,
                                                   size_t* input_consumed) {
-    uint8_t* out_tmp = NULL;
-    size_t out_length;
     EXPECT_NE(op_handle_, OP_HANDLE_SENTINEL);
-    keymaster_error_t error =
-        device()->update(device(), op_handle_, additional_params.data(), additional_params.size(),
-                         reinterpret_cast<const uint8_t*>(message.c_str()), message.length(),
-                         input_consumed, &out_tmp, &out_length);
-    if (error == KM_ERROR_OK && out_tmp)
-        output->append(reinterpret_cast<char*>(out_tmp), out_length);
-    free(out_tmp);
+    keymaster_blob_t input = {reinterpret_cast<const uint8_t*>(message.c_str()), message.length()};
+    keymaster_blob_t out_tmp;
+    keymaster_key_param_set_t out_params;
+    keymaster_error_t error = device()->update(device(), op_handle_, &additional_params, &input,
+                                               input_consumed, &out_params, &out_tmp);
+    if (error == KM_ERROR_OK && out_tmp.data)
+        output->append(reinterpret_cast<const char*>(out_tmp.data), out_tmp.data_length);
+    free((void*)out_tmp.data);
     return error;
 }
 
@@ -281,15 +274,21 @@ keymaster_error_t Keymaster1Test::FinishOperation(const string& signature, strin
 
 keymaster_error_t Keymaster1Test::FinishOperation(const AuthorizationSet& additional_params,
                                                   const string& signature, string* output) {
-    uint8_t* out_tmp = NULL;
-    size_t out_length;
+    keymaster_blob_t sig = {reinterpret_cast<const uint8_t*>(signature.c_str()),
+                            signature.length()};
+    keymaster_blob_t out_tmp;
+    keymaster_key_param_set_t out_params;
     keymaster_error_t error =
-        device()->finish(device(), op_handle_, additional_params.data(), additional_params.size(),
-                         reinterpret_cast<const uint8_t*>(signature.c_str()), signature.length(),
-                         &out_tmp, &out_length);
-    if (out_tmp)
-        output->append(reinterpret_cast<char*>(out_tmp), out_length);
-    free(out_tmp);
+        device()->finish(device(), op_handle_, &additional_params, &sig, &out_params, &out_tmp);
+    if (error != KM_ERROR_OK) {
+        EXPECT_TRUE(out_tmp.data == nullptr);
+        EXPECT_TRUE(out_params.params == nullptr);
+        return error;
+    }
+
+    if (out_tmp.data)
+        output->append(reinterpret_cast<const char*>(out_tmp.data), out_tmp.data_length);
+    free((void*)out_tmp.data);
     return error;
 }
 
@@ -521,18 +520,15 @@ keymaster_error_t Keymaster1Test::GetCharacteristics() {
 }
 
 keymaster_error_t Keymaster1Test::ExportKey(keymaster_key_format_t format, string* export_data) {
-    uint8_t* export_data_tmp;
-    size_t export_data_length;
-
-    keymaster_error_t error =
-        device()->export_key(device(), format, &blob_, &client_id_, NULL /* app_data */,
-                             &export_data_tmp, &export_data_length);
+    keymaster_blob_t export_tmp;
+    keymaster_error_t error = device()->export_key(device(), format, &blob_, &client_id_,
+                                                   NULL /* app_data */, &export_tmp);
 
     if (error != KM_ERROR_OK)
         return error;
 
-    *export_data = string(reinterpret_cast<char*>(export_data_tmp), export_data_length);
-    free(export_data_tmp);
+    *export_data = string(reinterpret_cast<const char*>(export_tmp.data), export_tmp.data_length);
+    free((void*)export_tmp.data);
     return error;
 }
 

@@ -614,7 +614,7 @@ keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::generate_key(
-    const keymaster1_device_t* dev, const keymaster_key_param_t* params, size_t params_count,
+    const keymaster1_device_t* dev, const keymaster_key_param_set_t* params,
     keymaster_key_blob_t* key_blob, keymaster_key_characteristics_t** characteristics) {
     if (!dev || !params)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -623,7 +623,7 @@ keymaster_error_t SoftKeymasterDevice::generate_key(
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     GenerateKeyRequest request;
-    request.key_description.Reinitialize(params, params_count);
+    request.key_description.Reinitialize(*params);
 
     GenerateKeyResponse response;
     convert_device(dev)->impl_->GenerateKey(request, &response);
@@ -674,8 +674,8 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::import_key(
-    const keymaster1_device_t* dev, const keymaster_key_param_t* params, size_t params_count,
-    keymaster_key_format_t key_format, const uint8_t* key_data, size_t key_data_length,
+    const keymaster1_device_t* dev, const keymaster_key_param_set_t* params,
+    keymaster_key_format_t key_format, const keymaster_blob_t* key_data,
     keymaster_key_blob_t* key_blob, keymaster_key_characteristics_t** characteristics) {
     if (!params || !key_data)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -683,12 +683,12 @@ keymaster_error_t SoftKeymasterDevice::import_key(
     if (!key_blob)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    *characteristics = NULL;
+    *characteristics = nullptr;
 
     ImportKeyRequest request;
-    request.key_description.Reinitialize(params, params_count);
+    request.key_description.Reinitialize(*params);
     request.key_format = key_format;
-    request.SetKeyMaterial(key_data, key_data_length);
+    request.SetKeyMaterial(key_data->data, key_data->data_length);
 
     ImportKeyResponse response;
     convert_device(dev)->impl_->ImportKey(request, &response);
@@ -711,18 +711,20 @@ keymaster_error_t SoftKeymasterDevice::import_key(
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::export_key(
-    const keymaster1_device_t* dev, keymaster_key_format_t export_format,
-    const keymaster_key_blob_t* key_to_export, const keymaster_blob_t* client_id,
-    const keymaster_blob_t* app_data, uint8_t** export_data, size_t* export_data_length) {
+keymaster_error_t SoftKeymasterDevice::export_key(const keymaster1_device_t* dev,
+                                                  keymaster_key_format_t export_format,
+                                                  const keymaster_key_blob_t* key_to_export,
+                                                  const keymaster_blob_t* client_id,
+                                                  const keymaster_blob_t* app_data,
+                                                  keymaster_blob_t* export_data) {
     if (!key_to_export || !key_to_export->key_material)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    if (!export_data || !export_data_length)
+    if (!export_data)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    *export_data = NULL;
-    *export_data_length = 0;
+    export_data->data = nullptr;
+    export_data->data_length = 0;
 
     ExportKeyRequest request;
     request.key_format = export_format;
@@ -734,11 +736,12 @@ keymaster_error_t SoftKeymasterDevice::export_key(
     if (response.error != KM_ERROR_OK)
         return response.error;
 
-    *export_data_length = response.key_data_length;
-    *export_data = reinterpret_cast<uint8_t*>(malloc(*export_data_length));
-    if (!export_data)
+    export_data->data_length = response.key_data_length;
+    uint8_t* tmp = reinterpret_cast<uint8_t*>(malloc(export_data->data_length));
+    if (!tmp)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(*export_data, response.key_data, *export_data_length);
+    memcpy(tmp, response.key_data, export_data->data_length);
+    export_data->data = tmp;
     return KM_ERROR_OK;
 }
 
@@ -754,35 +757,33 @@ keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_d
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::begin(
-    const keymaster1_device_t* dev, keymaster_purpose_t purpose, const keymaster_key_blob_t* key,
-    const keymaster_key_param_t* params, size_t params_count, keymaster_key_param_t** out_params,
-    size_t* out_params_count, keymaster_operation_handle_t* operation_handle) {
+keymaster_error_t SoftKeymasterDevice::begin(const keymaster1_device_t* dev,
+                                             keymaster_purpose_t purpose,
+                                             const keymaster_key_blob_t* key,
+                                             const keymaster_key_param_set_t* in_params,
+                                             keymaster_key_param_set_t* out_params,
+                                             keymaster_operation_handle_t* operation_handle) {
     if (!key || !key->key_material)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    if (!operation_handle || !out_params || !out_params_count)
+    if (!operation_handle || !out_params)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    *out_params = NULL;
-    *out_params_count = 0;
+    out_params->params = nullptr;
+    out_params->length = 0;
 
     BeginOperationRequest request;
     request.purpose = purpose;
     request.SetKeyMaterial(*key);
-    request.additional_params.Reinitialize(params, params_count);
+    request.additional_params.Reinitialize(*in_params);
 
     BeginOperationResponse response;
     convert_device(dev)->impl_->BeginOperation(request, &response);
     if (response.error != KM_ERROR_OK)
         return response.error;
 
-    if (response.output_params.size() > 0) {
-        keymaster_key_param_set_t out_params_set;
-        response.output_params.CopyToParamSet(&out_params_set);
-        *out_params = out_params_set.params;
-        *out_params_count = out_params_set.length;
-    }
+    if (response.output_params.size() > 0)
+        response.output_params.CopyToParamSet(out_params);
 
     *operation_handle = response.op_handle;
     return KM_ERROR_OK;
@@ -791,61 +792,82 @@ keymaster_error_t SoftKeymasterDevice::begin(
 /* static */
 keymaster_error_t SoftKeymasterDevice::update(const keymaster1_device_t* dev,
                                               keymaster_operation_handle_t operation_handle,
-                                              const keymaster_key_param_t* params,
-                                              size_t params_count, const uint8_t* input,
-                                              size_t input_length, size_t* input_consumed,
-                                              uint8_t** output, size_t* output_length) {
+                                              const keymaster_key_param_set_t* in_params,
+                                              const keymaster_blob_t* input, size_t* input_consumed,
+                                              keymaster_key_param_set_t* out_params,
+                                              keymaster_blob_t* output) {
     if (!input)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    if (!input_consumed || !output || !output_length)
+    if (!input_consumed || !output || !out_params)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    out_params->params = nullptr;
+    out_params->length = 0;
+    output->data = nullptr;
+    output->data_length = 0;
 
     UpdateOperationRequest request;
     request.op_handle = operation_handle;
-    request.input.Reinitialize(input, input_length);
-    request.additional_params.Reinitialize(params, params_count);
+    if (input)
+        request.input.Reinitialize(input->data, input->data_length);
+    if (in_params)
+        request.additional_params.Reinitialize(*in_params);
 
     UpdateOperationResponse response;
     convert_device(dev)->impl_->UpdateOperation(request, &response);
     if (response.error != KM_ERROR_OK)
         return response.error;
 
+    if (response.output_params.size() > 0)
+        response.output_params.CopyToParamSet(out_params);
+
     *input_consumed = response.input_consumed;
-    *output_length = response.output.available_read();
-    *output = reinterpret_cast<uint8_t*>(malloc(*output_length));
-    if (!*output)
+    output->data_length = response.output.available_read();
+    uint8_t* tmp = reinterpret_cast<uint8_t*>(malloc(output->data_length));
+    if (!tmp)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(*output, response.output.peek_read(), *output_length);
+    memcpy(tmp, response.output.peek_read(), output->data_length);
+    output->data = tmp;
     return KM_ERROR_OK;
 }
 
 /* static */
 keymaster_error_t SoftKeymasterDevice::finish(const keymaster1_device_t* dev,
                                               keymaster_operation_handle_t operation_handle,
-                                              const keymaster_key_param_t* params,
-                                              size_t params_count, const uint8_t* signature,
-                                              size_t signature_length, uint8_t** output,
-                                              size_t* output_length) {
-    if (!output || !output_length)
+                                              const keymaster_key_param_set_t* params,
+                                              const keymaster_blob_t* signature,
+                                              keymaster_key_param_set_t* out_params,
+                                              keymaster_blob_t* output) {
+    if (!output || !out_params)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    out_params->params = nullptr;
+    out_params->length = 0;
+    output->data = nullptr;
+    output->data_length = 0;
 
     FinishOperationRequest request;
     request.op_handle = operation_handle;
     if (signature)
-        request.signature.Reinitialize(signature, signature_length);
-    request.additional_params.Reinitialize(params, params_count);
+        request.signature.Reinitialize(signature->data, signature->data_length);
+    request.additional_params.Reinitialize(*params);
 
     FinishOperationResponse response;
     convert_device(dev)->impl_->FinishOperation(request, &response);
     if (response.error != KM_ERROR_OK)
         return response.error;
 
-    *output_length = response.output.available_read();
-    *output = reinterpret_cast<uint8_t*>(malloc(*output_length));
-    if (!*output)
+    if (response.output_params.size() > 0)
+        response.output_params.CopyToParamSet(out_params);
+    else
+
+        output->data_length = response.output.available_read();
+    uint8_t* tmp = reinterpret_cast<uint8_t*>(malloc(output->data_length));
+    if (!tmp)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(*output, response.output.peek_read(), *output_length);
+    memcpy(tmp, response.output.peek_read(), output->data_length);
+    output->data = tmp;
     return KM_ERROR_OK;
 }
 
