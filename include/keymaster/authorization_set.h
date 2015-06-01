@@ -28,10 +28,10 @@ namespace keymaster {
 class AuthorizationSetBuilder;
 
 /**
- * A container that manages a set of keymaster_key_param_t objects, providing serialization,
- * de-serialization and accessors.
+ * An extension of the keymaster_key_param_set_t struct, which provides serialization memory
+ * management and methods for easy manipulation and construction.
  */
-class AuthorizationSet : public Serializable {
+class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
   public:
     /**
      * Construct an empty, dynamically-allocated, growable AuthorizationSet.  Does not actually
@@ -40,8 +40,11 @@ class AuthorizationSet : public Serializable {
      * buffers, with \p Reinitialize.
      */
     AuthorizationSet()
-        : elems_(NULL), elems_size_(0), elems_capacity_(0), indirect_data_(NULL),
-          indirect_data_size_(0), indirect_data_capacity_(0), error_(OK) {}
+        : elems_capacity_(0), indirect_data_(NULL), indirect_data_size_(0),
+          indirect_data_capacity_(0), error_(OK) {
+        elems_ = nullptr;
+        elems_size_ = 0;
+    }
 
     /**
      * Construct an AuthorizationSet from the provided array.  The AuthorizationSet copies the data
@@ -50,17 +53,19 @@ class AuthorizationSet : public Serializable {
      * return ALLOCATION_FAILURE. It is the responsibility of the caller to check before using the
      * set, if allocations might fail.
      */
-    AuthorizationSet(const keymaster_key_param_t* elems, size_t count)
-        : elems_(NULL), indirect_data_(NULL) {
+    AuthorizationSet(const keymaster_key_param_t* elems, size_t count) : indirect_data_(nullptr) {
+        elems_ = nullptr;
         Reinitialize(elems, count);
     }
 
-    AuthorizationSet(const keymaster_key_param_set_t& set) : elems_(NULL), indirect_data_(NULL) {
+    explicit AuthorizationSet(const keymaster_key_param_set_t& set) : indirect_data_(nullptr) {
+        elems_ = nullptr;
         Reinitialize(set.params, set.length);
     }
 
-    AuthorizationSet(const uint8_t* serialized_set, size_t serialized_size)
-        : elems_(NULL), indirect_data_(NULL) {
+    explicit AuthorizationSet(const uint8_t* serialized_set, size_t serialized_size)
+        : indirect_data_(nullptr) {
+        elems_ = nullptr;
         Deserialize(&serialized_set, serialized_set + serialized_size);
     }
 
@@ -68,10 +73,13 @@ class AuthorizationSet : public Serializable {
      * Construct an AuthorizationSet from the provided builder.  This extracts the data from the
      * builder, rather than copying it, so after this call the builder is empty.
      */
-    AuthorizationSet(/* NOT const */ AuthorizationSetBuilder& builder);
+    explicit AuthorizationSet(/* NOT const */ AuthorizationSetBuilder& builder);
 
     // Copy constructor.
-    AuthorizationSet(const AuthorizationSet&);
+    AuthorizationSet(const AuthorizationSet& set) : Serializable(), indirect_data_(nullptr) {
+        elems_ = nullptr;
+        Reinitialize(set.elems_, set.elems_size_);
+    }
 
     /**
      * Clear existing authorization set data
@@ -88,6 +96,10 @@ class AuthorizationSet : public Serializable {
 
     bool Reinitialize(const AuthorizationSet& set) {
         return Reinitialize(set.elems_, set.elems_size_);
+    }
+
+    bool Reinitialize(const keymaster_key_param_set_t& set) {
+        return Reinitialize(set.params, set.length);
     }
 
     ~AuthorizationSet();
@@ -384,8 +396,11 @@ class AuthorizationSet : public Serializable {
 
     bool ContainsEnumValue(keymaster_tag_t tag, uint32_t val) const;
 
-    keymaster_key_param_t* elems_;
-    size_t elems_size_;
+    // Define elems_ and elems_size_ as aliases to params and length, respectivley.  This is to
+    // avoid using the variables without the trailing underscore in the implementation.
+    keymaster_key_param_t*& elems_ = keymaster_key_param_set_t::params;
+    size_t& elems_size_ = keymaster_key_param_set_t::length;
+
     size_t elems_capacity_;
     uint8_t* indirect_data_;
     size_t indirect_data_size_;
