@@ -188,7 +188,10 @@ TEST_P(CheckSupported, SupportedDigests) {
 
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains(KM_DIGEST_NONE, digests, len));
+    EXPECT_TRUE(
+        ResponseContains({KM_DIGEST_NONE, KM_DIGEST_MD5, KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
+                          KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512},
+                         digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
@@ -615,6 +618,17 @@ TEST_P(SigningOperationsTest, EcdsaSuccess) {
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, EcdsaSha256Success) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(
+                               KM_DIGEST_SHA_2_256)));
+    string message(1024, 'a');
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
@@ -1243,6 +1257,31 @@ TEST_P(VerificationOperationsTest, EcdsaSuccess) {
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
+}
+
+TEST_P(VerificationOperationsTest, EcdsaSha256Success) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .EcdsaSigningKey(256)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Digest(KM_DIGEST_NONE)));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(4, GetParam()->keymaster0_calls());
+
+    // Just for giggles, try verifying with the wrong digest.
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
 TEST_P(VerificationOperationsTest, HmacSha1Success) {
