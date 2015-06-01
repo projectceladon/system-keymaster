@@ -159,7 +159,8 @@ TEST_P(CheckSupported, SupportedPaddingModes) {
 
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA,
                                                                  KM_PURPOSE_ENCRYPT, &modes, &len));
-    EXPECT_TRUE(ResponseContains({KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT}, modes, len));
+    EXPECT_TRUE(
+        ResponseContains({KM_PAD_NONE, KM_PAD_RSA_OAEP, KM_PAD_RSA_PKCS1_1_5_ENCRYPT}, modes, len));
     free(modes);
 
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_padding_modes(device(), KM_ALGORITHM_EC,
@@ -1575,6 +1576,64 @@ TEST_P(ImportKeyTest, HmacSha256KeySuccess) {
 
 typedef Keymaster1Test EncryptionOperationsTest;
 INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, EncryptionOperationsTest, test_params);
+
+TEST_P(EncryptionOperationsTest, RsaNoPaddingSuccess) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(256, 3).Padding(KM_PAD_NONE)));
+
+    string message = "12345678901234567890123456789012";
+    string ciphertext1 = EncryptMessage(string(message), KM_PAD_NONE);
+    EXPECT_EQ(256U / 8, ciphertext1.size());
+
+    string ciphertext2 = EncryptMessage(string(message), KM_PAD_NONE);
+    EXPECT_EQ(256U / 8, ciphertext2.size());
+
+    // Unpadded RSA is deterministic
+    EXPECT_EQ(ciphertext1, ciphertext2);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, RsaNoPaddingTooShort) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(256, 3).Padding(KM_PAD_NONE)));
+
+    string message = "1234567890123456789012345678901";
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
+    EXPECT_EQ(0U, result.size());
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLong) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(256, 3).Padding(KM_PAD_NONE)));
+
+    string message = "123456789012345678901234567890123";
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
+    EXPECT_EQ(0U, result.size());
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
 
 TEST_P(EncryptionOperationsTest, RsaOaepSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
