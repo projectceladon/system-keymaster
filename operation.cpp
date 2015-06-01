@@ -16,6 +16,10 @@
 
 #include "operation.h"
 
+#include <keymaster/authorization_set.h>
+
+#include "key.h"
+
 namespace keymaster {
 
 bool OperationFactory::supported(keymaster_padding_t padding) const {
@@ -43,6 +47,47 @@ bool OperationFactory::supported(keymaster_digest_t digest) const {
         if (digest == supported_digests[i])
             return true;
     return false;
+}
+
+bool OperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
+                                             keymaster_padding_t* padding,
+                                             keymaster_error_t* error) const {
+    *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+    if (!begin_params.GetTagValue(TAG_PADDING, padding)) {
+        LOG_E("%d padding modes specified in begin params", begin_params.GetTagCount(TAG_PADDING));
+        return false;
+    } else if (!supported(*padding)) {
+        LOG_E("Padding mode %d not supported", *padding);
+        return false;
+    } else if (!key.authorizations().Contains(TAG_PADDING, *padding) &&
+               !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
+        LOG_E("Padding mode %d was specified, but not authorized by key", *padding);
+        *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+        return false;
+    }
+
+    *error = KM_ERROR_OK;
+    return true;
+}
+
+bool OperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
+                                            keymaster_digest_t* digest,
+                                            keymaster_error_t* error) const {
+    *error = KM_ERROR_UNSUPPORTED_DIGEST;
+    if (!begin_params.GetTagValue(TAG_DIGEST, digest)) {
+        LOG_E("%d digests specified in begin params", begin_params.GetTagCount(TAG_DIGEST));
+        return false;
+    } else if (!supported(*digest)) {
+        LOG_E("Digest %d not supported", *digest);
+        return false;
+    } else if (!key.authorizations().Contains(TAG_DIGEST, *digest) &&
+               !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
+        LOG_E("Digest %d was specified, but not authorized by key", *digest);
+        *error = KM_ERROR_INCOMPATIBLE_DIGEST;
+        return false;
+    }
+    *error = KM_ERROR_OK;
+    return true;
 }
 
 }  // namespace keymaster
