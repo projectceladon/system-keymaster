@@ -78,8 +78,10 @@ CPPSRCS=\
 	hmac_key.cpp \
 	hmac_operation.cpp \
 	hmac_test.cpp \
+	integrity_assured_key_blob.cpp \
 	key.cpp \
 	key_blob_test.cpp \
+	keymaster0_engine.cpp \
 	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp \
 	logger.cpp \
@@ -89,6 +91,7 @@ CPPSRCS=\
 	operation.cpp \
 	operation_table.cpp \
 	rsa_key.cpp \
+	rsa_keymaster0_key.cpp \
 	rsa_operation.cpp \
 	serializable.cpp \
 	soft_keymaster_context.cpp \
@@ -215,7 +218,9 @@ android_keymaster_test: android_keymaster_test.o \
 	ecdsa_operation.o \
 	hmac_key.o \
 	hmac_operation.o \
+	integrity_assured_key_blob.o \
 	key.o \
+	keymaster0_engine.o \
 	logger.o \
 	ocb.o \
 	ocb_utils.o \
@@ -225,10 +230,13 @@ android_keymaster_test: android_keymaster_test.o \
 	operation_table.o \
 	rsa_key.o \
 	rsa_operation.o \
+	rsa_keymaster0_key.o \
 	serializable.o \
 	soft_keymaster_context.o \
 	soft_keymaster_device.o \
 	symmetric_key.o \
+	$(BASE)/system/security/softkeymaster/keymaster_openssl.o \
+	$(BASE)/system/security/keystore/keyblob_utils.o \
 	$(GTEST_OBJS)
 
 abstract_factory_registry_test: abstract_factory_registry_test.o \

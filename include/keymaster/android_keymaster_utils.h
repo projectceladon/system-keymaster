@@ -237,6 +237,12 @@ struct KeymasterKeyBlob : public keymaster_key_blob_t {
         key_material_size = blob.key_material_size;
     }
 
+    void operator=(const KeymasterKeyBlob& blob) {
+        Clear();
+        key_material = dup_buffer(blob.key_material, blob.key_material_size);
+        key_material_size = blob.key_material_size;
+    }
+
     ~KeymasterKeyBlob() { Clear(); }
 
     const uint8_t* begin() const { return key_material; }

@@ -16,6 +16,7 @@
 
 #include <keymaster/soft_keymaster_context.h>
 
+#include <memory>
 #include <time.h>
 
 #include <openssl/aes.h>
@@ -29,9 +30,13 @@
 #include "auth_encrypted_key_blob.h"
 #include "ec_key.h"
 #include "hmac_key.h"
+#include "keymaster0_engine.h"
 #include "ocb_utils.h"
 #include "openssl_err.h"
-#include "rsa_key.h"
+#include "rsa_keymaster0_key.h"
+#include "integrity_assured_key_blob.h"
+
+using std::unique_ptr;
 
 namespace keymaster {
 
@@ -44,17 +49,19 @@ const KeymasterKeyBlob MASTER_KEY(master_key_bytes, array_length(master_key_byte
 
 class SoftKeymasterKeyRegistrations {
   public:
-    SoftKeymasterKeyRegistrations(const KeymasterContext* context)
-        : rsa_(context), ec_(context), hmac_(context), aes_(context) {}
+    SoftKeymasterKeyRegistrations(SoftKeymasterContext* context, Keymaster0Engine* engine)
+        : rsa_(context, engine), ec_(context), hmac_(context), aes_(context) {}
 
-    KeyFactoryRegistry::Registration<RsaKeyFactory> rsa_;
+    KeyFactoryRegistry::Registration<RsaKeymaster0KeyFactory> rsa_;
     KeyFactoryRegistry::Registration<EcdsaKeyFactory> ec_;
     KeyFactoryRegistry::Registration<HmacKeyFactory> hmac_;
     KeyFactoryRegistry::Registration<AesKeyFactory> aes_;
 };
 
-SoftKeymasterContext::SoftKeymasterContext()
-    : registrations_(new SoftKeymasterKeyRegistrations(this)) {
+SoftKeymasterContext::SoftKeymasterContext(keymaster0_device_t* keymaster0_device) {
+    if (keymaster0_device && (keymaster0_device->flags & KEYMASTER_SOFTWARE_ONLY) == 0)
+        engine_.reset(new Keymaster0Engine(keymaster0_device));
+    registrations_.reset(new SoftKeymasterKeyRegistrations(this, engine_.get()));
 }
 
 static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
@@ -90,10 +97,10 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
                                            keymaster_key_origin_t origin,
                                            AuthorizationSet* hw_enforced,
                                            AuthorizationSet* sw_enforced) {
-    hw_enforced->Clear();
     sw_enforced->Clear();
-    for (size_t i = 0; i < key_description.size(); ++i) {
-        switch (key_description[i].tag) {
+
+    for (auto& entry : key_description) {
+        switch (entry.tag) {
         // These cannot be specified by the client.
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_ORIGIN:
@@ -110,9 +117,11 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_APPLICATION_DATA:
             break;
 
-        // Everything else we just copy into sw_enforced.
+        // Everything else we just copy into sw_enforced, unless the KeyFactory has placed it in
+        // hw_enforced, in which case we defer to its decision.
         default:
-            sw_enforced->push_back(key_description[i]);
+            if (hw_enforced->GetTagCount(entry.tag) == 0)
+                sw_enforced->push_back(entry);
             break;
         }
     }
@@ -129,9 +138,7 @@ keymaster_error_t SoftKeymasterContext::CreateKeyBlob(const AuthorizationSet& ke
                                                       AuthorizationSet* hw_enforced,
                                                       AuthorizationSet* sw_enforced) const {
 
-    keymaster_error_t error;
-
-    error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
+    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -140,36 +147,18 @@ keymaster_error_t SoftKeymasterContext::CreateKeyBlob(const AuthorizationSet& ke
     if (error != KM_ERROR_OK)
         return error;
 
-    Buffer nonce, tag;
-    if (!nonce.reserve(OCB_NONCE_LENGTH) || !tag.reserve(OCB_TAG_LENGTH))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    GenerateRandom(nonce.peek_write(), OCB_NONCE_LENGTH);
-    nonce.advance_write(OCB_NONCE_LENGTH);
-
-    KeymasterKeyBlob encrypted_key;
-    error = OcbEncryptKey(*hw_enforced, *sw_enforced, hidden, MASTER_KEY, key_material, nonce,
-                          &encrypted_key, &tag);
-    if (error != KM_ERROR_OK)
-        return error;
-
-    return SerializeAuthEncryptedBlob(encrypted_key, *hw_enforced, *sw_enforced, nonce, tag, blob);
+    return SerializeIntegrityAssuredBlob(key_material, hidden, *hw_enforced, *sw_enforced, blob);
 }
 
-keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
-                                                     const AuthorizationSet& additional_params,
-                                                     KeymasterKeyBlob* key_material,
-                                                     AuthorizationSet* hw_enforced,
-                                                     AuthorizationSet* sw_enforced) const {
+static keymaster_error_t ParseOcbAuthEncryptedBlob(const KeymasterKeyBlob& blob,
+                                                   const AuthorizationSet& hidden,
+                                                   KeymasterKeyBlob* key_material,
+                                                   AuthorizationSet* hw_enforced,
+                                                   AuthorizationSet* sw_enforced) {
     Buffer nonce, tag;
     KeymasterKeyBlob encrypted_key_material;
     keymaster_error_t error = DeserializeAuthEncryptedBlob(blob, &encrypted_key_material,
                                                            hw_enforced, sw_enforced, &nonce, &tag);
-    if (error != KM_ERROR_OK)
-        return error;
-
-    AuthorizationSet hidden;
-    error = BuildHiddenAuthorizations(additional_params, &hidden);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -178,6 +167,181 @@ keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blo
 
     return OcbDecryptKey(*hw_enforced, *sw_enforced, hidden, MASTER_KEY, encrypted_key_material,
                          nonce, tag, key_material);
+}
+
+// Note: This parsing code in below is from system/security/softkeymaster/keymaster_openssl.cpp's
+// unwrap_key function, modified for the preferred function signature and formatting.  It does some
+// odd things, but they have been left unchanged to avoid breaking compatibility.
+static const uint8_t SOFT_KEY_MAGIC[] = {'P', 'K', '#', '8'};
+const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
+static keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
+                                                   KeymasterKeyBlob* key_material,
+                                                   AuthorizationSet* hw_enforced,
+                                                   AuthorizationSet* sw_enforced) {
+    long publicLen = 0;
+    long privateLen = 0;
+    const uint8_t* p = blob.key_material;
+    const uint8_t* end = blob.key_material + blob.key_material_size;
+
+    int type = 0;
+    ptrdiff_t min_size =
+        sizeof(SOFT_KEY_MAGIC) + sizeof(type) + sizeof(publicLen) + 1 + sizeof(privateLen) + 1;
+    if (end - p < min_size) {
+        LOG_W("key blob appears to be truncated (if an old SW key)", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    if (memcmp(p, SOFT_KEY_MAGIC, sizeof(SOFT_KEY_MAGIC)) != 0)
+        return KM_ERROR_INVALID_KEY_BLOB;
+    p += sizeof(SOFT_KEY_MAGIC);
+
+    for (size_t i = 0; i < sizeof(type); i++)
+        type = (type << 8) | *p++;
+
+    for (size_t i = 0; i < sizeof(type); i++)
+        publicLen = (publicLen << 8) | *p++;
+
+    if (p + publicLen > end) {
+        LOG_W("public key length encoding error: size=%ld, end=%td", publicLen, end - p);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+    p += publicLen;
+
+    if (end - p < 2) {
+        LOG_W("key blob appears to be truncated (if an old SW key)", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    for (size_t i = 0; i < sizeof(type); i++)
+        privateLen = (privateLen << 8) | *p++;
+
+    if (p + privateLen > end) {
+        LOG_W("private key length encoding error: size=%ld, end=%td", privateLen, end - p);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    // Just to be sure, make sure that the ASN.1 structure parses correctly.  We don't actually use
+    // the EVP_PKEY here.
+    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
+    if (pkey.get() == nullptr)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    EVP_PKEY* tmp = pkey.get();
+    const uint8_t* key_start = p;
+    if (d2i_PrivateKey(type, &tmp, &p, privateLen) == NULL) {
+        LOG_W("Failed to parse PKCS#8 key material (if old SW key)", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    if (!key_material->Reset(privateLen))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    memcpy(key_material->writable_data(), key_start, privateLen);
+
+    hw_enforced->Clear();
+    sw_enforced->Clear();
+
+    switch (type) {
+    case EVP_PKEY_RSA:
+        sw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        sw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
+        break;
+
+    case EVP_PKEY_EC:
+        sw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        break;
+
+    case EVP_PKEY_DSA:
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+
+    default:
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
+    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
+    sw_enforced->push_back(TAG_ALL_USERS);
+    sw_enforced->push_back(TAG_NO_AUTH_REQUIRED);
+    uint64_t now = java_time(time(NULL));
+    sw_enforced->push_back(TAG_CREATION_DATETIME, now);
+    sw_enforced->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
+    sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    sw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
+                                                     const AuthorizationSet& additional_params,
+                                                     KeymasterKeyBlob* key_material,
+                                                     AuthorizationSet* hw_enforced,
+                                                     AuthorizationSet* sw_enforced) const {
+    // This is a little bit complicated.
+    //
+    // The SoftKeymasterContext has to handle a lot of different kinds of key blobs.
+    //
+    // 1.  New keymaster1 software key blobs.  These are integrity-assured but not encrypted.  The
+    //     raw key material and auth sets should be extracted and returned.  This is the kind
+    //     produced by this context when the KeyFactory doesn't use keymaster0 to back the keys.
+    //
+    // 2.  Old keymaster1 software key blobs.  These are OCB-encrypted with an all-zero master key.
+    //     They should be decrypted and the key material and auth sets extracted and returned.
+    //
+    // 3.  Old keymaster0 software key blobs.  These are raw key material with a small header tacked
+    //     on the front.  They don't have auth sets, so reasonable defaults are generated and
+    //     returned along with the raw key material.
+    //
+    // 4.  New keymaster0 hardware key blobs.  These are integrity-assured but not encrypted (though
+    //     they're protected by the keymaster0 hardware implementation).  The keymaster0 key blob
+    //     and auth sets should be extracted and returned.
+    //
+    // 5.  Old keymaster0 hardware key blobs.  These are raw hardware key blobs.  They don't have
+    //     auth sets so reasonable defaults are generated and returned along with the key blob.
+    //
+    // Determining what kind of blob has arrived is somewhat tricky.  What helps is that
+    // integrity-assured and OCB-encrypted blobs are self-consistent and effectively impossible to
+    // parse as anything else.  Old keymaster0 software key blobs have a header.  It's reasonably
+    // unlikely that hardware keys would have the same header.  So anything that is neither
+    // integrity-assured nor OCB-encrypted and lacks the old software key header is assumed to be
+    // keymaster0 hardware.
+
+    AuthorizationSet hidden;
+    keymaster_error_t error = BuildHiddenAuthorizations(additional_params, &hidden);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    // Assume it's an integrity-assured blob (new software-only blob, or new keymaster0-backed
+    // blob).
+    error = DeserializeIntegrityAssuredBlob(blob, hidden, key_material, hw_enforced, sw_enforced);
+    if (error != KM_ERROR_INVALID_KEY_BLOB)
+        return error;
+
+    // Wasn't an integrity-assured blob.  Maybe it's an OCB-encrypted blob.
+    error = ParseOcbAuthEncryptedBlob(blob, hidden, key_material, hw_enforced, sw_enforced);
+    if (error == KM_ERROR_OK)
+        LOG_D("Parsed an old keymaster1 software key", 0);
+    if (error != KM_ERROR_INVALID_KEY_BLOB)
+        return error;
+
+    // Wasn't an OCB-encrypted blob.  Maybe it's an old softkeymaster blob.
+    error = ParseOldSoftkeymasterBlob(blob, key_material, hw_enforced, sw_enforced);
+    if (error == KM_ERROR_OK)
+        LOG_D("Parsed an old sofkeymaster key", 0);
+    if (error != KM_ERROR_INVALID_KEY_BLOB)
+        return error;
+
+    // Not an old softkeymaster blob, either.  The only remaining option is old HW keymaster0.
+    if (!engine_)
+        return KM_ERROR_INVALID_KEY_BLOB;
+
+    // See if the HW thinks it's valid.
+    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> tmp_key(engine_->GetKeymaster0PublicKey(blob));
+    if (!tmp_key)
+        return KM_ERROR_INVALID_KEY_BLOB;
+
+    *key_material = blob;
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t SoftKeymasterContext::AddRngEntropy(const uint8_t* buf, size_t length) const {

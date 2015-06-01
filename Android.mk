@@ -48,14 +48,15 @@ LOCAL_SRC_FILES:= \
 		android_keymaster.cpp \
 		android_keymaster_messages.cpp \
 		android_keymaster_utils.cpp \
-		auth_encrypted_key_blob.cpp \
 		asymmetric_key.cpp \
+		auth_encrypted_key_blob.cpp \
 		ec_key.cpp \
 		ecdsa_operation.cpp \
 		hkdf.cpp \
 		hmac.cpp \
 		hmac_key.cpp \
 		hmac_operation.cpp \
+		integrity_assured_key_blob.cpp \
 		key.cpp \
 		ocb.c \
 		ocb_utils.cpp \
@@ -86,6 +87,8 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := libsoftkeymasterdevice
 LOCAL_SRC_FILES := \
+	keymaster0_engine.cpp \
+	rsa_keymaster0_key.cpp \
 	soft_keymaster_context.cpp \
 	soft_keymaster_device.cpp \
 	soft_keymaster_logger.cpp
@@ -118,7 +121,12 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror
 LOCAL_MODULE_TAGS := tests
-LOCAL_SHARED_LIBRARIES := libsoftkeymasterdevice libkeymaster_messages libkeymaster1 libcrypto
+LOCAL_SHARED_LIBRARIES := \
+	libsoftkeymasterdevice \
+	libkeymaster_messages \
+	libkeymaster1 \
+	libcrypto \
+	libsoftkeymaster
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_NATIVE_TEST)
 

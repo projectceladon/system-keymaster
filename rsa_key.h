@@ -42,6 +42,13 @@ class RsaKeyFactory : public AsymmetricKeyFactory {
     keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
                                      const AuthorizationSet& sw_enforced,
                                      UniquePtr<AsymmetricKey>* key) override;
+
+  protected:
+    keymaster_error_t UpdateImportKeyDescription(const AuthorizationSet& key_description,
+                                                 keymaster_key_format_t import_key_format,
+                                                 const KeymasterKeyBlob& import_key_material,
+                                                 AuthorizationSet* updated_description,
+                                                 uint64_t* public_exponent, uint32_t* key_size);
 };
 
 class RsaOperationFactory;
@@ -63,6 +70,11 @@ class RsaKey : public AsymmetricKey {
     };
 
     RSA* key() const { return rsa_key_.get(); }
+
+  protected:
+    RsaKey(RSA* rsa, const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+           keymaster_error_t* error)
+        : AsymmetricKey(hw_enforced, sw_enforced, error), rsa_key_(rsa) {}
 
   private:
     UniquePtr<RSA, RSA_Delete> rsa_key_;

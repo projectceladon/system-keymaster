@@ -193,6 +193,8 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
         response->error = KM_ERROR_UNSUPPORTED_ALGORITHM;
     else {
         KeymasterKeyBlob key_blob;
+        response->enforced.Clear();
+        response->unenforced.Clear();
         response->error = factory->GenerateKey(request.key_description, &key_blob,
                                                &response->enforced, &response->unenforced);
         if (response->error == KM_ERROR_OK)
@@ -238,6 +240,8 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     UniquePtr<Key> key;
     response->error = LoadKey(request.key_blob, request.additional_params, &hw_enforced,
                               &sw_enforced, &algorithm, &key);
+    if (response->error != KM_ERROR_OK)
+        return;
 
     // TODO(swillden): Move this check to a general authorization checker.
     // TODO(swillden): Consider introducing error codes for unauthorized usages.
@@ -360,6 +364,14 @@ void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespo
         if (response->error == KM_ERROR_OK)
             response->key_blob = key_blob.release();
     }
+}
+
+keymaster_error_t AndroidKeymaster::DeleteKey(const DeleteKeyRequest& request) {
+    return context_->DeleteKey(KeymasterKeyBlob(request.key_blob));
+}
+
+keymaster_error_t AndroidKeymaster::DeleteAllKeys() {
+    return context_->DeleteAllKeys();
 }
 
 keymaster_error_t AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key_blob,

@@ -58,19 +58,14 @@ struct keystore_module soft_keymaster_device_module = {
 
 namespace keymaster {
 
-SoftKeymasterDevice::SoftKeymasterDevice()
-    : impl_(new AndroidKeymaster(new SoftKeymasterContext, 16)) {
-#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
+SoftKeymasterDevice::SoftKeymasterDevice(keymaster0_device_t* keymaster0_device)
+    : impl_(new AndroidKeymaster(new SoftKeymasterContext(keymaster0_device), 16)) {
     static_assert(std::is_standard_layout<SoftKeymasterDevice>::value,
                   "SoftKeymasterDevice must be standard layout");
     static_assert(offsetof(SoftKeymasterDevice, device_) == 0,
-                  "device_ must be the first member of KeymasterOpenSsl");
+                  "device_ must be the first member of SoftKeymasterDevice");
     static_assert(offsetof(SoftKeymasterDevice, device_.common) == 0,
                   "common must be the first member of keymaster_device");
-#else
-    assert(reinterpret_cast<keymaster_device*>(this) == &device_);
-    assert(reinterpret_cast<hw_device_t*>(this) == &(device_.common));
-#endif
     LOG_I("Creating device", 0);
     LOG_D("Device address: %p", this);
 
@@ -84,16 +79,16 @@ SoftKeymasterDevice::SoftKeymasterDevice()
     device_.flags =
         KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE | KEYMASTER_SUPPORTS_EC;
 
-    // V0.3 APIs
+    // keymaster0 APIs
     device_.generate_keypair = generate_keypair;
     device_.import_keypair = import_keypair;
     device_.get_keypair_public = get_keypair_public;
-    device_.delete_keypair = NULL;
-    device_.delete_all = NULL;
+    device_.delete_keypair = delete_keypair;
+    device_.delete_all = delete_all;
     device_.sign_data = sign_data;
     device_.verify_data = verify_data;
 
-    // V0.4 APIs
+    // keymaster1 APIs
     device_.get_supported_algorithms = get_supported_algorithms;
     device_.get_supported_block_modes = get_supported_block_modes;
     device_.get_supported_padding_modes = get_supported_padding_modes;
@@ -105,8 +100,8 @@ SoftKeymasterDevice::SoftKeymasterDevice()
     device_.get_key_characteristics = get_key_characteristics;
     device_.import_key = import_key;
     device_.export_key = export_key;
-    device_.delete_key = NULL;
-    device_.delete_all_keys = NULL;
+    device_.delete_key = delete_key;
+    device_.delete_all_keys = delete_all_keys;
     device_.begin = begin;
     device_.update = update;
     device_.finish = finish;
@@ -325,6 +320,18 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
     LOG_D("Returning %d bytes in x509 key\n", (int)*x509_data_length);
 
     return KM_ERROR_OK;
+}
+
+/* static */
+int SoftKeymasterDevice::delete_keypair(const struct keymaster1_device* /* dev */,
+                                        const uint8_t* /* key_blob */,
+                                        const size_t /* key_blob_length */) {
+    return KM_ERROR_UNIMPLEMENTED;
+}
+
+/* static */
+int SoftKeymasterDevice::delete_all(const struct keymaster1_device* /* dev */) {
+    return KM_ERROR_UNIMPLEMENTED;
 }
 
 /* static */
@@ -737,6 +744,17 @@ keymaster_error_t SoftKeymasterDevice::export_key(
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memcpy(*export_data, response.key_data, *export_data_length);
     return KM_ERROR_OK;
+}
+
+/* static */
+keymaster_error_t SoftKeymasterDevice::delete_key(const struct keymaster1_device* /* dev */,
+                                                  const keymaster_key_blob_t* /* key */) {
+    return KM_ERROR_UNIMPLEMENTED;
+}
+
+/* static */
+keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_device* /* dev */) {
+    return KM_ERROR_UNIMPLEMENTED;
 }
 
 /* static */
