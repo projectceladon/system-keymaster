@@ -148,10 +148,6 @@ class RsaOperationFactory : public OperationFactory {
     virtual keymaster_purpose_t purpose() const = 0;
 
   protected:
-    bool GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
-                               keymaster_padding_t* padding, keymaster_error_t* error) const;
-    bool GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
-                              keymaster_digest_t* digest, keymaster_error_t* error) const;
     static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
 };
 

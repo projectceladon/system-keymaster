@@ -30,47 +30,6 @@ namespace keymaster {
 
 static const int MIN_PSS_SALT_LEN = 8 /* salt len */ + 2 /* overhead */;
 
-bool RsaOperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_params,
-                                                const Key& key, keymaster_padding_t* padding,
-                                                keymaster_error_t* error) const {
-    *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    if (!begin_params.GetTagValue(TAG_PADDING, padding)) {
-        LOG_E("%d padding modes specified in begin params", begin_params.GetTagCount(TAG_PADDING));
-        return false;
-    } else if (!supported(*padding)) {
-        LOG_E("Padding mode %d not supported", *padding);
-        return false;
-    } else if (!key.authorizations().Contains(TAG_PADDING, *padding) &&
-               !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
-        LOG_E("Padding mode %d was specified, but not authorized by key", *padding);
-        *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
-        return false;
-    }
-
-    *error = KM_ERROR_OK;
-    return true;
-}
-
-bool RsaOperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
-                                               keymaster_digest_t* digest,
-                                               keymaster_error_t* error) const {
-    *error = KM_ERROR_UNSUPPORTED_DIGEST;
-    if (!begin_params.GetTagValue(TAG_DIGEST, digest)) {
-        LOG_E("%d digests specified in begin params", begin_params.GetTagCount(TAG_DIGEST));
-        return false;
-    } else if (!supported(*digest)) {
-        LOG_E("Digest %d not supported", *digest);
-        return false;
-    } else if (!key.authorizations().Contains(TAG_DIGEST, *digest) &&
-               !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
-        LOG_E("Digest %d was specified, but not authorized by key", *digest);
-        *error = KM_ERROR_INCOMPATIBLE_DIGEST;
-        return false;
-    }
-    *error = KM_ERROR_OK;
-    return true;
-}
-
 /* static */
 RSA* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
     const RsaKey* rsa_key = static_cast<const RsaKey*>(&key);
