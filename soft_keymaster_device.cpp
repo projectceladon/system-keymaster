@@ -352,10 +352,8 @@ int SoftKeymasterDevice::sign_data(const keymaster1_device_t* dev, const void* p
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_SIGN;
     begin_request.SetKeyMaterial(key_blob, key_blob_length);
-    keymaster_error_t err = ExtractSigningParams(dev, params, key_blob, key_blob_length,
-                                                 &begin_request.additional_params);
-    if (err != KM_ERROR_OK)
-        return err;
+    begin_request.additional_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_request.additional_params.push_back(TAG_PADDING, KM_PAD_NONE);
 
     BeginOperationResponse begin_response;
     convert_device(dev)->impl_->BeginOperation(begin_request, &begin_response);
@@ -405,10 +403,8 @@ int SoftKeymasterDevice::verify_data(const keymaster1_device_t* dev, const void*
     BeginOperationRequest begin_request;
     begin_request.purpose = KM_PURPOSE_VERIFY;
     begin_request.SetKeyMaterial(key_blob, key_blob_length);
-    keymaster_error_t err = ExtractSigningParams(dev, params, key_blob, key_blob_length,
-                                                 &begin_request.additional_params);
-    if (err != KM_ERROR_OK)
-        return err;
+    begin_request.additional_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_request.additional_params.push_back(TAG_PADDING, KM_PAD_NONE);
 
     BeginOperationResponse begin_response;
     convert_device(dev)->impl_->BeginOperation(begin_request, &begin_response);
@@ -857,54 +853,6 @@ keymaster_error_t SoftKeymasterDevice::finish(const keymaster1_device_t* dev,
 keymaster_error_t SoftKeymasterDevice::abort(const keymaster1_device_t* dev,
                                              keymaster_operation_handle_t operation_handle) {
     return convert_device(dev)->impl_->AbortOperation(operation_handle);
-}
-
-/* static */
-keymaster_error_t SoftKeymasterDevice::ExtractSigningParams(const keymaster1_device_t* dev,
-                                                            const void* signing_params,
-                                                            const uint8_t* key_blob,
-                                                            size_t key_blob_length,
-                                                            AuthorizationSet* auth_set) {
-    const keymaster_blob_t client_id = {nullptr, 0};
-    const keymaster_blob_t app_data = {nullptr, 0};
-    const keymaster_key_blob_t blob = {key_blob, key_blob_length};
-    keymaster_key_characteristics_t* characteristics;
-    keymaster_error_t error =
-        get_key_characteristics(dev, &blob, &client_id, &app_data, &characteristics);
-
-    if (error != KM_ERROR_OK)
-        return error;
-
-    AuthorizationSet auths(characteristics->hw_enforced);
-    auths.push_back(AuthorizationSet(characteristics->sw_enforced));
-    keymaster_algorithm_t algorithm;
-    if (!auths.GetTagValue(TAG_ALGORITHM, &algorithm))
-        return KM_ERROR_INVALID_KEY_BLOB;
-
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA: {
-        const keymaster_rsa_sign_params_t* rsa_params =
-            reinterpret_cast<const keymaster_rsa_sign_params_t*>(signing_params);
-        if (rsa_params->digest_type != DIGEST_NONE)
-            return KM_ERROR_UNSUPPORTED_DIGEST;
-        if (rsa_params->padding_type != PADDING_NONE)
-            return KM_ERROR_UNSUPPORTED_PADDING_MODE;
-        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE) ||
-            !auth_set->push_back(TAG_PADDING, KM_PAD_NONE))
-            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    } break;
-    case KM_ALGORITHM_EC: {
-        const keymaster_ec_sign_params_t* ecdsa_params =
-            reinterpret_cast<const keymaster_ec_sign_params_t*>(signing_params);
-        if (ecdsa_params->digest_type != DIGEST_NONE)
-            return KM_ERROR_UNSUPPORTED_DIGEST;
-        if (!auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE))
-            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    } break;
-    default:
-        return KM_ERROR_UNSUPPORTED_ALGORITHM;
-    }
-    return KM_ERROR_OK;
 }
 
 /* static */
