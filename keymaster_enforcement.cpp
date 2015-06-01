@@ -127,9 +127,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         case KM_TAG_DIGEST:
         case KM_TAG_MAC_LENGTH:
         case KM_TAG_PADDING:
-        case KM_TAG_CHUNK_LENGTH:
         case KM_TAG_NONCE:
-        case KM_TAG_RETURN_UNAUTHED:
 
         /* Tags not used for operations. */
         case KM_TAG_BLOB_USAGE_REQUIREMENTS:
