@@ -45,6 +45,14 @@ struct RSA_Delete {
     void operator()(RSA* p) { RSA_free(p); }
 };
 
+struct EC_GROUP_Delete {
+    void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
+};
+
+struct EC_Delete {
+    void operator()(EC_KEY* p) { EC_KEY_free(p); }
+};
+
 /**
  * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
  * failure. This means we need to tell our scoped pointers when we've transferred ownership, without

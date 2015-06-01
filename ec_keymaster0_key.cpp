@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "rsa_keymaster0_key.h"
+#include "ec_keymaster0_key.h"
 
 #include <memory>
 
-#define LOG_TAG "RsaKeymaster0Key"
+#define LOG_TAG "EcKeymaster0Key"
 #include <cutils/log.h>
 
 #include <keymaster/soft_keymaster_context.h>
@@ -30,64 +30,55 @@ using std::unique_ptr;
 
 namespace keymaster {
 
-RsaKeymaster0KeyFactory::RsaKeymaster0KeyFactory(const SoftKeymasterContext* context,
-                                                 const Keymaster0Engine* engine)
-    : RsaKeyFactory(context), engine_(engine), soft_context_(context) {
+EcdsaKeymaster0KeyFactory::EcdsaKeymaster0KeyFactory(const SoftKeymasterContext* context,
+                                                     const Keymaster0Engine* engine)
+    : EcdsaKeyFactory(context), engine_(engine), soft_context_(context) {
 }
 
-keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,
-                                                       KeymasterKeyBlob* key_blob,
-                                                       AuthorizationSet* hw_enforced,
-                                                       AuthorizationSet* sw_enforced) {
+keymaster_error_t EcdsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,
+                                                         KeymasterKeyBlob* key_blob,
+                                                         AuthorizationSet* hw_enforced,
+                                                         AuthorizationSet* sw_enforced) {
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    if (!engine_)
+    if (!engine_ || !engine_->supports_ec())
         return super::GenerateKey(key_description, key_blob, hw_enforced, sw_enforced);
-
-    uint64_t public_exponent;
-    if (!key_description.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent)) {
-        LOG_E("%s", "No public exponent specified for RSA key generation");
-        return KM_ERROR_INVALID_ARGUMENT;
-    }
 
     uint32_t key_size;
     if (!key_description.GetTagValue(TAG_KEY_SIZE, &key_size)) {
-        LOG_E("%s", "No key size specified for RSA key generation");
+        LOG_E("%s", "No key size specified for EC key generation");
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
     KeymasterKeyBlob key_material;
-    if (!engine_->GenerateRsaKey(public_exponent, key_size, &key_material))
+    if (!engine_->GenerateEcKey(key_size, &key_material))
         return KM_ERROR_UNKNOWN_ERROR;
 
     // These tags are hardware-enforced.  Putting them in the hw_enforced set here will ensure that
     // context_->CreateKeyBlob doesn't put them in sw_enforced.
-    hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-    hw_enforced->push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
+    hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
 
     return context_->CreateKeyBlob(key_description, KM_ORIGIN_GENERATED, key_material, key_blob,
                                    hw_enforced, sw_enforced);
 }
 
-keymaster_error_t RsaKeymaster0KeyFactory::ImportKey(
+keymaster_error_t EcdsaKeymaster0KeyFactory::ImportKey(
     const AuthorizationSet& key_description, keymaster_key_format_t input_key_material_format,
     const KeymasterKeyBlob& input_key_material, KeymasterKeyBlob* output_key_blob,
     AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced) {
     if (!output_key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    if (!engine_)
+    if (!engine_ || !engine_->supports_ec())
         return super::ImportKey(key_description, input_key_material_format, input_key_material,
                                 output_key_blob, hw_enforced, sw_enforced);
 
     AuthorizationSet authorizations;
-    uint64_t public_exponent;
     uint32_t key_size;
-    keymaster_error_t error =
-        UpdateImportKeyDescription(key_description, input_key_material_format, input_key_material,
-                                   &authorizations, &public_exponent, &key_size);
+    keymaster_error_t error = UpdateImportKeyDescription(
+        key_description, input_key_material_format, input_key_material, &authorizations, &key_size);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -97,48 +88,47 @@ keymaster_error_t RsaKeymaster0KeyFactory::ImportKey(
 
     // These tags are hardware-enforced.  Putting them in the hw_enforced set here will ensure that
     // context_->CreateKeyBlob doesn't put them in sw_enforced.
-    hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-    hw_enforced->push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
+    hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
 
     return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, imported_hw_key,
                                    output_key_blob, hw_enforced, sw_enforced);
 }
 
-keymaster_error_t RsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
-                                                   const AuthorizationSet& hw_enforced,
-                                                   const AuthorizationSet& sw_enforced,
-                                                   UniquePtr<Key>* key) {
+keymaster_error_t EcdsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
+                                                     const AuthorizationSet& hw_enforced,
+                                                     const AuthorizationSet& sw_enforced,
+                                                     UniquePtr<Key>* key) {
     if (!key)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     if (sw_enforced.GetTagCount(TAG_ALGORITHM) == 1)
         return super::LoadKey(key_material, hw_enforced, sw_enforced, key);
 
-    unique_ptr<RSA, RSA_Delete> rsa(engine_->BlobToRsaKey(key_material));
-    if (!rsa)
+    unique_ptr<EC_KEY, EC_Delete> ec_key(engine_->BlobToEcKey(key_material));
+    if (!ec_key)
         return KM_ERROR_UNKNOWN_ERROR;
 
     keymaster_error_t error;
-    key->reset(new RsaKeymaster0Key(rsa.release(), hw_enforced, sw_enforced, engine_, &error));
+    key->reset(new EcKeymaster0Key(ec_key.release(), hw_enforced, sw_enforced, engine_, &error));
     if (error != KM_ERROR_OK)
         return error;
 
     return KM_ERROR_OK;
 }
 
-RsaKeymaster0Key::RsaKeymaster0Key(RSA* rsa_key, const AuthorizationSet& hw_enforced,
-                                   const AuthorizationSet& sw_enforced,
-                                   const Keymaster0Engine* engine, keymaster_error_t* error)
-    : RsaKey(rsa_key, hw_enforced, sw_enforced, error), engine_(engine) {
+EcKeymaster0Key::EcKeymaster0Key(EC_KEY* ec_key, const AuthorizationSet& hw_enforced,
+                                 const AuthorizationSet& sw_enforced,
+                                 const Keymaster0Engine* engine, keymaster_error_t* error)
+    : EcKey(ec_key, hw_enforced, sw_enforced, error), engine_(engine) {
 }
 
-keymaster_error_t RsaKeymaster0Key::key_material(UniquePtr<uint8_t[]>* material,
-                                                 size_t* size) const {
+keymaster_error_t EcKeymaster0Key::key_material(UniquePtr<uint8_t[]>* material,
+                                                size_t* size) const {
     if (!engine_)
         return super::key_material(material, size);
 
-    const keymaster_key_blob_t* blob = engine_->RsaKeyToBlob(key());
+    const keymaster_key_blob_t* blob = engine_->EcKeyToBlob(key());
     if (!blob)
         return KM_ERROR_UNKNOWN_ERROR;
 

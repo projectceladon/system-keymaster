@@ -157,8 +157,7 @@ class Keymaster1TestInstanceCreator {
     virtual ~Keymaster1TestInstanceCreator(){};
     virtual keymaster1_device_t* CreateDevice() const = 0;
 
-    virtual bool crypto_params_in_hardware(keymaster_algorithm_t algorithm) const = 0;
-    virtual bool expect_keymaster0_calls() const = 0;
+    virtual bool algorithm_in_hardware(keymaster_algorithm_t algorithm) const = 0;
     virtual int keymaster0_calls() const = 0;
 };
 

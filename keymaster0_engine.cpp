@@ -39,9 +39,11 @@ namespace keymaster {
 // int Keymaster0Engine::ec_key_index_ = -1;
 Keymaster0Engine* Keymaster0Engine::instance_ = nullptr;
 const RSA_METHOD Keymaster0Engine::rsa_method_ = {
-    {
-        0 /* references */, 1 /* is_static */,
-    },
+    .common =
+        {
+            0,  // references
+            1   // is_static
+        },
     .app_data = nullptr,
     .init = nullptr,
     .finish = nullptr,
@@ -59,20 +61,43 @@ const RSA_METHOD Keymaster0Engine::rsa_method_ = {
     .mod_exp = nullptr,
     .bn_mod_exp = BN_mod_exp_mont,
 
-    .flags = RSA_FLAG_CACHE_PUBLIC | RSA_FLAG_OPAQUE | RSA_FLAG_EXT_PKEY,
+    .flags = RSA_FLAG_OPAQUE,
 
     .keygen = nullptr,
     .supports_digest = nullptr,
 };
 
+const ECDSA_METHOD Keymaster0Engine::ecdsa_method_ = {
+    .common =
+        {
+            0,  // references
+            1   // is_static
+        },
+    .app_data = nullptr,
+    .init = nullptr,
+    .finish = nullptr,
+    .group_order_size = nullptr,
+    .sign = Keymaster0Engine::ecdsa_sign,
+    .verify = nullptr,
+    .flags = ECDSA_FLAG_OPAQUE,
+};
+
 Keymaster0Engine::Keymaster0Engine(const keymaster0_device_t* keymaster0_device)
-    : keymaster0_device_(keymaster0_device), engine_(ENGINE_new()) {
+    : keymaster0_device_(keymaster0_device), engine_(ENGINE_new()), supports_ec_(false) {
     assert(!instance_);
     instance_ = this;
 
     rsa_index_ = RSA_get_ex_new_index(0 /* argl */, NULL /* argp */, NULL /* new_func */,
                                       keyblob_dup, keyblob_free);
+    ec_key_index_ = EC_KEY_get_ex_new_index(0 /* argl */, NULL /* argp */, NULL /* new_func */,
+                                            keyblob_dup, keyblob_free);
+
     ENGINE_set_RSA_method(engine_, &rsa_method_, sizeof(rsa_method_));
+
+    if ((keymaster0_device_->flags & KEYMASTER_SUPPORTS_EC) != 0) {
+        supports_ec_ = true;
+        ENGINE_set_ECDSA_method(engine_, &ecdsa_method_, sizeof(ecdsa_method_));
+    }
 }
 
 Keymaster0Engine::~Keymaster0Engine() {
@@ -101,9 +126,25 @@ bool Keymaster0Engine::GenerateRsaKey(uint64_t public_exponent, uint32_t public_
     return true;
 }
 
-bool Keymaster0Engine::ImportRsaKey(keymaster_key_format_t key_format,
-                                    const KeymasterKeyBlob& to_import,
-                                    KeymasterKeyBlob* imported_key) const {
+bool Keymaster0Engine::GenerateEcKey(uint32_t key_size, KeymasterKeyBlob* key_material) const {
+    assert(key_material);
+    keymaster_ec_keygen_params_t params;
+    params.field_size = key_size;
+
+    uint8_t* key_blob = 0;
+    if (keymaster0_device_->generate_keypair(keymaster0_device_, TYPE_EC, &params, &key_blob,
+                                             &key_material->key_material_size) < 0) {
+        ALOGE("Error generating EC key pair with keymaster0 device");
+        return false;
+    }
+    unique_ptr<uint8_t, Malloc_Delete> key_blob_deleter(key_blob);
+    key_material->key_material = dup_buffer(key_blob, key_material->key_material_size);
+    return true;
+}
+
+bool Keymaster0Engine::ImportKey(keymaster_key_format_t key_format,
+                                 const KeymasterKeyBlob& to_import,
+                                 KeymasterKeyBlob* imported_key) const {
     assert(imported_key);
     if (key_format != KM_KEY_FORMAT_PKCS8)
         return false;
@@ -112,7 +153,7 @@ bool Keymaster0Engine::ImportRsaKey(keymaster_key_format_t key_format,
     if (keymaster0_device_->import_keypair(keymaster0_device_, to_import.key_material,
                                            to_import.key_material_size, &key_blob,
                                            &imported_key->key_material_size) < 0) {
-        ALOGW("Error importing RSA keypair with keymaster0 device");
+        ALOGW("Error importing keypair with keymaster0 device");
         return false;
     }
     unique_ptr<uint8_t, Malloc_Delete> key_blob_deleter(key_blob);
@@ -161,8 +202,38 @@ RSA* Keymaster0Engine::BlobToRsaKey(const KeymasterKeyBlob& blob) const {
     return rsa.release();
 }
 
-const keymaster_key_blob_t* Keymaster0Engine::rsa_get_blob(const RSA* rsa) const {
+EC_KEY* Keymaster0Engine::BlobToEcKey(const KeymasterKeyBlob& blob) const {
+    // Create new EC key (with engine methods) and insert blob
+    unique_ptr<EC_KEY, EC_Delete> ec_key(EC_KEY_new_method(engine_));
+    if (!ec_key)
+        return nullptr;
+
+    keymaster_key_blob_t* blob_copy = duplicate_blob(blob);
+    if (!blob_copy->key_material || !EC_KEY_set_ex_data(ec_key.get(), ec_key_index_, blob_copy))
+        return nullptr;
+
+    // Copy public key into new EC key
+    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(GetKeymaster0PublicKey(blob));
+    if (!pkey)
+        return nullptr;
+
+    unique_ptr<EC_KEY, EC_Delete> public_ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
+    if (!public_ec_key)
+        return nullptr;
+
+    if (!EC_KEY_set_group(ec_key.get(), EC_KEY_get0_group(public_ec_key.get())) ||
+        !EC_KEY_set_public_key(ec_key.get(), EC_KEY_get0_public_key(public_ec_key.get())))
+        return nullptr;
+
+    return ec_key.release();
+}
+
+const keymaster_key_blob_t* Keymaster0Engine::RsaKeyToBlob(const RSA* rsa) const {
     return reinterpret_cast<keymaster_key_blob_t*>(RSA_get_ex_data(rsa, rsa_index_));
+}
+
+const keymaster_key_blob_t* Keymaster0Engine::EcKeyToBlob(const EC_KEY* ec_key) const {
+    return reinterpret_cast<keymaster_key_blob_t*>(EC_KEY_get_ex_data(ec_key, ec_key_index_));
 }
 
 /* static */
@@ -170,6 +241,8 @@ int Keymaster0Engine::keyblob_dup(CRYPTO_EX_DATA* /* to */, const CRYPTO_EX_DATA
                                   void** from_d, int /* index */, long /* argl */,
                                   void* /* argp */) {
     keymaster_key_blob_t* blob = reinterpret_cast<keymaster_key_blob_t*>(*from_d);
+    if (!blob)
+        return 1;
     *from_d = duplicate_blob(*blob);
     if (*from_d)
         return 1;
@@ -192,6 +265,14 @@ int Keymaster0Engine::rsa_private_transform(RSA* rsa, uint8_t* out, const uint8_
 
     assert(instance_);
     return instance_->RsaPrivateTransform(rsa, out, in, len);
+}
+
+/* static */
+int Keymaster0Engine::ecdsa_sign(const uint8_t* digest, size_t digest_len, uint8_t* sig,
+                                 unsigned int* sig_len, EC_KEY* ec_key) {
+    ALOGV("ecdsa_sign(%p, %u, %p)", digest, (unsigned)digest_len, ec_key);
+    assert(instance_);
+    return instance_->EcdsaSign(digest, digest_len, sig, sig_len, ec_key);
 }
 
 bool Keymaster0Engine::Keymaster0Sign(const void* signing_params, const keymaster_key_blob_t& blob,
@@ -229,7 +310,7 @@ EVP_PKEY* Keymaster0Engine::GetKeymaster0PublicKey(const KeymasterKeyBlob& blob)
 
 int Keymaster0Engine::RsaPrivateTransform(RSA* rsa, uint8_t* out, const uint8_t* in,
                                           size_t len) const {
-    const keymaster_key_blob_t* key_blob = rsa_get_blob(rsa);
+    const keymaster_key_blob_t* key_blob = RsaKeyToBlob(rsa);
     if (key_blob == NULL) {
         ALOGE("key had no key_blob!");
         return 0;
@@ -260,6 +341,36 @@ int Keymaster0Engine::RsaPrivateTransform(RSA* rsa, uint8_t* out, const uint8_t*
     }
 
     ALOGV("rsa=%p keystore_rsa_priv_dec successful", rsa);
+    return 1;
+}
+
+int Keymaster0Engine::EcdsaSign(const uint8_t* digest, size_t digest_len, uint8_t* sig,
+                                unsigned int* sig_len, EC_KEY* ec_key) const {
+    const keymaster_key_blob_t* key_blob = EcKeyToBlob(ec_key);
+    if (key_blob == NULL) {
+        ALOGE("key had no key_blob!");
+        return 0;
+    }
+
+    keymaster_ec_sign_params_t sign_params = {DIGEST_NONE};
+    unique_ptr<uint8_t[], Malloc_Delete> signature;
+    size_t signature_length;
+    if (!Keymaster0Sign(&sign_params, *key_blob, digest, digest_len, &signature, &signature_length))
+        return 0;
+    Eraser eraser(signature.get(), signature_length);
+
+    if (signature_length == 0) {
+        ALOGW("No valid signature returned");
+        return 0;
+    } else if (signature_length > ECDSA_size(ec_key)) {
+        ALOGW("Signature is too large");
+        return 0;
+    } else {
+        memcpy(sig, signature.get(), signature_length);
+        *sig_len = signature_length;
+    }
+
+    ALOGV("ecdsa_sign(%p, %u, %p) => success", digest, (unsigned)digest_len, ec_key);
     return 1;
 }
 
