@@ -18,12 +18,6 @@
 #include <string>
 #include <vector>
 
-#include <openssl/engine.h>
-
-#include <hardware/keymaster0.h>
-
-#include <keymaster/android_keymaster_utils.h>
-#include <keymaster/keymaster_tags.h>
 #include <keymaster/soft_keymaster_device.h>
 
 #include "android_keymaster_test_utils.h"
@@ -33,33 +27,26 @@ using std::istreambuf_iterator;
 using std::string;
 using std::vector;
 
-template <typename T> std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
-    os << "{ ";
-    bool first = true;
-    for (T t : vec) {
-        os << (first ? "" : ", ") << t;
-        if (first)
-            first = false;
-    }
-    os << " }";
-    return os;
-}
-
 namespace keymaster {
 namespace test {
 
 StdoutLogger logger;
 
-class KeymasterTest : public Keymaster1Test {
-  protected:
-    KeymasterTest() {
+class SoftKeymasterTestInstanceCreator : public Keymaster1TestInstanceCreator {
+  public:
+    keymaster1_device_t* CreateDevice() const override {
+        std::cerr << "Creating SoftKeymasterDevice" << std::endl;
         SoftKeymasterDevice* device = new SoftKeymasterDevice;
-        init(device->keymaster_device());
+        return device->keymaster_device();
     }
 };
 
-typedef KeymasterTest CheckSupported;
-TEST_F(CheckSupported, SupportedAlgorithms) {
+static auto test_params = testing::Values(InstanceCreatorPtr(new SoftKeymasterTestInstanceCreator));
+
+typedef Keymaster1Test CheckSupported;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, CheckSupported, test_params);
+
+TEST_P(CheckSupported, SupportedAlgorithms) {
     EXPECT_EQ(KM_ERROR_OUTPUT_PARAMETER_NULL,
               device()->get_supported_algorithms(device(), NULL, NULL));
 
@@ -71,7 +58,7 @@ TEST_F(CheckSupported, SupportedAlgorithms) {
     free(algorithms);
 }
 
-TEST_F(CheckSupported, SupportedBlockModes) {
+TEST_P(CheckSupported, SupportedBlockModes) {
     EXPECT_EQ(KM_ERROR_OUTPUT_PARAMETER_NULL,
               device()->get_supported_block_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT,
                                                   NULL, NULL));
@@ -93,7 +80,7 @@ TEST_F(CheckSupported, SupportedBlockModes) {
     free(modes);
 }
 
-TEST_F(CheckSupported, SupportedPaddingModes) {
+TEST_P(CheckSupported, SupportedPaddingModes) {
     EXPECT_EQ(KM_ERROR_OUTPUT_PARAMETER_NULL,
               device()->get_supported_padding_modes(device(), KM_ALGORITHM_RSA, KM_PURPOSE_ENCRYPT,
                                                     NULL, NULL));
@@ -121,7 +108,7 @@ TEST_F(CheckSupported, SupportedPaddingModes) {
                                                     &modes, &len));
 }
 
-TEST_F(CheckSupported, SupportedDigests) {
+TEST_P(CheckSupported, SupportedDigests) {
     EXPECT_EQ(
         KM_ERROR_OUTPUT_PARAMETER_NULL,
         device()->get_supported_digests(device(), KM_ALGORITHM_RSA, KM_PURPOSE_SIGN, NULL, NULL));
@@ -150,7 +137,7 @@ TEST_F(CheckSupported, SupportedDigests) {
     free(digests);
 }
 
-TEST_F(CheckSupported, SupportedImportFormats) {
+TEST_P(CheckSupported, SupportedImportFormats) {
     EXPECT_EQ(KM_ERROR_OUTPUT_PARAMETER_NULL,
               device()->get_supported_import_formats(device(), KM_ALGORITHM_RSA, NULL, NULL));
 
@@ -172,7 +159,7 @@ TEST_F(CheckSupported, SupportedImportFormats) {
     free(formats);
 }
 
-TEST_F(CheckSupported, SupportedExportFormats) {
+TEST_P(CheckSupported, SupportedExportFormats) {
     EXPECT_EQ(KM_ERROR_OUTPUT_PARAMETER_NULL,
               device()->get_supported_export_formats(device(), KM_ALGORITHM_RSA, NULL, NULL));
 
@@ -204,7 +191,7 @@ TEST_F(CheckSupported, SupportedExportFormats) {
     free(formats);
 }
 
-class NewKeyGeneration : public KeymasterTest {
+class NewKeyGeneration : public Keymaster1Test {
   protected:
     void CheckBaseParams() {
         EXPECT_EQ(0U, hw_enforced().size());
@@ -235,7 +222,9 @@ class NewKeyGeneration : public KeymasterTest {
     }
 };
 
-TEST_F(NewKeyGeneration, Rsa) {
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, NewKeyGeneration, test_params);
+
+TEST_P(NewKeyGeneration, Rsa) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -249,7 +238,7 @@ TEST_F(NewKeyGeneration, Rsa) {
     EXPECT_TRUE(contains(auths, TAG_RSA_PUBLIC_EXPONENT, 3));
 }
 
-TEST_F(NewKeyGeneration, RsaDefaultSize) {
+TEST_P(NewKeyGeneration, RsaDefaultSize) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
               GenerateKey(AuthorizationSetBuilder()
                               .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
@@ -257,7 +246,7 @@ TEST_F(NewKeyGeneration, RsaDefaultSize) {
                               .SigningKey()));
 }
 
-TEST_F(NewKeyGeneration, Ecdsa) {
+TEST_P(NewKeyGeneration, Ecdsa) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     CheckBaseParams();
@@ -267,7 +256,7 @@ TEST_F(NewKeyGeneration, Ecdsa) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 224));
 }
 
-TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
+TEST_P(NewKeyGeneration, EcdsaDefaultSize) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     CheckBaseParams();
@@ -279,27 +268,30 @@ TEST_F(NewKeyGeneration, EcdsaDefaultSize) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 224));
 }
 
-TEST_F(NewKeyGeneration, EcdsaInvalidSize) {
+TEST_P(NewKeyGeneration, EcdsaInvalidSize) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190).Digest(KM_DIGEST_NONE)));
 }
 
-TEST_F(NewKeyGeneration, EcdsaAllValidSizes) {
+TEST_P(NewKeyGeneration, EcdsaAllValidSizes) {
     size_t valid_sizes[] = {224, 256, 384, 521};
     for (size_t size : valid_sizes) {
         EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size).Digest(
                                    KM_DIGEST_NONE)))
-            << "Failed to generate size: " << size;
+            << "Failed to generate size: "
+            << size;
     }
 }
 
-TEST_F(NewKeyGeneration, HmacSha256) {
+TEST_P(NewKeyGeneration, HmacSha256) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
 }
 
-typedef KeymasterTest GetKeyCharacteristics;
-TEST_F(GetKeyCharacteristics, SimpleRsa) {
+typedef Keymaster1Test GetKeyCharacteristics;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, GetKeyCharacteristics, test_params);
+
+TEST_P(GetKeyCharacteristics, SimpleRsa) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -310,8 +302,10 @@ TEST_F(GetKeyCharacteristics, SimpleRsa) {
     EXPECT_EQ(original, sw_enforced());
 }
 
-typedef KeymasterTest SigningOperationsTest;
-TEST_F(SigningOperationsTest, RsaSuccess) {
+typedef Keymaster1Test SigningOperationsTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, SigningOperationsTest, test_params);
+
+TEST_P(SigningOperationsTest, RsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -321,7 +315,7 @@ TEST_F(SigningOperationsTest, RsaSuccess) {
     SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
-TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
+TEST_P(SigningOperationsTest, RsaSha256DigestSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(384, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -331,7 +325,7 @@ TEST_F(SigningOperationsTest, RsaSha256DigestSuccess) {
     SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
-TEST_F(SigningOperationsTest, RsaPssSha256Success) {
+TEST_P(SigningOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -342,7 +336,7 @@ TEST_F(SigningOperationsTest, RsaPssSha256Success) {
     SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
-TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
+TEST_P(SigningOperationsTest, RsaPkcs1Sha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -352,7 +346,7 @@ TEST_F(SigningOperationsTest, RsaPkcs1Sha256Success) {
     SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
 }
 
-TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
+TEST_P(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     // Key must be at least 10 bytes larger than hash, to provide minimal random salt, so verify
     // that 9 bytes larger than hash won't work.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
@@ -374,7 +368,7 @@ TEST_F(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, FinishOperation(signature, &result));
 }
 
-TEST_F(SigningOperationsTest, RsaAbort) {
+TEST_P(SigningOperationsTest, RsaAbort) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -388,7 +382,7 @@ TEST_F(SigningOperationsTest, RsaAbort) {
     EXPECT_EQ(KM_ERROR_INVALID_OPERATION_HANDLE, AbortOperation());
 }
 
-TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
+TEST_P(SigningOperationsTest, RsaUnsupportedDigest) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(256, 3)
                     .Digest(KM_DIGEST_MD5)
@@ -396,7 +390,7 @@ TEST_F(SigningOperationsTest, RsaUnsupportedDigest) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
 }
 
-TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
+TEST_P(SigningOperationsTest, RsaUnsupportedPadding) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(256, 3)
                     .Digest(KM_DIGEST_SHA_2_256 /* supported digest */)
@@ -406,7 +400,7 @@ TEST_F(SigningOperationsTest, RsaUnsupportedPadding) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
-TEST_F(SigningOperationsTest, RsaNoDigest) {
+TEST_P(SigningOperationsTest, RsaNoDigest) {
     // Digest must be specified.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey()));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN));
@@ -421,7 +415,7 @@ TEST_F(SigningOperationsTest, RsaNoDigest) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
-TEST_F(SigningOperationsTest, RsaNoPadding) {
+TEST_P(SigningOperationsTest, RsaNoPadding) {
     // Padding must be specified
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaKey(256, 3).SigningKey().Digest(
                                KM_DIGEST_NONE)));
@@ -430,7 +424,7 @@ TEST_F(SigningOperationsTest, RsaNoPadding) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
-TEST_F(SigningOperationsTest, RsaTooShortMessage) {
+TEST_P(SigningOperationsTest, RsaTooShortMessage) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -452,7 +446,7 @@ TEST_F(SigningOperationsTest, RsaTooShortMessage) {
     EXPECT_EQ(0U, signature.length());
 }
 
-TEST_F(SigningOperationsTest, RsaSignWithEncryptionKey) {
+TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaEncryptionKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -461,7 +455,7 @@ TEST_F(SigningOperationsTest, RsaSignWithEncryptionKey) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
 }
 
-TEST_F(SigningOperationsTest, EcdsaSuccess) {
+TEST_P(SigningOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
@@ -469,7 +463,7 @@ TEST_F(SigningOperationsTest, EcdsaSuccess) {
     SignMessage(message, &signature, KM_DIGEST_NONE);
 }
 
-TEST_F(SigningOperationsTest, AesEcbSign) {
+TEST_P(SigningOperationsTest, AesEcbSign) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
                   TAG_BLOCK_MODE, KM_MODE_ECB)));
@@ -477,7 +471,7 @@ TEST_F(SigningOperationsTest, AesEcbSign) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
 }
 
-TEST_F(SigningOperationsTest, HmacSha1Success) {
+TEST_P(SigningOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "12345678901234567890123456789012";
     string signature;
@@ -485,7 +479,7 @@ TEST_F(SigningOperationsTest, HmacSha1Success) {
     ASSERT_EQ(20U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacSha224Success) {
+TEST_P(SigningOperationsTest, HmacSha224Success) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224)));
     string message = "12345678901234567890123456789012";
@@ -494,7 +488,7 @@ TEST_F(SigningOperationsTest, HmacSha224Success) {
     ASSERT_EQ(28U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacSha256Success) {
+TEST_P(SigningOperationsTest, HmacSha256Success) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     string message = "12345678901234567890123456789012";
@@ -503,7 +497,7 @@ TEST_F(SigningOperationsTest, HmacSha256Success) {
     ASSERT_EQ(32U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacSha384Success) {
+TEST_P(SigningOperationsTest, HmacSha384Success) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384)));
 
@@ -513,7 +507,7 @@ TEST_F(SigningOperationsTest, HmacSha384Success) {
     ASSERT_EQ(48U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacSha512Success) {
+TEST_P(SigningOperationsTest, HmacSha512Success) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512)));
     string message = "12345678901234567890123456789012";
@@ -522,7 +516,7 @@ TEST_F(SigningOperationsTest, HmacSha512Success) {
     ASSERT_EQ(64U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacLengthInKey) {
+TEST_P(SigningOperationsTest, HmacLengthInKey) {
     // TODO(swillden): unified API should generate an error on key generation.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
@@ -535,7 +529,7 @@ TEST_F(SigningOperationsTest, HmacLengthInKey) {
     ASSERT_EQ(30U, signature.size());
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase1) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase1) {
     uint8_t key_data[] = {
         0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
         0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
@@ -572,7 +566,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase1) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase2) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase2) {
     string key = "Jefe";
     string message = "what do ya want for nothing?";
     uint8_t sha_224_expected[] = {
@@ -604,7 +598,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase2) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase3) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase3) {
     string key(20, 0xaa);
     string message(50, 0xdd);
     uint8_t sha_224_expected[] = {
@@ -636,7 +630,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase3) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase4) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase4) {
     uint8_t key_data[25] = {
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
         0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
@@ -672,7 +666,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase4) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase5) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase5) {
     string key(20, 0x0c);
     string message = "Test With Truncation";
 
@@ -699,7 +693,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase5) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase6) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase6) {
     string key(131, 0xaa);
     string message = "Test Using Larger Than Block-Size Key - Hash Key First";
 
@@ -732,7 +726,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase6) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacRfc4231TestCase7) {
+TEST_P(SigningOperationsTest, HmacRfc4231TestCase7) {
     string key(131, 0xaa);
     string message = "This is a test using a larger than block-size key and a larger than "
                      "block-size data. The key needs to be hashed before being used by the HMAC "
@@ -767,7 +761,7 @@ TEST_F(SigningOperationsTest, HmacRfc4231TestCase7) {
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 }
 
-TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
+TEST_P(SigningOperationsTest, HmacSha256TooLargeMacLength) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
     AuthorizationSet begin_params(client_params());
@@ -784,8 +778,10 @@ TEST_F(SigningOperationsTest, HmacSha256TooLargeMacLength) {
 
 // TODO(swillden): Add more verification failure tests.
 
-typedef KeymasterTest VerificationOperationsTest;
-TEST_F(VerificationOperationsTest, RsaSuccess) {
+typedef Keymaster1Test VerificationOperationsTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, VerificationOperationsTest, test_params);
+
+TEST_P(VerificationOperationsTest, RsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -796,7 +792,7 @@ TEST_F(VerificationOperationsTest, RsaSuccess) {
     VerifyMessage(message, signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
-TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
+TEST_P(VerificationOperationsTest, RsaSha256DigestSuccess) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(384, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
@@ -807,7 +803,7 @@ TEST_F(VerificationOperationsTest, RsaSha256DigestSuccess) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
-TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
+TEST_P(VerificationOperationsTest, RsaSha256CorruptSignature) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(384, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
@@ -829,7 +825,7 @@ TEST_F(VerificationOperationsTest, RsaSha256CorruptSignature) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
-TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
+TEST_P(VerificationOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -841,7 +837,7 @@ TEST_F(VerificationOperationsTest, RsaPssSha256Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 }
 
-TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
+TEST_P(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(512, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
@@ -863,7 +859,7 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
-TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
+TEST_P(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -886,7 +882,7 @@ TEST_F(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
-TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
+TEST_P(VerificationOperationsTest, RsaPkcs1Sha256Success) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(512, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
@@ -897,7 +893,7 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PKCS1_1_5_SIGN);
 }
 
-TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
+TEST_P(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
     GenerateKey(AuthorizationSetBuilder()
                     .RsaSigningKey(512, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
@@ -919,7 +915,7 @@ TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
 }
 
-TEST_F(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
+TEST_P(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -946,7 +942,7 @@ template <typename T> vector<T> make_vector(const T* array, size_t len) {
     return vector<T>(array, array + len);
 }
 
-TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
+TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
     // Get all supported digests and padding modes.
     size_t digests_len;
     keymaster_digest_t* digests;
@@ -1020,7 +1016,7 @@ TEST_F(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
     free(digests);
 }
 
-TEST_F(VerificationOperationsTest, EcdsaSuccess) {
+TEST_P(VerificationOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
     string message = "123456789012345678901234567890123456789012345678";
@@ -1029,7 +1025,7 @@ TEST_F(VerificationOperationsTest, EcdsaSuccess) {
     VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
-TEST_F(VerificationOperationsTest, HmacSha1Success) {
+TEST_P(VerificationOperationsTest, HmacSha1Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
@@ -1037,7 +1033,7 @@ TEST_F(VerificationOperationsTest, HmacSha1Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA1);
 }
 
-TEST_F(VerificationOperationsTest, HmacSha224Success) {
+TEST_P(VerificationOperationsTest, HmacSha224Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
@@ -1045,7 +1041,7 @@ TEST_F(VerificationOperationsTest, HmacSha224Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_224);
 }
 
-TEST_F(VerificationOperationsTest, HmacSha256Success) {
+TEST_P(VerificationOperationsTest, HmacSha256Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
@@ -1053,7 +1049,7 @@ TEST_F(VerificationOperationsTest, HmacSha256Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
-TEST_F(VerificationOperationsTest, HmacSha384Success) {
+TEST_P(VerificationOperationsTest, HmacSha384Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
@@ -1061,7 +1057,7 @@ TEST_F(VerificationOperationsTest, HmacSha384Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_384);
 }
 
-TEST_F(VerificationOperationsTest, HmacSha512Success) {
+TEST_P(VerificationOperationsTest, HmacSha512Success) {
     GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
@@ -1069,8 +1065,10 @@ TEST_F(VerificationOperationsTest, HmacSha512Success) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_512);
 }
 
-typedef VerificationOperationsTest ExportKeyTest;
-TEST_F(ExportKeyTest, RsaSuccess) {
+typedef Keymaster1Test ExportKeyTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, ExportKeyTest, test_params);
+
+TEST_P(ExportKeyTest, RsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -1082,7 +1080,7 @@ TEST_F(ExportKeyTest, RsaSuccess) {
     // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
 
-TEST_F(ExportKeyTest, EcdsaSuccess) {
+TEST_P(ExportKeyTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     string export_data;
@@ -1092,7 +1090,7 @@ TEST_F(ExportKeyTest, EcdsaSuccess) {
     // TODO(swillden): Verify that the exported key is actually usable to verify signatures.
 }
 
-TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
+TEST_P(ExportKeyTest, RsaUnsupportedKeyFormat) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -1101,7 +1099,7 @@ TEST_F(ExportKeyTest, RsaUnsupportedKeyFormat) {
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_FORMAT, ExportKey(KM_KEY_FORMAT_PKCS8, &export_data));
 }
 
-TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
+TEST_P(ExportKeyTest, RsaCorruptedKeyBlob) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -1111,7 +1109,7 @@ TEST_F(ExportKeyTest, RsaCorruptedKeyBlob) {
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, ExportKey(KM_KEY_FORMAT_X509, &export_data));
 }
 
-TEST_F(ExportKeyTest, AesKeyExportFails) {
+TEST_P(ExportKeyTest, AesKeyExportFails) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128)));
     string export_data;
 
@@ -1127,8 +1125,10 @@ static string read_file(const string& file_name) {
     return string(file_begin, file_end);
 }
 
-typedef VerificationOperationsTest ImportKeyTest;
-TEST_F(ImportKeyTest, RsaSuccess) {
+typedef Keymaster1Test ImportKeyTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, ImportKeyTest, test_params);
+
+TEST_P(ImportKeyTest, RsaSuccess) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
 
@@ -1153,7 +1153,7 @@ TEST_F(ImportKeyTest, RsaSuccess) {
     VerifyMessage(message, signature, KM_DIGEST_NONE, KM_PAD_NONE);
 }
 
-TEST_F(ImportKeyTest, OldApiRsaSuccess) {
+TEST_P(ImportKeyTest, OldApiRsaSuccess) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
 
@@ -1178,7 +1178,7 @@ TEST_F(ImportKeyTest, OldApiRsaSuccess) {
                    &output_params);
 }
 
-TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
+TEST_P(ImportKeyTest, RsaKeySizeMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
@@ -1189,7 +1189,7 @@ TEST_F(ImportKeyTest, RsaKeySizeMismatch) {
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
-TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
+TEST_P(ImportKeyTest, RsaPublicExponenMismatch) {
     string pk8_key = read_file("rsa_privkey_pk8.der");
     ASSERT_EQ(633U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
@@ -1200,7 +1200,7 @@ TEST_F(ImportKeyTest, RsaPublicExponenMismatch) {
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
-TEST_F(ImportKeyTest, EcdsaSuccess) {
+TEST_P(ImportKeyTest, EcdsaSuccess) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
@@ -1222,7 +1222,7 @@ TEST_F(ImportKeyTest, EcdsaSuccess) {
     VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
-TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
+TEST_P(ImportKeyTest, EcdsaSizeSpecified) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
 
@@ -1244,7 +1244,7 @@ TEST_F(ImportKeyTest, EcdsaSizeSpecified) {
     VerifyMessage(message, signature, KM_DIGEST_NONE);
 }
 
-TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
+TEST_P(ImportKeyTest, EcdsaSizeMismatch) {
     string pk8_key = read_file("ec_privkey_pk8.der");
     ASSERT_EQ(138U, pk8_key.size());
     ASSERT_EQ(KM_ERROR_IMPORT_PARAMETER_MISMATCH,
@@ -1254,7 +1254,7 @@ TEST_F(ImportKeyTest, EcdsaSizeMismatch) {
                         KM_KEY_FORMAT_PKCS8, pk8_key));
 }
 
-TEST_F(ImportKeyTest, AesKeySuccess) {
+TEST_P(ImportKeyTest, AesKeySuccess) {
     char key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     string key(key_data, sizeof(key_data));
     ASSERT_EQ(KM_ERROR_OK,
@@ -1271,7 +1271,7 @@ TEST_F(ImportKeyTest, AesKeySuccess) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
+TEST_P(ImportKeyTest, HmacSha256KeySuccess) {
     char key_data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     string key(key_data, sizeof(key_data));
     ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
@@ -1289,8 +1289,10 @@ TEST_F(ImportKeyTest, HmacSha256KeySuccess) {
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 }
 
-typedef KeymasterTest EncryptionOperationsTest;
-TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
+typedef Keymaster1Test EncryptionOperationsTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, EncryptionOperationsTest, test_params);
+
+TEST_P(EncryptionOperationsTest, RsaOaepSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
 
@@ -1305,7 +1307,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepSuccess) {
     EXPECT_NE(ciphertext1, ciphertext2);
 }
 
-TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
+TEST_P(EncryptionOperationsTest, RsaOaepRoundTrip) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
@@ -1316,7 +1318,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepRoundTrip) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
+TEST_P(EncryptionOperationsTest, RsaOaepTooLarge) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
     string message = "12345678901234567890123";
@@ -1331,7 +1333,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepTooLarge) {
     EXPECT_EQ(0U, result.size());
 }
 
-TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
+TEST_P(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_OAEP)));
     string message = "Hello World!";
@@ -1351,7 +1353,7 @@ TEST_F(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
     EXPECT_EQ(0U, result.size());
 }
 
-TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
+TEST_P(EncryptionOperationsTest, RsaPkcs1Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
@@ -1365,7 +1367,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1Success) {
     EXPECT_NE(ciphertext1, ciphertext2);
 }
 
-TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
+TEST_P(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
@@ -1376,7 +1378,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1RoundTrip) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
+TEST_P(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "123456789012345678901234567890123456789012345678901234";
@@ -1391,7 +1393,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1TooLarge) {
     EXPECT_EQ(0U, result.size());
 }
 
-TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
+TEST_P(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(512, 3).Padding(
                                KM_PAD_RSA_PKCS1_1_5_ENCRYPT)));
     string message = "Hello World!";
@@ -1411,7 +1413,7 @@ TEST_F(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
     EXPECT_EQ(0U, result.size());
 }
 
-TEST_F(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
+TEST_P(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
@@ -1420,14 +1422,14 @@ TEST_F(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 }
 
-TEST_F(EncryptionOperationsTest, EcdsaEncrypt) {
+TEST_P(EncryptionOperationsTest, EcdsaEncrypt) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 }
 
-TEST_F(EncryptionOperationsTest, HmacEncrypt) {
+TEST_P(EncryptionOperationsTest, HmacEncrypt) {
     ASSERT_EQ(
         KM_ERROR_OK,
         GenerateKey(
@@ -1436,7 +1438,7 @@ TEST_F(EncryptionOperationsTest, HmacEncrypt) {
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 }
 
-TEST_F(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
+TEST_P(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
@@ -1456,7 +1458,7 @@ TEST_F(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
+TEST_P(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
@@ -1475,7 +1477,7 @@ TEST_F(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&ciphertext));
 }
 
-TEST_F(EncryptionOperationsTest, AesEcbPkcs7Padding) {
+TEST_P(EncryptionOperationsTest, AesEcbPkcs7Padding) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
@@ -1491,7 +1493,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7Padding) {
     }
 }
 
-TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
+TEST_P(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
@@ -1514,7 +1516,7 @@ TEST_F(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
     EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, FinishOperation(&plaintext));
 }
 
-TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
+TEST_P(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
@@ -1538,7 +1540,7 @@ TEST_F(EncryptionOperationsTest, AesCtrRoundTripSuccess) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, AesCtrIncremental) {
+TEST_P(EncryptionOperationsTest, AesCtrIncremental) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
@@ -1614,7 +1616,7 @@ static const AesCtrSp80038aTestVector kAesCtrSp80038aTestVectors[] = {
     },
 };
 
-TEST_F(EncryptionOperationsTest, AesCtrSp80038aTestVector) {
+TEST_P(EncryptionOperationsTest, AesCtrSp80038aTestVector) {
     for (size_t i = 0; i < 3; i++) {
         const AesCtrSp80038aTestVector& test(kAesCtrSp80038aTestVectors[i]);
         const string key = hex2str(test.key);
@@ -1625,7 +1627,7 @@ TEST_F(EncryptionOperationsTest, AesCtrSp80038aTestVector) {
     }
 }
 
-TEST_F(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
+TEST_P(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
@@ -1636,7 +1638,7 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidPaddingMode) {
     EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PADDING_MODE, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
 }
 
-TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
+TEST_P(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CTR)
@@ -1650,7 +1652,7 @@ TEST_F(EncryptionOperationsTest, AesCtrInvalidCallerNonce) {
     EXPECT_EQ(KM_ERROR_INVALID_NONCE, BeginOperation(KM_PURPOSE_ENCRYPT, input_params));
 }
 
-TEST_F(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
+TEST_P(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
@@ -1673,7 +1675,7 @@ TEST_F(EncryptionOperationsTest, AesCbcRoundTripSuccess) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, AesCallerNonce) {
+TEST_P(EncryptionOperationsTest, AesCallerNonce) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
@@ -1714,7 +1716,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonce) {
     EXPECT_NE(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
+TEST_P(EncryptionOperationsTest, AesCallerNonceProhibited) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
@@ -1742,7 +1744,7 @@ TEST_F(EncryptionOperationsTest, AesCallerNonceProhibited) {
               BeginOperation(KM_PURPOSE_ENCRYPT, input_params, &output_params));
 }
 
-TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
+TEST_P(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
@@ -1781,7 +1783,7 @@ TEST_F(EncryptionOperationsTest, AesCbcIncrementalNoPadding) {
     EXPECT_EQ(message, plaintext);
 }
 
-TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
+TEST_P(EncryptionOperationsTest, AesCbcPkcs7Padding) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
@@ -1798,8 +1800,10 @@ TEST_F(EncryptionOperationsTest, AesCbcPkcs7Padding) {
     }
 }
 
-typedef KeymasterTest AddEntropyTest;
-TEST_F(AddEntropyTest, AddEntropy) {
+typedef Keymaster1Test AddEntropyTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, AddEntropyTest, test_params);
+
+TEST_P(AddEntropyTest, AddEntropy) {
     // There's no obvious way to test that entropy is actually added, but we can test that the API
     // doesn't blow up or return an error.
     EXPECT_EQ(KM_ERROR_OK,
