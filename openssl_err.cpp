@@ -37,6 +37,7 @@ static keymaster_error_t TranslateASN1Error(int reason);
 static keymaster_error_t TranslateCipherError(int reason);
 static keymaster_error_t TranslatePKCS8Error(int reason);
 static keymaster_error_t TranslateX509v3Error(int reason);
+static keymaster_error_t TranslateRsaError(int reason);
 #endif
 
 keymaster_error_t TranslateLastOpenSslError(bool log_message) {
@@ -60,6 +61,8 @@ keymaster_error_t TranslateLastOpenSslError(bool log_message) {
         return TranslatePKCS8Error(reason);
     case ERR_LIB_X509V3:
         return TranslateX509v3Error(reason);
+    case ERR_LIB_RSA:
+        return TranslateRsaError(reason);
 #else
     case ERR_LIB_ASN1:
         LOG_E("ASN.1 parsing error %d", reason);
@@ -138,6 +141,16 @@ keymaster_error_t TranslateX509v3Error(int reason) {
     default:
         return KM_ERROR_UNKNOWN_ERROR;
     }
+}
+
+keymaster_error_t TranslateRsaError(int reason) {
+    switch (reason) {
+    case RSA_R_DATA_TOO_LARGE_FOR_KEY_SIZE:
+    case RSA_R_DATA_TOO_SMALL_FOR_KEY_SIZE:
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    default:
+        return KM_ERROR_UNKNOWN_ERROR;
+    };
 }
 
 #endif  // OPENSSL_IS_BORINGSSL
