@@ -29,22 +29,22 @@ class SymmetricKeyFactory : public KeyFactory {
 
     keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
                                   KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
-                                  AuthorizationSet* sw_enforced) override;
+                                  AuthorizationSet* sw_enforced) const override;
     keymaster_error_t ImportKey(const AuthorizationSet& key_description,
                                 keymaster_key_format_t input_key_material_format,
                                 const KeymasterKeyBlob& input_key_material,
                                 KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
-                                AuthorizationSet* sw_enforced) override;
+                                AuthorizationSet* sw_enforced) const override;
 
-    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count);
-    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) {
+    virtual const keymaster_key_format_t* SupportedImportFormats(size_t* format_count) const;
+    virtual const keymaster_key_format_t* SupportedExportFormats(size_t* format_count) const {
         return NoFormats(format_count);
     };
 
   private:
     virtual bool key_size_supported(size_t key_size_bits) const = 0;
 
-    const keymaster_key_format_t* NoFormats(size_t* format_count) {
+    const keymaster_key_format_t* NoFormats(size_t* format_count) const {
         *format_count = 0;
         return NULL;
     }

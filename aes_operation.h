@@ -77,6 +77,42 @@ class AesEvpDecryptOperation : public AesEvpOperation {
     int evp_encrypt_mode() { return 0; }
 };
 
+/**
+ * Abstract base for AES operation factories.  This class does all of the work to create
+ * AES operations.
+ */
+class AesOperationFactory : public OperationFactory {
+  public:
+    virtual KeyType registry_key() const { return KeyType(KM_ALGORITHM_AES, purpose()); }
+
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
+    virtual const keymaster_block_mode_t* SupportedBlockModes(size_t* block_mode_count) const;
+    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_count) const;
+
+    virtual keymaster_purpose_t purpose() const = 0;
+
+  private:
+    virtual Operation* CreateEvpOperation(const SymmetricKey& key,
+                                          keymaster_block_mode_t block_mode,
+                                          keymaster_padding_t padding, bool caller_iv,
+                                          keymaster_error_t* error);
+};
+
+/**
+ * Concrete factory for AES encryption operations.
+ */
+class AesEncryptionOperationFactory : public AesOperationFactory {
+    keymaster_purpose_t purpose() const { return KM_PURPOSE_ENCRYPT; }
+};
+
+/**
+ * Concrete factory for AES decryption operations.
+ */
+class AesDecryptionOperationFactory : public AesOperationFactory {
+    keymaster_purpose_t purpose() const { return KM_PURPOSE_DECRYPT; }
+};
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_AES_OPERATION_H_

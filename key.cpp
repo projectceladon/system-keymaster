@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <assert.h>
+
 #include "key.h"
 
 #include <openssl/x509.h>
@@ -21,9 +23,6 @@
 #include "openssl_utils.h"
 
 namespace keymaster {
-
-/* static */
-template <> KeyFactoryRegistry* KeyFactoryRegistry::instance_ptr = 0;
 
 Key::Key(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
          keymaster_error_t* error) {
@@ -34,4 +33,5 @@ Key::Key(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforce
     if (authorizations_.is_valid() != AuthorizationSet::OK)
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 }
+
 }  // namespace keymaster

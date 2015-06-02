@@ -108,7 +108,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := keymaster_tests
 LOCAL_SRC_FILES := \
-	abstract_factory_registry_test.cpp \
 	android_keymaster_messages_test.cpp \
 	android_keymaster_test.cpp \
 	android_keymaster_test_utils.cpp \

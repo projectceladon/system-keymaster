@@ -34,6 +34,10 @@ class SoftKeymasterContext : public KeymasterContext {
   public:
     SoftKeymasterContext(keymaster0_device_t* keymaster0_device);
 
+    KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
+    OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
+                                          keymaster_purpose_t purpose) const override;
+    keymaster_algorithm_t* GetSupportedAlgorithms(size_t* algorithms_count) const override;
     keymaster_error_t CreateKeyBlob(const AuthorizationSet& auths, keymaster_key_origin_t origin,
                                     const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
                                     AuthorizationSet* hw_enforced,
@@ -48,7 +52,10 @@ class SoftKeymasterContext : public KeymasterContext {
 
   private:
     std::unique_ptr<Keymaster0Engine> engine_;
-    std::unique_ptr<SoftKeymasterKeyRegistrations> registrations_;
+    std::unique_ptr<KeyFactory> rsa_factory_;
+    std::unique_ptr<KeyFactory> ec_factory_;
+    std::unique_ptr<KeyFactory> aes_factory_;
+    std::unique_ptr<KeyFactory> hmac_factory_;
 };
 
 }  // namespace keymaster

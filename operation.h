@@ -25,8 +25,6 @@
 #include <hardware/keymaster_defs.h>
 #include <keymaster/logger.h>
 
-#include "abstract_factory_registry.h"
-
 namespace keymaster {
 
 class AuthorizationSet;
@@ -75,8 +73,6 @@ class OperationFactory {
     bool supported(keymaster_block_mode_t padding) const;
     bool supported(keymaster_digest_t padding) const;
 };
-
-typedef AbstractFactoryRegistry<OperationFactory> OperationFactoryRegistry;
 
 /**
  * Abstract base for all cryptographic operations.

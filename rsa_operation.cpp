@@ -30,23 +30,6 @@ namespace keymaster {
 
 static const int MIN_PSS_SALT_LEN = 8 /* salt len */ + 2 /* overhead */;
 
-/**
- * Abstract base for all RSA operation factories.  This class exists mainly to centralize some code
- * common to all RSA operation factories.
- */
-class RsaOperationFactory : public OperationFactory {
-  public:
-    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_RSA, purpose()); }
-    virtual keymaster_purpose_t purpose() const = 0;
-
-  protected:
-    bool GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
-                               keymaster_padding_t* padding, keymaster_error_t* error) const;
-    bool GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
-                              keymaster_digest_t* digest, keymaster_error_t* error) const;
-    static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
-};
-
 bool RsaOperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_params,
                                                 const Key& key, keymaster_padding_t* padding,
                                                 keymaster_error_t* error) const {
@@ -104,30 +87,17 @@ static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE, KM_DIGEST
 static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN,
                                                             KM_PAD_RSA_PSS};
 
-/**
- * Abstract base for RSA operations that digest their input (signing and verification).  This class
- * does most of the work of creation of RSA digesting operations, delegating only the actual
- * operation instantiation.
- */
-class RsaDigestingOperationFactory : public RsaOperationFactory {
-  public:
-    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
-                                       keymaster_error_t* error);
+const keymaster_digest_t*
+RsaDigestingOperationFactory::SupportedDigests(size_t* digest_count) const {
+    *digest_count = array_length(supported_digests);
+    return supported_digests;
+}
 
-    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
-        *digest_count = array_length(supported_digests);
-        return supported_digests;
-    }
-
-    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
-        *padding_mode_count = array_length(supported_sig_padding);
-        return supported_sig_padding;
-    }
-
-  private:
-    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
-                                            RSA* key) = 0;
-};
+const keymaster_padding_t*
+RsaDigestingOperationFactory::SupportedPaddingModes(size_t* padding_mode_count) const {
+    *padding_mode_count = array_length(supported_sig_padding);
+    return supported_sig_padding;
+}
 
 Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
                                                          const AuthorizationSet& begin_params,
@@ -149,29 +119,6 @@ Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
 static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_RSA_OAEP,
                                                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
 
-/**
- * Abstract base for en/de-crypting RSA operation factories.  This class does most of the work of
- * creating such operations, delegating only the actual operation instantiation.
- */
-class RsaCryptingOperationFactory : public RsaOperationFactory {
-  public:
-    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
-                                       keymaster_error_t* error);
-
-    virtual const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const {
-        *padding_mode_count = array_length(supported_crypt_padding);
-        return supported_crypt_padding;
-    }
-
-    virtual const keymaster_digest_t* SupportedDigests(size_t* digest_count) const {
-        *digest_count = 0;
-        return NULL;
-    }
-
-  private:
-    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) = 0;
-};
-
 Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
                                                         const AuthorizationSet& begin_params,
                                                         keymaster_error_t* error) {
@@ -187,53 +134,17 @@ Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
     return op;
 }
 
-/**
- * Concrete factory for RSA signing operations.
- */
-class RsaSigningOperationFactory : public RsaDigestingOperationFactory {
-  public:
-    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_SIGN; }
-    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
-                                            RSA* key) {
-        return new RsaSignOperation(digest, padding, key);
-    }
-};
-static OperationFactoryRegistry::Registration<RsaSigningOperationFactory> sign_registration;
+const keymaster_padding_t*
+RsaCryptingOperationFactory::SupportedPaddingModes(size_t* padding_mode_count) const {
+    *padding_mode_count = array_length(supported_crypt_padding);
+    return supported_crypt_padding;
+}
 
-/**
- * Concrete factory for RSA signing operations.
- */
-class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
-    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_VERIFY; }
-    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
-                                            RSA* key) {
-        return new RsaVerifyOperation(digest, padding, key);
-    }
-};
-static OperationFactoryRegistry::Registration<RsaVerificationOperationFactory> verify_registration;
-
-/**
- * Concrete factory for RSA signing operations.
- */
-class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
-    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_ENCRYPT; }
-    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) {
-        return new RsaEncryptOperation(padding, key);
-    }
-};
-static OperationFactoryRegistry::Registration<RsaEncryptionOperationFactory> encrypt_registration;
-
-/**
- * Concrete factory for RSA signing operations.
- */
-class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
-    virtual keymaster_purpose_t purpose() const { return KM_PURPOSE_DECRYPT; }
-    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) {
-        return new RsaDecryptOperation(padding, key);
-    }
-};
-
-static OperationFactoryRegistry::Registration<RsaDecryptionOperationFactory> decrypt_registration;
+const keymaster_digest_t*
+RsaCryptingOperationFactory::SupportedDigests(size_t* digest_count) const {
+    *digest_count = 0;
+    return NULL;
+}
 
 RsaOperation::~RsaOperation() {
     if (rsa_key_ != NULL)

@@ -19,10 +19,14 @@
 
 #include <assert.h>
 
-#include <keymaster/authorization_set.h>
-#include <keymaster/android_keymaster_utils.h>
+#include <hardware/keymaster_defs.h>
 
 namespace keymaster {
+
+class AuthorizationSet;
+class KeyFactory;
+class OperationFactory;
+struct KeymasterKeyBlob;
 
 /**
  * KeymasterContext provides a singleton abstract interface that encapsulates various
@@ -58,12 +62,17 @@ class KeymasterContext {
     KeymasterContext() {}
     virtual ~KeymasterContext(){};
 
+    virtual KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const = 0;
+    virtual OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
+                                                  keymaster_purpose_t purpose) const = 0;
+    virtual keymaster_algorithm_t* GetSupportedAlgorithms(size_t* algorithms_count) const = 0;
+
     /**
      * CreateKeyBlob takes authorization sets and key material and produces a key blob and hardware
      * and software authorization lists ready to be returned to the AndroidKeymaster client
      * (Keystore, generally).  The blob is integrity-checked and may be encrypted, depending on the
      * needs of the context.
-     *
+    *
      * This method is generally called only by KeyFactory subclassses.
      */
     virtual keymaster_error_t CreateKeyBlob(const AuthorizationSet& key_description,

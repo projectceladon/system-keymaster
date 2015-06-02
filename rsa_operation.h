@@ -37,13 +37,13 @@ class RsaOperation : public Operation {
         : Operation(purpose), rsa_key_(key), padding_(padding) {}
     ~RsaOperation();
 
-    virtual keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
-                                    AuthorizationSet* /* output_params */) {
+    keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
+                            AuthorizationSet* /* output_params */) override {
         return KM_ERROR_OK;
     }
-    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                                     Buffer* output, size_t* input_consumed);
-    virtual keymaster_error_t Abort() { return KM_ERROR_OK; }
+    keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                             Buffer* output, size_t* input_consumed) override;
+    keymaster_error_t Abort() override { return KM_ERROR_OK; }
 
   protected:
     keymaster_error_t StoreData(const Buffer& input, size_t* input_consumed);
@@ -65,10 +65,10 @@ class RsaDigestingOperation : public RsaOperation {
                           keymaster_padding_t padding, RSA* key);
     ~RsaDigestingOperation();
 
-    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
-                                    AuthorizationSet* output_params);
-    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                                     Buffer* output, size_t* input_consumed);
+    keymaster_error_t Begin(const AuthorizationSet& input_params,
+                            AuthorizationSet* output_params) override;
+    keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                             Buffer* output, size_t* input_consumed) override;
 
   protected:
     bool require_digest() const { return padding_ == KM_PAD_RSA_PSS; }
@@ -89,8 +89,8 @@ class RsaSignOperation : public RsaDigestingOperation {
   public:
     RsaSignOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
         : RsaDigestingOperation(KM_PURPOSE_SIGN, digest, padding, key) {}
-    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, Buffer* output);
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             Buffer* output) override;
 
   private:
     keymaster_error_t SignUndigested(Buffer* output);
@@ -107,8 +107,8 @@ class RsaVerifyOperation : public RsaDigestingOperation {
   public:
     RsaVerifyOperation(keymaster_digest_t digest, keymaster_padding_t padding, RSA* key)
         : RsaDigestingOperation(KM_PURPOSE_VERIFY, digest, padding, key) {}
-    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, Buffer* output);
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             Buffer* output) override;
 
   private:
     keymaster_error_t VerifyUndigested(const Buffer& signature);
@@ -123,8 +123,8 @@ class RsaEncryptOperation : public RsaOperation {
   public:
     RsaEncryptOperation(keymaster_padding_t padding, RSA* key)
         : RsaOperation(KM_PURPOSE_ENCRYPT, padding, key) {}
-    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, Buffer* output);
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             Buffer* output) override;
 };
 
 /**
@@ -134,8 +134,100 @@ class RsaDecryptOperation : public RsaOperation {
   public:
     RsaDecryptOperation(keymaster_padding_t padding, RSA* key)
         : RsaOperation(KM_PURPOSE_DECRYPT, padding, key) {}
-    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, Buffer* output);
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             Buffer* output) override;
+};
+
+/**
+ * Abstract base for all RSA operation factories.  This class exists mainly to centralize some code
+ * common to all RSA operation factories.
+ */
+class RsaOperationFactory : public OperationFactory {
+  public:
+    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_RSA, purpose()); }
+    virtual keymaster_purpose_t purpose() const = 0;
+
+  protected:
+    bool GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
+                               keymaster_padding_t* padding, keymaster_error_t* error) const;
+    bool GetAndValidateDigest(const AuthorizationSet& begin_params, const Key& key,
+                              keymaster_digest_t* digest, keymaster_error_t* error) const;
+    static RSA* GetRsaKey(const Key& key, keymaster_error_t* error);
+};
+
+/**
+ * Abstract base for RSA operations that digest their input (signing and verification).  This class
+ * does most of the work of creation of RSA digesting operations, delegating only the actual
+ * operation instantiation.
+ */
+class RsaDigestingOperationFactory : public RsaOperationFactory {
+  public:
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
+    const keymaster_digest_t* SupportedDigests(size_t* digest_count) const override;
+    const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const override;
+
+  private:
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                            RSA* key) = 0;
+};
+
+/**
+ * Abstract base for en/de-crypting RSA operation factories.  This class does most of the work of
+ * creating such operations, delegating only the actual operation instantiation.
+ */
+class RsaCryptingOperationFactory : public RsaOperationFactory {
+  public:
+    virtual Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                                       keymaster_error_t* error);
+    const keymaster_padding_t* SupportedPaddingModes(size_t* padding_mode_count) const override;
+    const keymaster_digest_t* SupportedDigests(size_t* digest_count) const override;
+
+  private:
+    virtual Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) = 0;
+};
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaSigningOperationFactory : public RsaDigestingOperationFactory {
+  public:
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                    RSA* key) override {
+        return new RsaSignOperation(digest, padding, key);
+    }
+};
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
+                                    RSA* key) override {
+        return new RsaVerifyOperation(digest, padding, key);
+    }
+};
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_ENCRYPT; }
+    Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) override {
+        return new RsaEncryptOperation(padding, key);
+    }
+};
+
+/**
+ * Concrete factory for RSA signing operations.
+ */
+class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_DECRYPT; }
+    Operation* InstantiateOperation(keymaster_padding_t padding, RSA* key) override {
+        return new RsaDecryptOperation(padding, key);
+    }
 };
 
 }  // namespace keymaster

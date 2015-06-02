@@ -65,6 +65,33 @@ class EcdsaVerifyOperation : public EcdsaOperation {
                                      const Buffer& signature, Buffer* output);
 };
 
+class EcdsaOperationFactory : public OperationFactory {
+  private:
+    KeyType registry_key() const override { return KeyType(KM_ALGORITHM_EC, purpose()); }
+    Operation* CreateOperation(const Key& key, const AuthorizationSet& begin_params,
+                               keymaster_error_t* error) override;
+    const keymaster_digest_t* SupportedDigests(size_t* digest_count) const override;
+
+    virtual keymaster_purpose_t purpose() const = 0;
+    virtual Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) = 0;
+};
+
+class EcdsaSignOperationFactory : public EcdsaOperationFactory {
+  private:
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
+        return new EcdsaSignOperation(purpose(), digest, key);
+    }
+};
+
+class EcdsaVerifyOperationFactory : public EcdsaOperationFactory {
+  public:
+    keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
+    Operation* InstantiateOperation(keymaster_digest_t digest, EC_KEY* key) {
+        return new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, key);
+    }
+};
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_ECDSA_OPERATION_H_

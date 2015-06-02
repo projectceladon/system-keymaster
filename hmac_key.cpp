@@ -23,10 +23,24 @@
 
 namespace keymaster {
 
+static HmacSignOperationFactory sign_factory;
+static HmacVerifyOperationFactory verify_factory;
+
+OperationFactory* HmacKeyFactory::GetOperationFactory(keymaster_purpose_t purpose) const {
+    switch (purpose) {
+    case KM_PURPOSE_SIGN:
+        return &sign_factory;
+    case KM_PURPOSE_VERIFY:
+        return &verify_factory;
+    default:
+        return nullptr;
+    }
+}
+
 keymaster_error_t HmacKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
                                           const AuthorizationSet& hw_enforced,
                                           const AuthorizationSet& sw_enforced,
-                                          UniquePtr<Key>* key) {
+                                          UniquePtr<Key>* key) const {
     if (!key)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 

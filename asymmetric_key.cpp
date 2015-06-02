@@ -19,6 +19,7 @@
 #include <openssl/x509.h>
 
 #include <hardware/keymaster_defs.h>
+#include <keymaster/android_keymaster_utils.h>
 
 #include "openssl_err.h"
 #include "openssl_utils.h"
@@ -28,16 +29,16 @@ namespace keymaster {
 keymaster_error_t
 AsymmetricKeyFactory::KeyMaterialToEvpKey(keymaster_key_format_t key_format,
                                           const KeymasterKeyBlob& key_material,
-                                          UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey) {
+                                          UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey) const {
     if (key_format != KM_KEY_FORMAT_PKCS8)
         return KM_ERROR_UNSUPPORTED_KEY_FORMAT;
 
     return convert_pkcs8_blob_to_evp(key_material.key_material, key_material.key_material_size,
-                                     registry_key(), pkey);
+                                     keymaster_key_type(), pkey);
 }
 
 keymaster_error_t AsymmetricKeyFactory::EvpKeyToKeyMaterial(const EVP_PKEY* pkey,
-                                                            KeymasterKeyBlob* key_blob) {
+                                                            KeymasterKeyBlob* key_blob) const {
     int key_data_size = i2d_PrivateKey(pkey, NULL /* key_data*/);
     if (key_data_size <= 0)
         return TranslateLastOpenSslError();
@@ -53,13 +54,15 @@ keymaster_error_t AsymmetricKeyFactory::EvpKeyToKeyMaterial(const EVP_PKEY* pkey
 }
 
 static const keymaster_key_format_t supported_import_formats[] = {KM_KEY_FORMAT_PKCS8};
-const keymaster_key_format_t* AsymmetricKeyFactory::SupportedImportFormats(size_t* format_count) {
+const keymaster_key_format_t*
+AsymmetricKeyFactory::SupportedImportFormats(size_t* format_count) const {
     *format_count = array_length(supported_import_formats);
     return supported_import_formats;
 }
 
 static const keymaster_key_format_t supported_export_formats[] = {KM_KEY_FORMAT_X509};
-const keymaster_key_format_t* AsymmetricKeyFactory::SupportedExportFormats(size_t* format_count) {
+const keymaster_key_format_t*
+AsymmetricKeyFactory::SupportedExportFormats(size_t* format_count) const {
     *format_count = array_length(supported_export_formats);
     return supported_export_formats;
 }
@@ -67,7 +70,7 @@ const keymaster_key_format_t* AsymmetricKeyFactory::SupportedExportFormats(size_
 keymaster_error_t AsymmetricKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
                                                 const AuthorizationSet& hw_enforced,
                                                 const AuthorizationSet& sw_enforced,
-                                                UniquePtr<Key>* key) {
+                                                UniquePtr<Key>* key) const {
     UniquePtr<AsymmetricKey> asymmetric_key;
     keymaster_error_t error = CreateEmptyKey(hw_enforced, sw_enforced, &asymmetric_key);
     if (error != KM_ERROR_OK)
