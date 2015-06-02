@@ -1,30 +1,13 @@
 {
-   RSASignFailureErrorLeak1
+   BoringSSLErrorLeak
    Memcheck:Leak
    fun:malloc
-   fun:CRYPTO_set_thread_local
+   ...
    fun:err_get_state
-   fun:ERR_put_error
-   fun:RSA_padding_add_none
-   fun:sign_raw
-   fun:RSA_sign_raw
-   fun:RSA_private_encrypt
    ...
 }
 {
-   RSASignFailureErrorLeak1
-   Memcheck:Leak
-   fun:malloc
-   fun:err_get_state
-   fun:ERR_put_error
-   fun:RSA_padding_add_none
-   fun:sign_raw
-   fun:RSA_sign_raw
-   fun:RSA_private_encrypt
-   ...
-}
-{
-   EcKeyErrorLeak1
+   EcKeyErrorLeak
    Memcheck:Leak
    fun:malloc
    fun:err_add_error_vdata
@@ -35,5 +18,23 @@
    fun:d2i_ECPrivateKey
    fun:old_ec_priv_decode
    fun:d2i_PrivateKey
+   ...
+}
+{
+   BoringSSLGetNewIndexLeak1
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:CRYPTO_get_ex_new_index
+   ...
+}
+{
+   BoringSSLGetNewIndexLeak2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   ...
+   fun:CRYPTO_get_ex_new_index
    ...
 }
