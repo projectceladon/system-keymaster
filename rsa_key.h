@@ -23,37 +23,6 @@
 
 namespace keymaster {
 
-class RsaKeyFactory : public AsymmetricKeyFactory {
-  public:
-    RsaKeyFactory(const KeymasterContext* context) : AsymmetricKeyFactory(context) {}
-
-    keymaster_algorithm_t keymaster_key_type() const override { return KM_ALGORITHM_RSA; }
-    int evp_key_type() const override { return EVP_PKEY_RSA; }
-
-    keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
-                                  AuthorizationSet* sw_enforced) const override;
-    keymaster_error_t ImportKey(const AuthorizationSet& key_description,
-                                keymaster_key_format_t input_key_material_format,
-                                const KeymasterKeyBlob& input_key_material,
-                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
-                                AuthorizationSet* sw_enforced) const override;
-
-    keymaster_error_t CreateEmptyKey(const AuthorizationSet& hw_enforced,
-                                     const AuthorizationSet& sw_enforced,
-                                     UniquePtr<AsymmetricKey>* key) const override;
-
-    OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const override;
-
-  protected:
-    keymaster_error_t UpdateImportKeyDescription(const AuthorizationSet& key_description,
-                                                 keymaster_key_format_t import_key_format,
-                                                 const KeymasterKeyBlob& import_key_material,
-                                                 AuthorizationSet* updated_description,
-                                                 uint64_t* public_exponent,
-                                                 uint32_t* key_size) const;
-};
-
 class RsaKey : public AsymmetricKey {
   public:
     RsaKey(const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,

@@ -19,6 +19,8 @@
 
 #include <openssl/ec_key.h>
 
+#include <keymaster/ec_key_factory.h>
+
 #include "ec_key.h"
 
 namespace keymaster {
@@ -30,8 +32,8 @@ class SoftKeymasterContext;
  * An EcdsaKeyFactory which can delegate key generation, importing and loading operations to a
  * keymaster0-backed OpenSSL engine.
  */
-class EcdsaKeymaster0KeyFactory : public EcdsaKeyFactory {
-    typedef EcdsaKeyFactory super;
+class EcdsaKeymaster0KeyFactory : public EcKeyFactory {
+    typedef EcKeyFactory super;
 
   public:
     EcdsaKeymaster0KeyFactory(const SoftKeymasterContext* context, const Keymaster0Engine* engine);

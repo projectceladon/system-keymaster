@@ -29,6 +29,8 @@
 
 namespace keymaster {
 
+struct KeymasterKeyBlob;
+
 struct EVP_PKEY_Delete {
     void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
 };
@@ -68,6 +70,13 @@ void convert_bn_to_blob(BIGNUM* bn, keymaster_blob_t* blob);
 keymaster_error_t convert_pkcs8_blob_to_evp(const uint8_t* key_data, size_t key_length,
                                             keymaster_algorithm_t expected_algorithm,
                                             UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey);
+
+keymaster_error_t KeyMaterialToEvpKey(keymaster_key_format_t key_format,
+                                      const KeymasterKeyBlob& key_material,
+                                      keymaster_algorithm_t expected_algorithm,
+                                      UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* evp_pkey);
+
+keymaster_error_t EvpKeyToKeyMaterial(const EVP_PKEY* evp_pkey, KeymasterKeyBlob* key_blob);
 
 }  // namespace keymaster
 
