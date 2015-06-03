@@ -260,8 +260,9 @@ void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
     if (operation == NULL)
         return;
 
-    response->error = operation->Update(request.additional_params, request.input, &response->output,
-                                        &response->input_consumed);
+    response->error =
+        operation->Update(request.additional_params, request.input, &response->output_params,
+                          &response->output, &response->input_consumed);
     if (response->error != KM_ERROR_OK) {
         // Any error invalidates the operation.
         operation_table_->Delete(request.op_handle);
@@ -278,8 +279,8 @@ void AndroidKeymaster::FinishOperation(const FinishOperationRequest& request,
     if (operation == NULL)
         return;
 
-    response->error =
-        operation->Finish(request.additional_params, request.signature, &response->output);
+    response->error = operation->Finish(request.additional_params, request.signature,
+                                        &response->output_params, &response->output);
     operation_table_->Delete(request.op_handle);
 }
 
