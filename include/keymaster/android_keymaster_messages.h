@@ -55,9 +55,8 @@ const uint32_t ADD_RNG_ENTROPY = 8;
  * Note that this approach implies that GetVersionRequest and GetVersionResponse cannot be
  * versioned.
  */
-const int32_t MAX_MESSAGE_VERSION = 1;
-inline int32_t MessageVersion(uint8_t major_ver, uint8_t /* minor_ver */,
-                              uint8_t /* subminor_ver */) {
+const int32_t MAX_MESSAGE_VERSION = 2;
+inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t /* subminor_ver */) {
     int32_t message_version = -1;
     switch (major_ver) {
     case 0:
@@ -66,11 +65,14 @@ inline int32_t MessageVersion(uint8_t major_ver, uint8_t /* minor_ver */,
         message_version = 0;
         break;
     case 1:
-        // Currently all 1.X.X versions are interoperable and all use message version 1.  In the
-        // future minor numbers may indicate incompatibility. Subminor version should never matter
-        // for compatibility.
-        message_version = 1;
-        break;
+        switch (minor_ver) {
+        case 0:
+            message_version = 1;
+            break;
+        case 1:
+            message_version = 2;
+            break;
+        }
     };
     return message_version;
 }
@@ -266,6 +268,7 @@ struct UpdateOperationResponse : public KeymasterResponse {
 
     Buffer output;
     size_t input_consumed;
+    AuthorizationSet output_params;
 };
 
 struct FinishOperationRequest : public KeymasterMessage {
@@ -288,6 +291,7 @@ struct FinishOperationResponse : public KeymasterResponse {
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end);
 
     Buffer output;
+    AuthorizationSet output_params;
 };
 
 struct AddEntropyRequest : public KeymasterMessage {

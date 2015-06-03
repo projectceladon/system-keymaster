@@ -109,10 +109,13 @@ TEST(RoundTrip, SupportedResponse) {
 }
 
 static keymaster_key_param_t params[] = {
-    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-    Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA), Authorization(TAG_USER_ID, 7),
+    Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
+    Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+    Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
+    Authorization(TAG_USER_ID, 7),
     Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_PASSWORD),
-    Authorization(TAG_APPLICATION_ID, "app_id", 6), Authorization(TAG_AUTH_TIMEOUT, 300),
+    Authorization(TAG_APPLICATION_ID, "app_id", 6),
+    Authorization(TAG_AUTH_TIMEOUT, 300),
 };
 uint8_t TEST_DATA[] = "a key blob";
 
@@ -210,6 +213,7 @@ TEST(RoundTrip, BeginOperationResponse) {
             deserialized.reset(round_trip(ver, msg, 12));
             break;
         case 1:
+        case 2:
             deserialized.reset(round_trip(ver, msg, 39));
             break;
         default:
@@ -224,6 +228,7 @@ TEST(RoundTrip, BeginOperationResponse) {
             EXPECT_EQ(0U, deserialized->output_params.size());
             break;
         case 1:
+        case 2:
             EXPECT_EQ(msg.output_params, deserialized->output_params);
             break;
         default:
@@ -255,6 +260,7 @@ TEST(RoundTrip, UpdateOperationRequest) {
             deserialized.reset(round_trip(ver, msg, 15));
             break;
         case 1:
+        case 2:
             deserialized.reset(round_trip(ver, msg, 27));
             break;
         default:
@@ -271,6 +277,7 @@ TEST(RoundTrip, UpdateOperationResponse) {
         msg.error = KM_ERROR_OK;
         msg.output.Reinitialize("foo", 3);
         msg.input_consumed = 99;
+        msg.output_params.push_back(TAG_APPLICATION_ID, "bar", 3);
 
         UniquePtr<UpdateOperationResponse> deserialized;
         switch (ver) {
@@ -279,6 +286,9 @@ TEST(RoundTrip, UpdateOperationResponse) {
             break;
         case 1:
             deserialized.reset(round_trip(ver, msg, 15));
+            break;
+        case 2:
+            deserialized.reset(round_trip(ver, msg, 42));
             break;
         default:
             FAIL();
@@ -293,6 +303,10 @@ TEST(RoundTrip, UpdateOperationResponse) {
             break;
         case 1:
             EXPECT_EQ(99U, deserialized->input_consumed);
+            break;
+        case 2:
+            EXPECT_EQ(99U, deserialized->input_consumed);
+            EXPECT_EQ(1U, deserialized->output_params.size());
             break;
         default:
             FAIL();
@@ -312,6 +326,7 @@ TEST(RoundTrip, FinishOperationRequest) {
             deserialized.reset(round_trip(ver, msg, 15));
             break;
         case 1:
+        case 2:
             deserialized.reset(round_trip(ver, msg, 27));
             break;
         default:
@@ -329,7 +344,18 @@ TEST(Round_Trip, FinishOperationResponse) {
         msg.error = KM_ERROR_OK;
         msg.output.Reinitialize("foo", 3);
 
-        UniquePtr<FinishOperationResponse> deserialized(round_trip(ver, msg, 11));
+        UniquePtr<FinishOperationResponse> deserialized;
+        switch (ver) {
+        case 0:
+        case 1:
+            deserialized.reset(round_trip(ver, msg, 11));
+            break;
+        case 2:
+            deserialized.reset(round_trip(ver, msg, 23));
+            break;
+        default:
+            FAIL();
+        }
         EXPECT_EQ(msg.error, deserialized->error);
         EXPECT_EQ(msg.output.available_read(), deserialized->output.available_read());
         EXPECT_EQ(0, memcmp(msg.output.peek_read(), deserialized->output.peek_read(),
