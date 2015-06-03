@@ -33,7 +33,7 @@ using std::unique_ptr;
 extern "C" {
 int __android_log_print(int prio, const char* tag, const char* fmt);
 int __android_log_print(int prio, const char* tag, const char* fmt) {
-    prio, tag, fmt;
+    (void)prio, (void)tag, (void)fmt;
     return 0;
 }
 }  // extern "C"
