@@ -249,7 +249,8 @@ keymaster_error_t Keymaster1Test::UpdateOperation(const string& message, string*
 }
 
 keymaster_error_t Keymaster1Test::UpdateOperation(const AuthorizationSet& additional_params,
-                                                  const string& message, string* output,
+                                                  const string& message,
+                                                  AuthorizationSet* output_params, string* output,
                                                   size_t* input_consumed) {
     EXPECT_NE(op_handle_, OP_HANDLE_SENTINEL);
     keymaster_blob_t input = {reinterpret_cast<const uint8_t*>(message.c_str()), message.length()};
@@ -260,6 +261,9 @@ keymaster_error_t Keymaster1Test::UpdateOperation(const AuthorizationSet& additi
     if (error == KM_ERROR_OK && out_tmp.data)
         output->append(reinterpret_cast<const char*>(out_tmp.data), out_tmp.data_length);
     free((void*)out_tmp.data);
+    if (output_params)
+        output_params->Reinitialize(out_params);
+    keymaster_free_param_set(&out_params);
     return error;
 }
 
@@ -269,11 +273,13 @@ keymaster_error_t Keymaster1Test::FinishOperation(string* output) {
 
 keymaster_error_t Keymaster1Test::FinishOperation(const string& signature, string* output) {
     AuthorizationSet additional_params;
-    return FinishOperation(additional_params, signature, output);
+    AuthorizationSet output_params;
+    return FinishOperation(additional_params, signature, &output_params, output);
 }
 
 keymaster_error_t Keymaster1Test::FinishOperation(const AuthorizationSet& additional_params,
-                                                  const string& signature, string* output) {
+                                                  const string& signature,
+                                                  AuthorizationSet* output_params, string* output) {
     keymaster_blob_t sig = {reinterpret_cast<const uint8_t*>(signature.c_str()),
                             signature.length()};
     keymaster_blob_t out_tmp;
@@ -289,6 +295,9 @@ keymaster_error_t Keymaster1Test::FinishOperation(const AuthorizationSet& additi
     if (out_tmp.data)
         output->append(reinterpret_cast<const char*>(out_tmp.data), out_tmp.data_length);
     free((void*)out_tmp.data);
+    if (output_params)
+        output_params->Reinitialize(out_params);
+    keymaster_free_param_set(&out_params);
     return error;
 }
 
@@ -310,12 +319,13 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string& message,
                                       const AuthorizationSet& begin_params,
                                       const AuthorizationSet& update_params,
-                                      AuthorizationSet* output_params) {
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, begin_params, output_params));
+                                      AuthorizationSet* begin_out_params) {
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, begin_params, begin_out_params));
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, nullptr /* output_params */,
+                                           &result, &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
     EXPECT_EQ(KM_ERROR_OK, FinishOperation(update_params, "", &result));
     return result;
@@ -329,7 +339,8 @@ string Keymaster1Test::ProcessMessage(keymaster_purpose_t purpose, const string&
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, nullptr /* output_params */,
+                                           &result, &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
     EXPECT_EQ(KM_ERROR_OK, FinishOperation(update_params, signature, &result));
     return result;

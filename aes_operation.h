@@ -34,39 +34,51 @@ class AesEvpOperation : public Operation {
                     size_t key_size);
     ~AesEvpOperation();
 
-    virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
-                                    AuthorizationSet* output_params);
-    virtual keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
-                                     AuthorizationSet* output_params, Buffer* output,
-                                     size_t* input_consumed);
-    virtual keymaster_error_t Finish(const AuthorizationSet& additional_params,
-                                     const Buffer& signature, AuthorizationSet* output_params,
-                                     Buffer* output);
-    virtual keymaster_error_t Abort();
+    keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                             AuthorizationSet* output_params, Buffer* output,
+                             size_t* input_consumed) override;
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             AuthorizationSet* output_params, Buffer* output) override;
+    keymaster_error_t Abort() override;
 
     virtual int evp_encrypt_mode() = 0;
 
-  private:
+  protected:
+    bool need_iv() const;
     keymaster_error_t InitializeCipher();
     keymaster_error_t GetIv(const AuthorizationSet& input_params);
-    keymaster_error_t GenerateIv();
-    bool need_iv() const;
 
-    EVP_CIPHER_CTX ctx_;
-    const size_t key_size_;
     const keymaster_block_mode_t block_mode_;
-    const keymaster_padding_t padding_;
-    const bool caller_iv_;
+    EVP_CIPHER_CTX ctx_;
     UniquePtr<uint8_t[]> iv_;
+    size_t iv_length_;
+    const bool caller_iv_;
+
+  private:
+    bool data_started_;
+    const size_t key_size_;
+    const keymaster_padding_t padding_;
     uint8_t key_[MAX_EVP_KEY_SIZE];
 };
 
 class AesEvpEncryptOperation : public AesEvpOperation {
   public:
     AesEvpEncryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
-                           bool caller_iv, const uint8_t* key, size_t key_size)
-        : AesEvpOperation(KM_PURPOSE_ENCRYPT, block_mode, padding, caller_iv, key, key_size) {}
-    int evp_encrypt_mode() { return 1; }
+                           bool caller_iv, size_t tag_length, const uint8_t* key, size_t key_size)
+        : AesEvpOperation(KM_PURPOSE_ENCRYPT, block_mode, padding, caller_iv, key, key_size),
+          tag_length_(tag_length) {}
+
+    keymaster_error_t Begin(const AuthorizationSet& input_params,
+                            AuthorizationSet* output_params) override;
+    keymaster_error_t Finish(const AuthorizationSet& additional_params, const Buffer& signature,
+                             AuthorizationSet* output_params, Buffer* output) override;
+
+    int evp_encrypt_mode() override { return 1; }
+
+  private:
+    keymaster_error_t GenerateIv();
+
+    size_t tag_length_;
 };
 
 class AesEvpDecryptOperation : public AesEvpOperation {
@@ -74,9 +86,19 @@ class AesEvpDecryptOperation : public AesEvpOperation {
     AesEvpDecryptOperation(keymaster_block_mode_t block_mode, keymaster_padding_t padding,
                            const uint8_t* key, size_t key_size)
         : AesEvpOperation(KM_PURPOSE_DECRYPT, block_mode, padding,
-                          false /* caller_iv -- don't care */, key, key_size) {}
+                          false /* caller_iv -- don't care */, key, key_size),
+          tag_provided_(false) {}
 
-    int evp_encrypt_mode() { return 0; }
+    keymaster_error_t Begin(const AuthorizationSet& input_params,
+                            AuthorizationSet* output_params) override;
+    keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
+                             AuthorizationSet* output_params, Buffer* output,
+                             size_t* input_consumed) override;
+
+    int evp_encrypt_mode() override { return 0; }
+
+  private:
+    bool tag_provided_;
 };
 
 /**
@@ -98,7 +120,7 @@ class AesOperationFactory : public OperationFactory {
     virtual Operation* CreateEvpOperation(const SymmetricKey& key,
                                           keymaster_block_mode_t block_mode,
                                           keymaster_padding_t padding, bool caller_iv,
-                                          keymaster_error_t* error);
+                                          size_t tag_length, keymaster_error_t* error);
 };
 
 /**

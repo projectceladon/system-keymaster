@@ -188,13 +188,18 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
     keymaster_error_t UpdateOperation(const std::string& message, std::string* output,
                                       size_t* input_consumed);
     keymaster_error_t UpdateOperation(const AuthorizationSet& additional_params,
-                                      const std::string& message, std::string* output,
-                                      size_t* input_consumed);
+                                      const std::string& message, AuthorizationSet* output_params,
+                                      std::string* output, size_t* input_consumed);
 
     keymaster_error_t FinishOperation(std::string* output);
     keymaster_error_t FinishOperation(const std::string& signature, std::string* output);
     keymaster_error_t FinishOperation(const AuthorizationSet& additional_params,
-                                      const std::string& signature, std::string* output);
+                                      const std::string& signature, std::string* output) {
+        return FinishOperation(additional_params, signature, nullptr /* output_params */, output);
+    }
+    keymaster_error_t FinishOperation(const AuthorizationSet& additional_params,
+                                      const std::string& signature, AuthorizationSet* output_params,
+                                      std::string* output);
 
     keymaster_error_t AbortOperation();
 
