@@ -28,7 +28,7 @@ LOCAL_SRC_FILES:= \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
-LOCAL_CFLAGS = -Wall -Werror
+LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
@@ -73,7 +73,8 @@ LOCAL_SRC_FILES:= \
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_SHARED_LIBRARIES := libcrypto libkeymaster_messages
-LOCAL_CFLAGS = -Wall -Werror
+LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
 LOCAL_MODULE_TAGS := optional
@@ -99,8 +100,8 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := \
 	system/security/keystore \
 	$(LOCAL_PATH)/include
-LOCAL_CFLAGS = -Wall -Werror
-LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable
+LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
@@ -122,7 +123,8 @@ LOCAL_SRC_FILES := \
 	keymaster_enforcement_test.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
-LOCAL_CFLAGS = -Wall -Werror
+LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 LOCAL_MODULE_TAGS := tests
 LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymasterdevice \
