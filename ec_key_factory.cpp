@@ -16,6 +16,8 @@
 
 #include <keymaster/ec_key_factory.h>
 
+#include <openssl/evp.h>
+
 #include <keymaster/keymaster_context.h>
 
 #include "ec_key.h"
