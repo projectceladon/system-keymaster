@@ -52,7 +52,6 @@ class KeyBlobTest : public testing::Test {
         sw_enforced_.push_back(TAG_ACTIVE_DATETIME, 10);
         sw_enforced_.push_back(TAG_ORIGINATION_EXPIRE_DATETIME, 100);
         sw_enforced_.push_back(TAG_CREATION_DATETIME, 10);
-        sw_enforced_.push_back(TAG_CHUNK_LENGTH, 10);
 
         hidden_.push_back(TAG_ROOT_OF_TRUST, "foo", 3);
         hidden_.push_back(TAG_APPLICATION_ID, "my_app", 6);
