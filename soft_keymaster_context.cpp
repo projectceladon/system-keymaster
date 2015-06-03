@@ -197,10 +197,9 @@ static keymaster_error_t ParseOcbAuthEncryptedBlob(const KeymasterKeyBlob& blob,
 // odd things, but they have been left unchanged to avoid breaking compatibility.
 static const uint8_t SOFT_KEY_MAGIC[] = {'P', 'K', '#', '8'};
 const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
-static keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
-                                                   KeymasterKeyBlob* key_material,
-                                                   AuthorizationSet* hw_enforced,
-                                                   AuthorizationSet* sw_enforced) {
+keymaster_error_t SoftKeymasterContext::ParseOldSoftkeymasterBlob(
+    const KeymasterKeyBlob& blob, KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
+    AuthorizationSet* sw_enforced) const {
     long publicLen = 0;
     long privateLen = 0;
     const uint8_t* p = blob.key_material;
@@ -256,41 +255,16 @@ static keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
         return KM_ERROR_INVALID_KEY_BLOB;
     }
 
+    // All auths go into sw_enforced, including those that would be HW-enforced if we were faking
+    // auths for a HW-backed key.
+    hw_enforced->Clear();
+    keymaster_error_t error = FakeKeyAuthorizations(pkey.get(), sw_enforced, sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
     if (!key_material->Reset(privateLen))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memcpy(key_material->writable_data(), key_start, privateLen);
-
-    hw_enforced->Clear();
-    sw_enforced->Clear();
-
-    switch (type) {
-    case EVP_PKEY_RSA:
-        sw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-        sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
-        sw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
-        break;
-
-    case EVP_PKEY_EC:
-        sw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
-        sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
-        break;
-
-    case EVP_PKEY_DSA:
-        return KM_ERROR_UNSUPPORTED_ALGORITHM;
-
-    default:
-        return KM_ERROR_INVALID_KEY_BLOB;
-    }
-
-    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
-    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
-    sw_enforced->push_back(TAG_ALL_USERS);
-    sw_enforced->push_back(TAG_NO_AUTH_REQUIRED);
-    uint64_t now = java_time(time(NULL));
-    sw_enforced->push_back(TAG_CREATION_DATETIME, now);
-    sw_enforced->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
-    sw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
-    sw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
 
     return KM_ERROR_OK;
 }
@@ -362,8 +336,65 @@ keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blo
     unique_ptr<EVP_PKEY, EVP_PKEY_Delete> tmp_key(engine_->GetKeymaster0PublicKey(blob));
     if (!tmp_key)
         return KM_ERROR_INVALID_KEY_BLOB;
+    else
+        error = FakeKeyAuthorizations(tmp_key.get(), hw_enforced, sw_enforced);
 
-    *key_material = blob;
+    if (error == KM_ERROR_OK)
+        *key_material = blob;
+
+    return error;
+}
+
+keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
+                                                              AuthorizationSet* hw_enforced,
+                                                              AuthorizationSet* sw_enforced) const {
+    hw_enforced->Clear();
+    sw_enforced->Clear();
+
+    // It does; build auth sets
+    switch (EVP_PKEY_type(pubkey->type)) {
+    case EVP_PKEY_RSA: {
+        hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        hw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
+        unique_ptr<RSA, RSA_Delete> rsa(EVP_PKEY_get1_RSA(pubkey));
+        if (!rsa)
+            return TranslateLastOpenSslError();
+        hw_enforced->push_back(TAG_KEY_SIZE, RSA_size(rsa.get()) * 8);
+        uint64_t public_exponent = BN_get_word(rsa->e);
+        if (public_exponent == 0xffffffffL)
+            return KM_ERROR_INVALID_KEY_BLOB;
+        hw_enforced->push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
+        break;
+    }
+
+    case EVP_PKEY_EC: {
+        hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
+        if (!ec_key.get())
+            return TranslateLastOpenSslError();
+        size_t key_size_bits;
+        keymaster_error_t error =
+            EcKeyFactory::get_group_size(*EC_KEY_get0_group(ec_key.get()), &key_size_bits);
+        if (error != KM_ERROR_OK)
+            return error;
+        hw_enforced->push_back(TAG_KEY_SIZE, key_size_bits);
+        break;
+    }
+
+    default:
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
+
+    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
+    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
+    sw_enforced->push_back(TAG_ALL_USERS);
+    sw_enforced->push_back(TAG_NO_AUTH_REQUIRED);
+    uint64_t now = java_time(time(NULL));
+    sw_enforced->push_back(TAG_CREATION_DATETIME, now);
+    sw_enforced->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
+
     return KM_ERROR_OK;
 }
 
