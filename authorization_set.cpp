@@ -32,11 +32,6 @@ static inline bool is_blob_tag(keymaster_tag_t tag) {
 
 const size_t STARTING_ELEMS_CAPACITY = 8;
 
-AuthorizationSet::AuthorizationSet(const AuthorizationSet& set)
-    : Serializable(), elems_(NULL), indirect_data_(NULL) {
-    Reinitialize(set.elems_, set.elems_size_);
-}
-
 AuthorizationSet::AuthorizationSet(AuthorizationSetBuilder& builder) {
     elems_ = builder.set.elems_;
     builder.set.elems_ = NULL;
