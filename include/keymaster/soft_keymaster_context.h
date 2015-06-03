@@ -19,6 +19,8 @@
 
 #include <memory>
 
+#include <openssl/evp.h>
+
 #include <hardware/keymaster0.h>
 #include <keymaster/keymaster_context.h>
 
@@ -51,6 +53,13 @@ class SoftKeymasterContext : public KeymasterContext {
     keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const override;
 
   private:
+    keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
+                                                KeymasterKeyBlob* key_material,
+                                                AuthorizationSet* hw_enforced,
+                                                AuthorizationSet* sw_enforced) const;
+    keymaster_error_t FakeKeyAuthorizations(EVP_PKEY* pubkey, AuthorizationSet* hw_enforced,
+                                            AuthorizationSet* sw_enforced) const;
+
     std::unique_ptr<Keymaster0Engine> engine_;
     std::unique_ptr<KeyFactory> rsa_factory_;
     std::unique_ptr<KeyFactory> ec_factory_;

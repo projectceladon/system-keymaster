@@ -2538,5 +2538,86 @@ TEST_P(Keymaster0AdapterTest, OldSoftwareKeymaster0RsaBlob) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(Keymaster0AdapterTest, OldSwKeymaster0RsaBlobGetCharacteristics) {
+    // Load and use an old softkeymaster blob.  These blobs contain PKCS#8 key data.
+    string km0_sw = read_file("km0_sw_rsa_512.blob");
+    EXPECT_EQ(333U, km0_sw.length());
+
+    uint8_t* key_data = reinterpret_cast<uint8_t*>(malloc(km0_sw.length()));
+    memcpy(key_data, km0_sw.data(), km0_sw.length());
+    set_key_blob(key_data, km0_sw.length());
+
+    EXPECT_EQ(KM_ERROR_OK, GetCharacteristics());
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_RSA));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_KEY_SIZE, 512));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 3));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_DIGEST, KM_DIGEST_NONE));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PADDING, KM_PAD_NONE));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_VERIFY));
+    EXPECT_TRUE(sw_enforced().GetTagValue(TAG_ALL_USERS));
+    EXPECT_TRUE(sw_enforced().GetTagValue(TAG_NO_AUTH_REQUIRED));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(Keymaster0AdapterTest, OldHwKeymaster0RsaBlob) {
+    // Load and use an old softkeymaster blob.  These blobs contain PKCS#8 key data.
+    string km0_sw = read_file("km0_sw_rsa_512.blob");
+    EXPECT_EQ(333U, km0_sw.length());
+
+    // The keymaster0 wrapper swaps the old softkeymaster leading 'P' for a 'Q' to make the key not
+    // be recognized as a software key.  Do the same here to pretend this is a hardware key.
+    EXPECT_EQ('P', km0_sw[0]);
+    km0_sw[0] = 'Q';
+
+    uint8_t* key_data = reinterpret_cast<uint8_t*>(malloc(km0_sw.length()));
+    memcpy(key_data, km0_sw.data(), km0_sw.length());
+    set_key_blob(key_data, km0_sw.length());
+
+    string message(64, 'a');
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE, KM_PAD_NONE);
+
+    EXPECT_EQ(5, GetParam()->keymaster0_calls());
+}
+
+TEST_P(Keymaster0AdapterTest, OldHwKeymaster0RsaBlobGetCharacteristics) {
+    // Load and use an old softkeymaster blob.  These blobs contain PKCS#8 key data.
+    string km0_sw = read_file("km0_sw_rsa_512.blob");
+    EXPECT_EQ(333U, km0_sw.length());
+
+    // The keymaster0 wrapper swaps the old softkeymaster leading 'P' for a 'Q' to make the key not
+    // be recognized as a software key.  Do the same here to pretend this is a hardware key.
+    EXPECT_EQ('P', km0_sw[0]);
+    km0_sw[0] = 'Q';
+
+    uint8_t* key_data = reinterpret_cast<uint8_t*>(malloc(km0_sw.length()));
+    memcpy(key_data, km0_sw.data(), km0_sw.length());
+    set_key_blob(key_data, km0_sw.length());
+
+    EXPECT_EQ(KM_ERROR_OK, GetCharacteristics());
+    EXPECT_TRUE(contains(hw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_RSA));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_KEY_SIZE, 512));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 3));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_NONE));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_NONE));
+    EXPECT_EQ(5U, hw_enforced().size());
+
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_SIGN));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_VERIFY));
+    EXPECT_TRUE(sw_enforced().GetTagValue(TAG_ALL_USERS));
+    EXPECT_TRUE(sw_enforced().GetTagValue(TAG_NO_AUTH_REQUIRED));
+
+    EXPECT_FALSE(contains(sw_enforced(), TAG_ALGORITHM, KM_ALGORITHM_RSA));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_KEY_SIZE, 512));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 3));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_DIGEST, KM_DIGEST_NONE));
+    EXPECT_FALSE(contains(sw_enforced(), TAG_PADDING, KM_PAD_NONE));
+
+    EXPECT_EQ(1, GetParam()->keymaster0_calls());
+}
+
 }  // namespace test
 }  // namespace keymaster
