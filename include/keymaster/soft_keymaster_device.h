@@ -117,7 +117,7 @@ class SoftKeymasterDevice {
     static keymaster_error_t add_rng_entropy(const keymaster1_device_t* dev, const uint8_t* data,
                                              size_t data_length);
     static keymaster_error_t generate_key(const keymaster1_device_t* dev,
-                                          const keymaster_key_param_t* params, size_t params_count,
+                                          const keymaster_key_param_set_t* params,
                                           keymaster_key_blob_t* key_blob,
                                           keymaster_key_characteristics_t** characteristics);
     static keymaster_error_t get_key_characteristics(const keymaster1_device_t* dev,
@@ -125,32 +125,36 @@ class SoftKeymasterDevice {
                                                      const keymaster_blob_t* client_id,
                                                      const keymaster_blob_t* app_data,
                                                      keymaster_key_characteristics_t** character);
-    static keymaster_error_t import_key(const keymaster1_device_t* dev,
-                                        const keymaster_key_param_t* params, size_t params_count,
-                                        keymaster_key_format_t key_format, const uint8_t* key_data,
-                                        size_t key_data_length, keymaster_key_blob_t* key_blob,
+    static keymaster_error_t import_key(const keymaster1_device_t* dev,  //
+                                        const keymaster_key_param_set_t* params,
+                                        keymaster_key_format_t key_format,
+                                        const keymaster_blob_t* key_data,
+                                        keymaster_key_blob_t* key_blob,
                                         keymaster_key_characteristics_t** characteristics);
-    static keymaster_error_t
-    export_key(const keymaster1_device_t* dev, keymaster_key_format_t export_format,
-               const keymaster_key_blob_t* key_to_export, const keymaster_blob_t* client_id,
-               const keymaster_blob_t* app_data, uint8_t** export_data, size_t* export_data_length);
+    static keymaster_error_t export_key(const keymaster1_device_t* dev,  //
+                                        keymaster_key_format_t export_format,
+                                        const keymaster_key_blob_t* key_to_export,
+                                        const keymaster_blob_t* client_id,
+                                        const keymaster_blob_t* app_data,
+                                        keymaster_blob_t* export_data);
     static keymaster_error_t delete_key(const struct keymaster1_device* dev,
                                         const keymaster_key_blob_t* key);
     static keymaster_error_t delete_all_keys(const struct keymaster1_device* dev);
     static keymaster_error_t begin(const keymaster1_device_t* dev, keymaster_purpose_t purpose,
                                    const keymaster_key_blob_t* key,
-                                   const keymaster_key_param_t* params, size_t params_count,
-                                   keymaster_key_param_t** out_params, size_t* out_params_count,
+                                   const keymaster_key_param_set_t* in_params,
+                                   keymaster_key_param_set_t* out_params,
                                    keymaster_operation_handle_t* operation_handle);
-    static keymaster_error_t
-    update(const keymaster1_device_t* dev, keymaster_operation_handle_t operation_handle,
-           const keymaster_key_param_t* params, size_t params_count, const uint8_t* input,
-           size_t input_length, size_t* input_consumed, uint8_t** output, size_t* output_length);
-    static keymaster_error_t finish(const keymaster1_device_t* dev,
+    static keymaster_error_t update(const keymaster1_device_t* dev,
                                     keymaster_operation_handle_t operation_handle,
-                                    const keymaster_key_param_t* params, size_t params_count,
-                                    const uint8_t* signature, size_t signature_length,
-                                    uint8_t** output, size_t* output_length);
+                                    const keymaster_key_param_set_t* in_params,
+                                    const keymaster_blob_t* input, size_t* input_consumed,
+                                    keymaster_key_param_set_t* out_params,
+                                    keymaster_blob_t* output);
+    static keymaster_error_t
+    finish(const keymaster1_device_t* dev, keymaster_operation_handle_t operation_handle,
+           const keymaster_key_param_set_t* in_params, const keymaster_blob_t* signature,
+           keymaster_key_param_set_t* out_params, keymaster_blob_t* output);
     static keymaster_error_t abort(const keymaster1_device_t* dev,
                                    keymaster_operation_handle_t operation_handle);
 
