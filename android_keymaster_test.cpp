@@ -183,7 +183,10 @@ TEST_P(CheckSupported, SupportedDigests) {
     keymaster_digest_t* digests;
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_RSA,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE, KM_DIGEST_SHA_2_256}, digests, len));
+    EXPECT_TRUE(
+        ResponseContains({KM_DIGEST_NONE, KM_DIGEST_MD5, KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
+                          KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512},
+                         digests, len));
     free(digests);
 
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
@@ -442,19 +445,6 @@ TEST_P(SigningOperationsTest, RsaSuccess) {
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
 }
 
-TEST_P(SigningOperationsTest, RsaSha256DigestSuccess) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(384, 3)
-                                           .Digest(KM_DIGEST_SHA_2_256)
-                                           .Padding(KM_PAD_RSA_PSS)));
-    string message(1024, 'a');
-    string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
-
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(3, GetParam()->keymaster0_calls());
-}
-
 TEST_P(SigningOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
@@ -483,8 +473,8 @@ TEST_P(SigningOperationsTest, RsaPkcs1Sha256Success) {
 }
 
 TEST_P(SigningOperationsTest, RsaPssSha256TooSmallKey) {
-    // Key must be at least 10 bytes larger than hash, to provide minimal random salt, so verify
-    // that 9 bytes larger than hash won't work.
+    // Key must be at least 10 bytes larger than hash, to provide eight bytes of random salt, so
+    // verify that nine bytes larger than hash won't work.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256 + 9 * 8, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -495,16 +485,7 @@ TEST_P(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
     begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, FinishOperation(signature, &result));
-
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
 TEST_P(SigningOperationsTest, RsaAbort) {
@@ -615,7 +596,7 @@ TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
 TEST_P(SigningOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
-    string message = "123456789012345678901234567890123456789012345678";
+    string message(1024, 'a');
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
 
@@ -996,45 +977,6 @@ TEST_P(VerificationOperationsTest, RsaSuccess) {
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
 }
 
-TEST_P(VerificationOperationsTest, RsaSha256DigestSuccess) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .RsaSigningKey(384, 3)
-                    .Digest(KM_DIGEST_SHA_2_256)
-                    .Padding(KM_PAD_RSA_PSS));
-    string message(1024, 'a');
-    string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
-
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(4, GetParam()->keymaster0_calls());
-}
-
-TEST_P(VerificationOperationsTest, RsaSha256CorruptSignature) {
-    GenerateKey(AuthorizationSetBuilder()
-                    .RsaSigningKey(384, 3)
-                    .Digest(KM_DIGEST_SHA_2_256)
-                    .Padding(KM_PAD_RSA_PSS));
-    string message(1024, 'a');
-    string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
-    ++signature[signature.size() / 2];
-
-    AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
-    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
-
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
-
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(4, GetParam()->keymaster0_calls());
-}
-
 TEST_P(VerificationOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
@@ -1185,13 +1127,19 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                                                     &padding_modes, &padding_modes_len));
 
     // Try them.
+    int trial_count = 0;
     for (keymaster_padding_t padding_mode : make_vector(padding_modes, padding_modes_len)) {
         for (keymaster_digest_t digest : make_vector(digests, digests_len)) {
+            if (digest != KM_DIGEST_NONE && padding_mode == KM_PAD_NONE)
+                // Digesting requires padding
+                continue;
+
             // Compute key & message size that will work.
-            size_t key_bits = 256;
+            size_t key_bits = 0;
             size_t message_len = 1000;
-            switch (digest) {
-            case KM_DIGEST_NONE:
+
+            if (digest == KM_DIGEST_NONE) {
+                key_bits = 256;
                 switch (padding_mode) {
                 case KM_PAD_NONE:
                     // Match key size.
@@ -1207,26 +1155,42 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                     FAIL() << "Missing padding";
                     break;
                 }
-                break;
+            } else {
+                size_t digest_bits;
+                switch (digest) {
+                case KM_DIGEST_MD5:
+                    digest_bits = 128;
+                    break;
+                case KM_DIGEST_SHA1:
+                    digest_bits = 160;
+                    break;
+                case KM_DIGEST_SHA_2_224:
+                    digest_bits = 224;
+                    break;
+                case KM_DIGEST_SHA_2_256:
+                    digest_bits = 256;
+                    break;
+                case KM_DIGEST_SHA_2_384:
+                    digest_bits = 384;
+                    break;
+                case KM_DIGEST_SHA_2_512:
+                    digest_bits = 512;
+                    break;
+                default:
+                    FAIL() << "Missing digest";
+                }
 
-            case KM_DIGEST_SHA_2_256:
                 switch (padding_mode) {
-                case KM_PAD_NONE:
-                    // Digesting requires padding
-                    continue;
                 case KM_PAD_RSA_PKCS1_1_5_SIGN:
-                    key_bits += 8 * 11;
+                    key_bits = digest_bits + 8 * (11 + 19);
                     break;
                 case KM_PAD_RSA_PSS:
-                    key_bits += 8 * 10;
+                    key_bits = digest_bits + 8 * 10;
                     break;
                 default:
                     FAIL() << "Missing padding";
                     break;
                 }
-                break;
-            default:
-                FAIL() << "Missing digest";
             }
 
             GenerateKey(AuthorizationSetBuilder()
@@ -1237,6 +1201,7 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
             string signature;
             SignMessage(message, &signature, digest, padding_mode);
             VerifyMessage(message, signature, digest, padding_mode);
+            ++trial_count;
         }
     }
 
@@ -1244,7 +1209,7 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
     free(digests);
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(16, GetParam()->keymaster0_calls());
+        EXPECT_EQ(trial_count * 4, GetParam()->keymaster0_calls());
 }
 
 TEST_P(VerificationOperationsTest, EcdsaSuccess) {
