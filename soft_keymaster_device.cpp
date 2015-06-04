@@ -76,8 +76,12 @@ SoftKeymasterDevice::SoftKeymasterDevice(keymaster0_device_t* keymaster0_device)
     device_.common.module = reinterpret_cast<hw_module_t*>(&soft_keymaster_device_module);
     device_.common.close = &close_device;
 
-    device_.flags =
-        KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE | KEYMASTER_SUPPORTS_EC;
+    device_.flags = KEYMASTER_BLOBS_ARE_STANDALONE | KEYMASTER_SUPPORTS_EC;
+    if (keymaster0_device) {
+        device_.flags |= keymaster0_device->flags & KEYMASTER_SOFTWARE_ONLY;
+    } else {
+        device_.flags |= KEYMASTER_SOFTWARE_ONLY;
+    }
 
     // keymaster0 APIs
     device_.generate_keypair = generate_keypair;
