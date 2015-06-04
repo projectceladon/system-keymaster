@@ -83,8 +83,16 @@ SoftKeymasterDevice::SoftKeymasterDevice(keymaster0_device_t* keymaster0_device)
     device_.generate_keypair = generate_keypair;
     device_.import_keypair = import_keypair;
     device_.get_keypair_public = get_keypair_public;
-    device_.delete_keypair = delete_keypair;
-    device_.delete_all = delete_all;
+    if (keymaster0_device && keymaster0_device->delete_keypair) {
+        device_.delete_keypair = delete_keypair;
+    } else {
+        device_.delete_keypair = nullptr;
+    }
+    if (keymaster0_device && keymaster0_device->delete_all) {
+        device_.delete_all = delete_all;
+    } else {
+        device_.delete_all = nullptr;
+    }
     device_.sign_data = sign_data;
     device_.verify_data = verify_data;
 
@@ -323,15 +331,21 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
 }
 
 /* static */
-int SoftKeymasterDevice::delete_keypair(const struct keymaster1_device* /* dev */,
-                                        const uint8_t* /* key_blob */,
-                                        const size_t /* key_blob_length */) {
-    return KM_ERROR_UNIMPLEMENTED;
+int SoftKeymasterDevice::delete_keypair(const struct keymaster1_device* dev,
+                                        const uint8_t* key_blob,
+                                        const size_t key_blob_length) {
+    if (!dev || !dev->delete_keypair) {
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+    }
+    return dev->delete_keypair(dev, key_blob, key_blob_length);
 }
 
 /* static */
-int SoftKeymasterDevice::delete_all(const struct keymaster1_device* /* dev */) {
-    return KM_ERROR_UNIMPLEMENTED;
+int SoftKeymasterDevice::delete_all(const struct keymaster1_device* dev) {
+    if (!dev || !dev->delete_all) {
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+    }
+    return dev->delete_all(dev);
 }
 
 /* static */
