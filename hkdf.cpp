@@ -47,6 +47,8 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
         result = prk_hmac.Init(zeros, sizeof(zeros));
     }
     assert(result);
+    // avoid the unused variable warning if asserts are disabled.
+    (void) result;
 
     // |prk| is a pseudorandom key (of kSHA256HashLength octets).
     uint8_t prk[kSHA256HashLength];
