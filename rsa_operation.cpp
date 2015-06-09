@@ -28,8 +28,6 @@
 
 namespace keymaster {
 
-static const int MIN_PSS_SALT_LEN = 8 /* salt len */ + 2 /* overhead */;
-
 /* static */
 EVP_PKEY* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
     const RsaKey* rsa_key = static_cast<const RsaKey*>(&key);
