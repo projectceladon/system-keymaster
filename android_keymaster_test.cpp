@@ -460,6 +460,19 @@ TEST_P(SigningOperationsTest, RsaPssSha256Success) {
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
 }
 
+TEST_P(SigningOperationsTest, RsaPaddingNoneAllowsOther) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_NONE)));
+    string message = "12345678901234567890123456789012";
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
 TEST_P(SigningOperationsTest, RsaPkcs1Sha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)

@@ -216,6 +216,8 @@ int RsaDigestingOperation::GetOpensslPadding(keymaster_error_t* error) {
         }
         if (EVP_MD_size(digest_algorithm_) + PSS_OVERHEAD + MIN_SALT_SIZE >
             (size_t)EVP_PKEY_size(rsa_key_)) {
+            LOG_E("%d-byte digest cannot be used with %d-byte RSA key in PSS padding mode",
+                  EVP_MD_size(digest_algorithm_), EVP_PKEY_size(rsa_key_));
             *error = KM_ERROR_INCOMPATIBLE_DIGEST;
             return -1;
         }
