@@ -59,8 +59,13 @@ bool OperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_param
     } else if (!supported(*padding)) {
         LOG_E("Padding mode %d not supported", *padding);
         return false;
-    } else if (!key.authorizations().Contains(TAG_PADDING, *padding) &&
-               !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
+    } else if (
+        // If key contains KM_PAD_NONE, all padding modes are authorized.
+        !key.authorizations().Contains(TAG_PADDING, KM_PAD_NONE) &&
+        !key.authorizations().Contains(TAG_PADDING_OLD, KM_PAD_NONE) &&
+        // Otherwise the key needs to authorize the specific mode.
+        !key.authorizations().Contains(TAG_PADDING, *padding) &&
+        !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
         LOG_E("Padding mode %d was specified, but not authorized by key", *padding);
         *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
         return false;
@@ -80,8 +85,13 @@ bool OperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params
     } else if (!supported(*digest)) {
         LOG_E("Digest %d not supported", *digest);
         return false;
-    } else if (!key.authorizations().Contains(TAG_DIGEST, *digest) &&
-               !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
+    } else if (
+        // If key contains KM_DIGEST_NONE, all digests are authorized.
+        !key.authorizations().Contains(TAG_DIGEST, KM_DIGEST_NONE) &&
+        !key.authorizations().Contains(TAG_DIGEST_OLD, KM_DIGEST_NONE) &&
+        // Otherwise the key needs to authorize the specific digest.
+        !key.authorizations().Contains(TAG_DIGEST, *digest) &&
+        !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
         LOG_E("Digest %d was specified, but not authorized by key", *digest);
         *error = KM_ERROR_INCOMPATIBLE_DIGEST;
         return false;
