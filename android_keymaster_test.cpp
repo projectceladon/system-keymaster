@@ -2514,6 +2514,23 @@ TEST_P(Keymaster0AdapterTest, OldSoftwareKeymaster1RsaBlob) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(Keymaster0AdapterTest, UnversionedSoftwareKeymaster1RsaBlob) {
+    // Load and use an old-style Keymaster1 software key blob, without the version byte.  These
+    // blobs contain OCB-encrypted key data.
+    string km1_sw = read_file("km1_sw_rsa_512_unversioned.blob");
+    EXPECT_EQ(477U, km1_sw.length());
+
+    uint8_t* key_data = reinterpret_cast<uint8_t*>(malloc(km1_sw.length()));
+    memcpy(key_data, km1_sw.data(), km1_sw.length());
+    set_key_blob(key_data, km1_sw.length());
+
+    string message(64, 'a');
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
 TEST_P(Keymaster0AdapterTest, OldSoftwareKeymaster1EcdsaBlob) {
     // Load and use an old-style Keymaster1 software key blob.  These blobs contain OCB-encrypted
     // key data.
