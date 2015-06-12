@@ -55,7 +55,6 @@ class EcdsaKeymaster0KeyFactory : public EcKeyFactory {
 
   private:
     const Keymaster0Engine* engine_;
-    const SoftKeymasterContext* soft_context_;
 };
 
 class EcKeymaster0Key : public EcKey {

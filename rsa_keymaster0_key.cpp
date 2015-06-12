@@ -34,7 +34,7 @@ namespace keymaster {
 
 RsaKeymaster0KeyFactory::RsaKeymaster0KeyFactory(const SoftKeymasterContext* context,
                                                  const Keymaster0Engine* engine)
-    : RsaKeyFactory(context), engine_(engine), soft_context_(context) {
+    : RsaKeyFactory(context), engine_(engine) {
 }
 
 keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,

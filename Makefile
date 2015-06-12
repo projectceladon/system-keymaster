@@ -38,7 +38,7 @@ ifdef USE_CLANG
 CC=/usr/bin/clang
 CXX=/usr/bin/clang
 CLANG_TEST_DEFINE=-DKEYMASTER_CLANG_TEST_BUILD
-COMPILER_SPECIFIC_ARGS=-std=c++11 $(CLANG_TEST_DEFINE)
+COMPILER_SPECIFIC_ARGS=-std=c++11 $(CLANG_TEST_DEFINE) -Wunused-private-field
 else
 COMPILER_SPECIFIC_ARGS=-std=c++0x -fprofile-arcs
 endif
