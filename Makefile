@@ -45,7 +45,7 @@ endif
 
 CPPFLAGS=$(INCLUDES) -g -O0 -MD -MP
 CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
-	-Werror=sign-compare -ftest-coverage -fno-permissive \
+	-Werror=sign-compare -ftest-coverage -fno-permissive -Wunused-value \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
 	$(COMPILER_SPECIFIC_ARGS)
 
