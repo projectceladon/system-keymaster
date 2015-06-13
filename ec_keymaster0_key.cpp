@@ -31,7 +31,7 @@ namespace keymaster {
 
 EcdsaKeymaster0KeyFactory::EcdsaKeymaster0KeyFactory(const SoftKeymasterContext* context,
                                                      const Keymaster0Engine* engine)
-    : EcKeyFactory(context), engine_(engine), soft_context_(context) {
+    : EcKeyFactory(context), engine_(engine) {
 }
 
 keymaster_error_t EcdsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,
