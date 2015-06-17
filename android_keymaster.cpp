@@ -43,11 +43,9 @@ const uint8_t MINOR_VER = 1;
 const uint8_t SUBMINOR_VER = 0;
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size)
-    : context_(context), operation_table_(new OperationTable(operation_table_size)) {
-}
+    : context_(context), operation_table_(new OperationTable(operation_table_size)) {}
 
-AndroidKeymaster::~AndroidKeymaster() {
-}
+AndroidKeymaster::~AndroidKeymaster() {}
 
 struct AE_CTX_Delete {
     void operator()(ae_ctx* ctx) const { ae_free(ctx); }
@@ -226,16 +224,19 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (response->error != KM_ERROR_OK)
         return;
 
-    // TODO(swillden): Move this check to a general authorization checker.
-    // TODO(swillden): Consider introducing error codes for unauthorized usages.
-    response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
-    if (!hw_enforced.Contains(TAG_PURPOSE, request.purpose) &&
-        !sw_enforced.Contains(TAG_PURPOSE, request.purpose))
+    response->error = KM_ERROR_UNKNOWN_ERROR;
+    keymaster_algorithm_t key_algorithm;
+    if (!key->authorizations().GetTagValue(TAG_ALGORITHM, &key_algorithm))
         return;
 
     response->error = KM_ERROR_UNSUPPORTED_PURPOSE;
     OperationFactory* factory = key_factory->GetOperationFactory(request.purpose);
     if (!factory)
+        return;
+
+    response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
+    if (!key->authorizations().Contains(TAG_PURPOSE, request.purpose) &&
+        !factory->is_public_key_operation())
         return;
 
     UniquePtr<Operation> operation(
