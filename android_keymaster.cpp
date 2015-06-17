@@ -80,8 +80,8 @@ void AndroidKeymaster::GetVersion(const GetVersionRequest&, GetVersionResponse* 
     rsp->error = KM_ERROR_OK;
 }
 
-void AndroidKeymaster::SupportedAlgorithms(
-    SupportedResponse<keymaster_algorithm_t>* response) const {
+void AndroidKeymaster::SupportedAlgorithms(const SupportedAlgorithmsRequest& /* request */,
+                                           SupportedAlgorithmsResponse* response) {
     if (response == NULL)
         return;
 
@@ -116,49 +116,50 @@ void GetSupported(const KeymasterContext& context, keymaster_algorithm_t algorit
     response->SetResults(supported, count);
 }
 
-void AndroidKeymaster::SupportedBlockModes(
-    keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-    SupportedResponse<keymaster_block_mode_t>* response) const {
-    GetSupported(*context_, algorithm, purpose, &OperationFactory::SupportedBlockModes, response);
+void AndroidKeymaster::SupportedBlockModes(const SupportedBlockModesRequest& request,
+                                           SupportedBlockModesResponse* response) {
+    GetSupported(*context_, request.algorithm, request.purpose,
+                 &OperationFactory::SupportedBlockModes, response);
 }
 
-void AndroidKeymaster::SupportedPaddingModes(
-    keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-    SupportedResponse<keymaster_padding_t>* response) const {
-    GetSupported(*context_, algorithm, purpose, &OperationFactory::SupportedPaddingModes, response);
+void AndroidKeymaster::SupportedPaddingModes(const SupportedPaddingModesRequest& request,
+                                             SupportedPaddingModesResponse* response) {
+    GetSupported(*context_, request.algorithm, request.purpose,
+                 &OperationFactory::SupportedPaddingModes, response);
 }
 
-void AndroidKeymaster::SupportedDigests(keymaster_algorithm_t algorithm,
-                                        keymaster_purpose_t purpose,
-                                        SupportedResponse<keymaster_digest_t>* response) const {
-    GetSupported(*context_, algorithm, purpose, &OperationFactory::SupportedDigests, response);
+void AndroidKeymaster::SupportedDigests(const SupportedDigestsRequest& request,
+                                        SupportedDigestsResponse* response) {
+    GetSupported(*context_, request.algorithm, request.purpose, &OperationFactory::SupportedDigests,
+                 response);
 }
 
-void AndroidKeymaster::SupportedImportFormats(
-    keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
-    if (response == NULL || !check_supported(*context_, algorithm, response))
+void AndroidKeymaster::SupportedImportFormats(const SupportedImportFormatsRequest& request,
+                                              SupportedImportFormatsResponse* response) {
+    if (response == NULL || !check_supported(*context_, request.algorithm, response))
         return;
 
     size_t count;
     const keymaster_key_format_t* formats =
-        context_->GetKeyFactory(algorithm)->SupportedImportFormats(&count);
+        context_->GetKeyFactory(request.algorithm)->SupportedImportFormats(&count);
     response->SetResults(formats, count);
 }
 
-void AndroidKeymaster::SupportedExportFormats(
-    keymaster_algorithm_t algorithm, SupportedResponse<keymaster_key_format_t>* response) const {
-    if (response == NULL || !check_supported(*context_, algorithm, response))
+void AndroidKeymaster::SupportedExportFormats(const SupportedExportFormatsRequest& request,
+                                              SupportedExportFormatsResponse* response) {
+    if (response == NULL || !check_supported(*context_, request.algorithm, response))
         return;
 
     size_t count;
     const keymaster_key_format_t* formats =
-        context_->GetKeyFactory(algorithm)->SupportedExportFormats(&count);
+        context_->GetKeyFactory(request.algorithm)->SupportedExportFormats(&count);
     response->SetResults(formats, count);
 }
 
-keymaster_error_t AndroidKeymaster::AddRngEntropy(const AddEntropyRequest& request) {
-    return context_->AddRngEntropy(request.random_data.peek_read(),
-                                   request.random_data.available_read());
+void AndroidKeymaster::AddRngEntropy(const AddEntropyRequest& request,
+                                     AddEntropyResponse* response) {
+    response->error = context_->AddRngEntropy(request.random_data.peek_read(),
+                                              request.random_data.available_read());
 }
 
 void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
@@ -284,16 +285,19 @@ void AndroidKeymaster::FinishOperation(const FinishOperationRequest& request,
     operation_table_->Delete(request.op_handle);
 }
 
-keymaster_error_t AndroidKeymaster::AbortOperation(const keymaster_operation_handle_t op_handle) {
-    Operation* operation = operation_table_->Find(op_handle);
-    if (operation == NULL)
-        return KM_ERROR_INVALID_OPERATION_HANDLE;
+void AndroidKeymaster::AbortOperation(const AbortOperationRequest& request,
+                                      AbortOperationResponse* response) {
+    if (!response)
+        return;
 
-    keymaster_error_t error = operation->Abort();
-    operation_table_->Delete(op_handle);
-    if (error != KM_ERROR_OK)
-        return error;
-    return KM_ERROR_OK;
+    Operation* operation = operation_table_->Find(request.op_handle);
+    if (!operation) {
+        response->error = KM_ERROR_INVALID_OPERATION_HANDLE;
+        return;
+    }
+
+    response->error = operation->Abort();
+    operation_table_->Delete(request.op_handle);
 }
 
 void AndroidKeymaster::ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response) {
@@ -350,12 +354,16 @@ void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespo
     }
 }
 
-keymaster_error_t AndroidKeymaster::DeleteKey(const DeleteKeyRequest& request) {
-    return context_->DeleteKey(KeymasterKeyBlob(request.key_blob));
+void AndroidKeymaster::DeleteKey(const DeleteKeyRequest& request, DeleteKeyResponse* response) {
+    if (!response)
+        return;
+    response->error = context_->DeleteKey(KeymasterKeyBlob(request.key_blob));
 }
 
-keymaster_error_t AndroidKeymaster::DeleteAllKeys() {
-    return context_->DeleteAllKeys();
+void AndroidKeymaster::DeleteAllKeys(const DeleteAllKeysRequest&, DeleteAllKeysResponse* response) {
+    if (!response)
+        return;
+    response->error = context_->DeleteAllKeys();
 }
 
 keymaster_error_t AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key_blob,
