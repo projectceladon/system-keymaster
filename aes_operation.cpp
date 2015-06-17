@@ -30,7 +30,7 @@
 
 namespace keymaster {
 
-static const size_t GCM_DEFAULT_NONCE_SIZE = 12;
+static const size_t GCM_NONCE_SIZE = 12;
 static const size_t GCM_MAX_TAG_LENGTH = 16;
 static const size_t GCM_MIN_TAG_LENGTH = 12;
 
@@ -322,6 +322,11 @@ keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
               iv_blob.data_length);
         return KM_ERROR_INVALID_NONCE;
     }
+    if (block_mode_ == KM_MODE_GCM && iv_blob.data_length != GCM_NONCE_SIZE) {
+        LOG_E("Expected %d-byte nonce for AES-GCM operation, but got %d bytes", GCM_NONCE_SIZE,
+              iv_blob.data_length);
+        return KM_ERROR_INVALID_NONCE;
+    }
     iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -472,7 +477,7 @@ keymaster_error_t AesEvpEncryptOperation::Finish(const AuthorizationSet& additio
 }
 
 keymaster_error_t AesEvpEncryptOperation::GenerateIv() {
-    iv_length_ = (block_mode_ == KM_MODE_GCM) ? GCM_DEFAULT_NONCE_SIZE : AES_BLOCK_SIZE;
+    iv_length_ = (block_mode_ == KM_MODE_GCM) ? GCM_NONCE_SIZE : AES_BLOCK_SIZE;
     iv_.reset(new uint8_t[iv_length_]);
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
