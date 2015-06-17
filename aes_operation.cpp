@@ -318,6 +318,11 @@ keymaster_error_t AesEvpOperation::GetIv(const AuthorizationSet& input_params) {
               iv_blob.data_length);
         return KM_ERROR_INVALID_NONCE;
     }
+    if (block_mode_ == KM_MODE_GCM && iv_blob.data_length != GCM_NONCE_SIZE) {
+        LOG_E("Expected %d-byte nonce for AES-GCM operation, but got %d bytes", GCM_NONCE_SIZE,
+              iv_blob.data_length);
+        return KM_ERROR_INVALID_NONCE;
+    }
     iv_.reset(dup_array(iv_blob.data, iv_blob.data_length));
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
