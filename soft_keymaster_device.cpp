@@ -336,8 +336,7 @@ int SoftKeymasterDevice::get_keypair_public(const struct keymaster1_device* dev,
 
 /* static */
 int SoftKeymasterDevice::delete_keypair(const struct keymaster1_device* dev,
-                                        const uint8_t* key_blob,
-                                        const size_t key_blob_length) {
+                                        const uint8_t* key_blob, const size_t key_blob_length) {
     if (!dev || !dev->delete_keypair) {
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
     }
@@ -463,8 +462,9 @@ keymaster_error_t SoftKeymasterDevice::get_supported_algorithms(const keymaster1
     if (!algorithms || !algorithms_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_algorithm_t> response;
-    convert_device(dev)->impl_->SupportedAlgorithms(&response);
+    SupportedAlgorithmsRequest request;
+    SupportedAlgorithmsResponse response;
+    convert_device(dev)->impl_->SupportedAlgorithms(request, &response);
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_algorithms failed with %d", response.error);
 
@@ -492,8 +492,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_block_modes(const keymaster
     if (!modes || !modes_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_block_mode_t> response;
-    convert_device(dev)->impl_->SupportedBlockModes(algorithm, purpose, &response);
+    SupportedBlockModesRequest request;
+    request.algorithm = algorithm;
+    request.purpose = purpose;
+    SupportedBlockModesResponse response;
+    convert_device(dev)->impl_->SupportedBlockModes(request, &response);
 
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_block_modes failed with %d", response.error);
@@ -521,8 +524,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_padding_modes(const keymast
     if (!modes || !modes_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_padding_t> response;
-    convert_device(dev)->impl_->SupportedPaddingModes(algorithm, purpose, &response);
+    SupportedPaddingModesRequest request;
+    request.algorithm = algorithm;
+    request.purpose = purpose;
+    SupportedPaddingModesResponse response;
+    convert_device(dev)->impl_->SupportedPaddingModes(request, &response);
 
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_padding_modes failed with %d", response.error);
@@ -549,8 +555,11 @@ keymaster_error_t SoftKeymasterDevice::get_supported_digests(const keymaster1_de
     if (!digests || !digests_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_digest_t> response;
-    convert_device(dev)->impl_->SupportedDigests(algorithm, purpose, &response);
+    SupportedDigestsRequest request;
+    request.algorithm = algorithm;
+    request.purpose = purpose;
+    SupportedDigestsResponse response;
+    convert_device(dev)->impl_->SupportedDigests(request, &response);
 
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_digests failed with %d", response.error);
@@ -575,8 +584,10 @@ keymaster_error_t SoftKeymasterDevice::get_supported_import_formats(
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_key_format_t> response;
-    convert_device(dev)->impl_->SupportedImportFormats(algorithm, &response);
+    SupportedImportFormatsRequest request;
+    request.algorithm = algorithm;
+    SupportedImportFormatsResponse response;
+    convert_device(dev)->impl_->SupportedImportFormats(request, &response);
 
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_import_formats failed with %d", response.error);
@@ -602,8 +613,10 @@ keymaster_error_t SoftKeymasterDevice::get_supported_export_formats(
     if (!formats || !formats_length)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    SupportedResponse<keymaster_key_format_t> response;
-    convert_device(dev)->impl_->SupportedExportFormats(algorithm, &response);
+    SupportedExportFormatsRequest request;
+    request.algorithm = algorithm;
+    SupportedExportFormatsResponse response;
+    convert_device(dev)->impl_->SupportedExportFormats(request, &response);
 
     if (response.error != KM_ERROR_OK) {
         LOG_E("get_supported_export_formats failed with %d", response.error);
@@ -627,7 +640,11 @@ keymaster_error_t SoftKeymasterDevice::add_rng_entropy(const keymaster1_device_t
 
     AddEntropyRequest request;
     request.random_data.Reinitialize(data, data_length);
-    return convert_device(dev)->impl_->AddRngEntropy(request);
+    AddEntropyResponse response;
+    convert_device(dev)->impl_->AddRngEntropy(request, &response);
+    if (response.error != KM_ERROR_OK)
+        LOG_E("add_rng_entropy failed with %d", response.error);
+    return response.error;
 }
 
 /* static */
@@ -892,7 +909,11 @@ keymaster_error_t SoftKeymasterDevice::finish(const keymaster1_device_t* dev,
 /* static */
 keymaster_error_t SoftKeymasterDevice::abort(const keymaster1_device_t* dev,
                                              keymaster_operation_handle_t operation_handle) {
-    return convert_device(dev)->impl_->AbortOperation(operation_handle);
+    AbortOperationRequest request;
+    request.op_handle = operation_handle;
+    AbortOperationResponse response;
+    convert_device(dev)->impl_->AbortOperation(request, &response);
+    return response.error;
 }
 
 /* static */

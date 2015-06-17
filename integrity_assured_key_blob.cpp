@@ -47,7 +47,7 @@ class HmacCleanup {
     HMAC_CTX* ctx_;
 };
 
-keymaster_error_t ComputeHmac(const uint8_t* serialized_data, size_t serialized_data_size,
+static keymaster_error_t ComputeHmac(const uint8_t* serialized_data, size_t serialized_data_size,
                               const AuthorizationSet& hidden, uint8_t hmac[HMAC_SIZE]) {
     size_t hidden_bytes_size = hidden.SerializedSize();
     UniquePtr<uint8_t[]> hidden_bytes(new uint8_t[hidden_bytes_size]);
