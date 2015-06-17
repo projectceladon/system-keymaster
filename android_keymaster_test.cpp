@@ -398,8 +398,7 @@ TEST_P(NewKeyGeneration, EcdsaAllValidSizes) {
     for (size_t size : valid_sizes) {
         EXPECT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(size).Digest(
                                    KM_DIGEST_NONE)))
-            << "Failed to generate size: "
-            << size;
+            << "Failed to generate size: " << size;
     }
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
@@ -2227,42 +2226,201 @@ TEST_P(EncryptionOperationsTest, AesGcmRoundTripSuccess) {
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
     begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     begin_params.push_back(TAG_MAC_LENGTH, 128);
-    AuthorizationSet begin_out_params;
 
     AuthorizationSet update_params;
     update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
-    AuthorizationSet update_out_params;
-
-    AuthorizationSet finish_params;
-    AuthorizationSet finish_out_params;
-
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
 
     // Encrypt
+    AuthorizationSet begin_out_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    string ciphertext;
+    size_t input_consumed;
+    AuthorizationSet update_out_params;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
                                            &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
 
-    // Grab nonce & tag.
+    // Grab nonce
     EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
-    EXPECT_NE(-1, finish_out_params.find(TAG_AEAD_TAG));
     begin_params.push_back(begin_out_params);
-    update_params.push_back(finish_out_params);
 
     // Decrypt.
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    string plaintext;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
                                            &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
 
     EXPECT_EQ(message, plaintext);
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, AesGcmCorruptKey) {
+    uint8_t nonce[] = {
+        0xb7, 0x94, 0x37, 0xae, 0x08, 0xff, 0x35, 0x5d, 0x7d, 0x8a, 0x4d, 0x0f,
+    };
+    uint8_t ciphertext[] = {
+        0xb3, 0xf6, 0x79, 0x9e, 0x8f, 0x93, 0x26, 0xf2, 0xdf, 0x1e, 0x80, 0xfc, 0xd2, 0xcb, 0x16,
+        0xd7, 0x8c, 0x9d, 0xc7, 0xcc, 0x14, 0xbb, 0x67, 0x78, 0x62, 0xdc, 0x6c, 0x63, 0x9b, 0x3a,
+        0x63, 0x38, 0xd2, 0x4b, 0x31, 0x2d, 0x39, 0x89, 0xe5, 0x92, 0x0b, 0x5d, 0xbf, 0xc9, 0x76,
+        0x76, 0x5e, 0xfb, 0xfe, 0x57, 0xbb, 0x38, 0x59, 0x40, 0xa7, 0xa4, 0x3b, 0xdf, 0x05, 0xbd,
+        0xda, 0xe3, 0xc9, 0xd6, 0xa2, 0xfb, 0xbd, 0xfc, 0xc0, 0xcb, 0xa0,
+    };
+    string ciphertext_str(reinterpret_cast<char*>(ciphertext), sizeof(ciphertext));
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 128);
+    begin_params.push_back(TAG_NONCE, nonce, sizeof(nonce));
+
+    string plaintext;
+    size_t input_consumed;
+
+    // Import correct key and decrypt
+    uint8_t good_key[] = {
+        0xba, 0x76, 0x35, 0x4f, 0x0a, 0xed, 0x6e, 0x8d,
+        0x91, 0xf4, 0x5c, 0x4f, 0xf5, 0xa0, 0x62, 0xdb,
+    };
+    string good_key_str(reinterpret_cast<char*>(good_key), sizeof(good_key));
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .AesEncryptionKey(128)
+                                         .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                         .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                         .Authorization(TAG_CALLER_NONCE),
+                                     KM_KEY_FORMAT_RAW, good_key_str));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext_str, &plaintext, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
+
+    // Import bad key and decrypt
+    uint8_t bad_key[] = {
+        0xbb, 0x76, 0x35, 0x4f, 0x0a, 0xed, 0x6e, 0x8d,
+        0x91, 0xf4, 0x5c, 0x4f, 0xf5, 0xa0, 0x62, 0xdb,
+    };
+    string bad_key_str(reinterpret_cast<char*>(bad_key), sizeof(bad_key));
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .AesEncryptionKey(128)
+                                         .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                         .Authorization(TAG_PADDING, KM_PAD_NONE),
+                                     KM_KEY_FORMAT_RAW, bad_key_str));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext_str, &plaintext, &input_consumed));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&plaintext));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, AesGcmAadNoData) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+    string aad = "123456789012345678";
+    string empty_message;
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 128);
+
+    AuthorizationSet update_params;
+    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
+
+    // Encrypt
+    AuthorizationSet begin_out_params;
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    string ciphertext;
+    size_t input_consumed;
+    AuthorizationSet update_out_params;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, empty_message, &update_out_params,
+                                           &ciphertext, &input_consumed));
+    EXPECT_EQ(0U, input_consumed);
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
+
+    // Grab nonce
+    EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
+    begin_params.push_back(begin_out_params);
+
+    // Decrypt.
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    string plaintext;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
+                                           &plaintext, &input_consumed));
+    EXPECT_EQ(ciphertext.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
+
+    EXPECT_EQ(empty_message, plaintext);
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, AesGcmIncremental) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 128);
+
+    AuthorizationSet update_params;
+    update_params.push_back(TAG_ASSOCIATED_DATA, "b", 1);
+
+    // Encrypt
+    AuthorizationSet begin_out_params;
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    string ciphertext;
+    size_t input_consumed;
+    AuthorizationSet update_out_params;
+
+    // Send AAD, incrementally
+    for (int i = 0; i < 1000; ++i) {
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, "", &update_out_params, &ciphertext,
+                                               &input_consumed));
+        EXPECT_EQ(0U, input_consumed);
+        EXPECT_EQ(0U, ciphertext.size());
+    }
+
+    // Now send data, incrementally, no data.
+    AuthorizationSet empty_params;
+    for (int i = 0; i < 1000; ++i) {
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(empty_params, "a", &update_out_params, &ciphertext,
+                                               &input_consumed));
+        EXPECT_EQ(1U, input_consumed);
+    }
+    EXPECT_EQ(1000U, ciphertext.size());
+
+    // And finish.
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
+    EXPECT_EQ(1016U, ciphertext.size());
+
+    // Grab nonce
+    EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
+    begin_params.push_back(begin_out_params);
+
+    // Decrypt.
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    string plaintext;
+
+    // Send AAD, incrementally, no data
+    for (int i = 0; i < 1000; ++i) {
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, "", &update_out_params, &plaintext,
+                                               &input_consumed));
+        EXPECT_EQ(0U, input_consumed);
+        EXPECT_EQ(0U, plaintext.size());
+    }
+
+    // Now send data, incrementally.
+    for (size_t i = 0; i < ciphertext.length(); ++i) {
+        EXPECT_EQ(KM_ERROR_OK, UpdateOperation(empty_params, string(ciphertext.data() + i, 1),
+                                               &update_out_params, &plaintext, &input_consumed));
+        EXPECT_EQ(1U, input_consumed);
+    }
+    EXPECT_EQ(1000U, plaintext.size());
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
+
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
@@ -2280,46 +2438,37 @@ TEST_P(EncryptionOperationsTest, AesGcmMultiPartAad) {
 
     AuthorizationSet update_params;
     update_params.push_back(TAG_ASSOCIATED_DATA, "foo", 3);
-    AuthorizationSet update_out_params;
-
-    AuthorizationSet finish_params;
-    AuthorizationSet finish_out_params;
-
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
 
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
 
     // No data, AAD only.
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, "", &update_out_params, &ciphertext,
-                                           &input_consumed));
+    string ciphertext;
+    size_t input_consumed;
+    AuthorizationSet update_out_params;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, "" /* message */, &update_out_params,
+                                           &ciphertext, &input_consumed));
+    EXPECT_EQ(0U, input_consumed);
 
     // AAD and data.
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
                                            &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
 
-    // Grab nonce & tag.
+    // Grab nonce.
     EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
     begin_params.push_back(begin_out_params);
 
-    EXPECT_NE(-1, finish_out_params.find(TAG_AEAD_TAG));
-    update_params.push_back(finish_out_params);
+    // Decrypt
+    update_params.Clear();
+    update_params.push_back(TAG_ASSOCIATED_DATA, "foofoo", 6);
 
-    // All of the AAD in one.
-
-    // Decrypt.
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, "", &update_out_params, &ciphertext,
-                                           &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    string plaintext;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
                                            &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&plaintext));
 
     EXPECT_EQ(message, plaintext);
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
@@ -2330,50 +2479,44 @@ TEST_P(EncryptionOperationsTest, AesGcmBadAad) {
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
                                            .Authorization(TAG_PADDING, KM_PAD_NONE)));
-    string aad = "foobar";
     string message = "12345678901234567890123456789012";
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
     begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     begin_params.push_back(TAG_MAC_LENGTH, 128);
-    AuthorizationSet begin_out_params;
 
     AuthorizationSet update_params;
-    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
-    AuthorizationSet update_out_params;
+    update_params.push_back(TAG_ASSOCIATED_DATA, "foobar", 6);
 
     AuthorizationSet finish_params;
     AuthorizationSet finish_out_params;
 
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
-
     // Encrypt
+    AuthorizationSet begin_out_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    AuthorizationSet update_out_params;
+    string ciphertext;
+    size_t input_consumed;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
                                            &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
 
-    // Grab nonce & tag.
+    // Grab nonce
     EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
-    EXPECT_NE(-1, finish_out_params.find(TAG_AEAD_TAG));
     begin_params.push_back(begin_out_params);
+
     update_params.Clear();
     update_params.push_back(TAG_ASSOCIATED_DATA, "barfoo" /* Wrong AAD */, 6);
-    update_params.push_back(finish_out_params);
 
     // Decrypt.
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
+    string plaintext;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
                                            &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&discard));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&plaintext));
 
-    EXPECT_EQ(message, plaintext);
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
@@ -2382,43 +2525,35 @@ TEST_P(EncryptionOperationsTest, AesGcmWrongNonce) {
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
                                            .Authorization(TAG_PADDING, KM_PAD_NONE)));
-    string aad = "foobar";
     string message = "12345678901234567890123456789012";
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
     begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     begin_params.push_back(TAG_MAC_LENGTH, 128);
-    AuthorizationSet begin_out_params;
 
     AuthorizationSet update_params;
-    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
-    AuthorizationSet update_out_params;
-
-    AuthorizationSet finish_params;
-    AuthorizationSet finish_out_params;
-
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
+    update_params.push_back(TAG_ASSOCIATED_DATA, "foobar", 6);
 
     // Encrypt
+    AuthorizationSet begin_out_params;
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    AuthorizationSet update_out_params;
+    string ciphertext;
+    size_t input_consumed;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
                                            &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
 
-    EXPECT_NE(-1, finish_out_params.find(TAG_AEAD_TAG));
-    update_params.push_back(finish_out_params);
     begin_params.push_back(TAG_NONCE, "123456789012", 12);
 
+    // Decrypt
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
+    string plaintext;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
                                            &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&discard));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&plaintext));
 
     // With wrong nonce, should have gotten garbage plaintext.
     EXPECT_NE(message, plaintext);
@@ -2440,89 +2575,33 @@ TEST_P(EncryptionOperationsTest, AesGcmCorruptTag) {
 
     AuthorizationSet update_params;
     update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
-    AuthorizationSet update_out_params;
-
-    AuthorizationSet finish_params;
-    AuthorizationSet finish_out_params;
-
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
 
     // Encrypt
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    AuthorizationSet update_out_params;
+    string ciphertext;
+    size_t input_consumed;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
                                            &input_consumed));
     EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
 
-    // Grab nonce & tag; corrupt tag.
+    // Corrupt tag
+    (*ciphertext.rbegin())++;
+
+    // Grab nonce.
     EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
     begin_params.push_back(begin_out_params);
-    keymaster_blob_t tag;
-    EXPECT_TRUE(finish_out_params.GetTagValue(TAG_AEAD_TAG, &tag));
-    const_cast<uint8_t*>(tag.data)[tag.data_length / 2]++;
-    update_params.push_back(TAG_AEAD_TAG, tag);
 
     // Decrypt.
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
+    string plaintext;
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, ciphertext, &update_out_params,
                                            &plaintext, &input_consumed));
     EXPECT_EQ(ciphertext.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&discard));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&plaintext));
 
     EXPECT_EQ(message, plaintext);
-    EXPECT_EQ(0, GetParam()->keymaster0_calls());
-}
-
-TEST_P(EncryptionOperationsTest, AesGcmShortTag) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .AesEncryptionKey(128)
-                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
-    string aad = "foobar";
-    string message = "123456789012345678901234567890123456";
-    AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
-    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
-    begin_params.push_back(TAG_MAC_LENGTH, 128);
-    AuthorizationSet begin_out_params;
-
-    AuthorizationSet update_params;
-    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
-    AuthorizationSet update_out_params;
-
-    AuthorizationSet finish_params;
-    AuthorizationSet finish_out_params;
-
-    string ciphertext;
-    string discard;
-    string plaintext;
-
-    size_t input_consumed;
-
-    // Encrypt
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
-                                           &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(finish_params, "", &finish_out_params, &discard));
-
-    EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
-    begin_params.push_back(begin_out_params);
-    keymaster_blob_t tag;
-    EXPECT_TRUE(finish_out_params.GetTagValue(TAG_AEAD_TAG, &tag));
-    tag.data_length = 11;
-    update_params.push_back(TAG_AEAD_TAG, tag);
-
-    // Decrypt.
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params, &begin_out_params));
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH,
-              UpdateOperation(update_params, ciphertext, &update_out_params, &plaintext,
-                              &input_consumed));
-
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
