@@ -50,30 +50,31 @@ class AndroidKeymaster {
     AndroidKeymaster(KeymasterContext* context, size_t operation_table_size);
     virtual ~AndroidKeymaster();
 
-    void SupportedAlgorithms(SupportedResponse<keymaster_algorithm_t>* response) const;
-    void SupportedBlockModes(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-                             SupportedResponse<keymaster_block_mode_t>* response) const;
-    void SupportedPaddingModes(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-                               SupportedResponse<keymaster_padding_t>* response) const;
-    void SupportedDigests(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
-                          SupportedResponse<keymaster_digest_t>* response) const;
-    void SupportedImportFormats(keymaster_algorithm_t algorithm,
-                                SupportedResponse<keymaster_key_format_t>* response) const;
-    void SupportedExportFormats(keymaster_algorithm_t algorithm,
-                                SupportedResponse<keymaster_key_format_t>* response) const;
+    void SupportedAlgorithms(const SupportedAlgorithmsRequest& request,
+                             SupportedAlgorithmsResponse* response);
+    void SupportedBlockModes(const SupportedBlockModesRequest& request,
+                             SupportedBlockModesResponse* response);
+    void SupportedPaddingModes(const SupportedPaddingModesRequest& request,
+                               SupportedPaddingModesResponse* response);
+    void SupportedDigests(const SupportedDigestsRequest& request,
+                          SupportedDigestsResponse* response);
+    void SupportedImportFormats(const SupportedImportFormatsRequest& request,
+                                SupportedImportFormatsResponse* response);
+    void SupportedExportFormats(const SupportedExportFormatsRequest& request,
+                                SupportedExportFormatsResponse* response);
 
-    keymaster_error_t AddRngEntropy(const AddEntropyRequest& request);
+    void AddRngEntropy(const AddEntropyRequest& request, AddEntropyResponse* response);
     void GenerateKey(const GenerateKeyRequest& request, GenerateKeyResponse* response);
     void GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                GetKeyCharacteristicsResponse* response);
     void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
     void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
-    keymaster_error_t DeleteKey(const DeleteKeyRequest& request);
-    keymaster_error_t DeleteAllKeys();
+    void DeleteKey(const DeleteKeyRequest& request, DeleteKeyResponse* response);
+    void DeleteAllKeys(const DeleteAllKeysRequest& request, DeleteAllKeysResponse* response);
     void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);
     void UpdateOperation(const UpdateOperationRequest& request, UpdateOperationResponse* response);
     void FinishOperation(const FinishOperationRequest& request, FinishOperationResponse* response);
-    keymaster_error_t AbortOperation(const keymaster_operation_handle_t op_handle);
+    void AbortOperation(const AbortOperationRequest& request, AbortOperationResponse* response);
     void GetVersion(const GetVersionRequest& request, GetVersionResponse* response);
 
   private:

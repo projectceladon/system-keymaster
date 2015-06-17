@@ -81,17 +81,25 @@ TEST(RoundTrip, EmptyKeymasterResponseError) {
     }
 }
 
-TEST(RoundTrip, SupportedAlgorithmsResponse) {
+TEST(RoundTrip, SupportedByAlgorithmRequest) {
     for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
-        SupportedAlgorithmsResponse rsp(ver);
-        keymaster_algorithm_t algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC};
-        rsp.error = KM_ERROR_OK;
-        rsp.algorithms = dup_array(algorithms);
-        rsp.algorithms_length = array_length(algorithms);
+        SupportedByAlgorithmRequest req(ver);
+        req.algorithm = KM_ALGORITHM_EC;
 
-        UniquePtr<SupportedAlgorithmsResponse> deserialized(round_trip(ver, rsp, 16));
-        EXPECT_EQ(array_length(algorithms), deserialized->algorithms_length);
-        EXPECT_EQ(0, memcmp(deserialized->algorithms, algorithms, array_size(algorithms)));
+        UniquePtr<SupportedByAlgorithmRequest> deserialized(round_trip(ver, req, 4));
+        EXPECT_EQ(KM_ALGORITHM_EC, deserialized->algorithm);
+    }
+}
+
+TEST(RoundTrip, SupportedByAlgorithmAndPurposeRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        SupportedByAlgorithmAndPurposeRequest req(ver);
+        req.algorithm = KM_ALGORITHM_EC;
+        req.purpose = KM_PURPOSE_DECRYPT;
+
+        UniquePtr<SupportedByAlgorithmAndPurposeRequest> deserialized(round_trip(ver, req, 8));
+        EXPECT_EQ(KM_ALGORITHM_EC, deserialized->algorithm);
+        EXPECT_EQ(KM_PURPOSE_DECRYPT, deserialized->purpose);
     }
 }
 
@@ -434,6 +442,27 @@ TEST(RoundTrip, DeleteKeyRequest) {
     }
 }
 
+TEST(RoundTrip, DeleteKeyResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        DeleteKeyResponse msg(ver);
+        UniquePtr<DeleteKeyResponse> deserialized(round_trip(ver, msg, 4));
+    }
+}
+
+TEST(RoundTrip, DeleteAllKeysRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        DeleteAllKeysRequest msg(ver);
+        UniquePtr<DeleteAllKeysRequest> deserialized(round_trip(ver, msg, 0));
+    }
+}
+
+TEST(RoundTrip, DeleteAllKeysResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        DeleteAllKeysResponse msg(ver);
+        UniquePtr<DeleteAllKeysResponse> deserialized(round_trip(ver, msg, 4));
+    }
+}
+
 TEST(RoundTrip, GetVersionRequest) {
     GetVersionRequest msg;
 
@@ -479,6 +508,27 @@ TEST(RoundTrip, AddEntropyRequest) {
         UniquePtr<AddEntropyRequest> deserialized(round_trip(ver, msg, 7));
         EXPECT_EQ(3U, deserialized->random_data.available_read());
         EXPECT_EQ(0, memcmp("foo", deserialized->random_data.peek_read(), 3));
+    }
+}
+
+TEST(RoundTrip, AddEntropyResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AddEntropyResponse msg(ver);
+        UniquePtr<AddEntropyResponse> deserialized(round_trip(ver, msg, 4));
+    }
+}
+
+TEST(RoundTrip, AbortOperationRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AbortOperationRequest msg(ver);
+        UniquePtr<AbortOperationRequest> deserialized(round_trip(ver, msg, 8));
+    }
+}
+
+TEST(RoundTrip, AbortOperationResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AbortOperationResponse msg(ver);
+        UniquePtr<AbortOperationResponse> deserialized(round_trip(ver, msg, 4));
     }
 }
 
@@ -530,23 +580,30 @@ template <typename Message> void parse_garbage() {
 #define GARBAGE_TEST(Message)                                                                      \
     TEST(GarbageTest, Message) { parse_garbage<Message>(); }
 
-GARBAGE_TEST(SupportedAlgorithmsResponse)
+GARBAGE_TEST(AbortOperationRequest);
+GARBAGE_TEST(AbortOperationResponse);
+GARBAGE_TEST(AddEntropyRequest);
+GARBAGE_TEST(AddEntropyResponse);
+GARBAGE_TEST(BeginOperationRequest);
+GARBAGE_TEST(BeginOperationResponse);
+GARBAGE_TEST(DeleteAllKeysRequest);
+GARBAGE_TEST(DeleteAllKeysResponse);
+GARBAGE_TEST(DeleteKeyRequest);
+GARBAGE_TEST(DeleteKeyResponse);
+GARBAGE_TEST(ExportKeyRequest);
+GARBAGE_TEST(ExportKeyResponse);
+GARBAGE_TEST(FinishOperationRequest);
+GARBAGE_TEST(FinishOperationResponse);
 GARBAGE_TEST(GenerateKeyRequest);
 GARBAGE_TEST(GenerateKeyResponse);
 GARBAGE_TEST(GetKeyCharacteristicsRequest);
 GARBAGE_TEST(GetKeyCharacteristicsResponse);
-GARBAGE_TEST(BeginOperationRequest);
-GARBAGE_TEST(BeginOperationResponse);
-GARBAGE_TEST(UpdateOperationRequest);
-GARBAGE_TEST(UpdateOperationResponse);
-GARBAGE_TEST(FinishOperationRequest);
-GARBAGE_TEST(FinishOperationResponse);
-GARBAGE_TEST(AddEntropyRequest);
 GARBAGE_TEST(ImportKeyRequest);
 GARBAGE_TEST(ImportKeyResponse);
-GARBAGE_TEST(ExportKeyRequest);
-GARBAGE_TEST(ExportKeyResponse);
-GARBAGE_TEST(DeleteKeyRequest);
+GARBAGE_TEST(SupportedByAlgorithmAndPurposeRequest)
+GARBAGE_TEST(SupportedByAlgorithmRequest)
+GARBAGE_TEST(UpdateOperationRequest);
+GARBAGE_TEST(UpdateOperationResponse);
 
 // The macro doesn't work on this one.
 TEST(GarbageTest, SupportedResponse) {

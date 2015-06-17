@@ -72,24 +72,6 @@ bool KeymasterResponse::Deserialize(const uint8_t** buf_ptr, const uint8_t* end)
     return NonErrorDeserialize(buf_ptr, end);
 }
 
-size_t SupportedAlgorithmsResponse::NonErrorSerializedSize() const {
-    return sizeof(uint32_t) + sizeof(uint32_t) * algorithms_length;
-}
-
-uint8_t* SupportedAlgorithmsResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    return append_uint32_array_to_buf(buf, end, algorithms, algorithms_length);
-}
-
-bool SupportedAlgorithmsResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    delete[] algorithms;
-    algorithms = NULL;
-    UniquePtr<keymaster_algorithm_t[]> deserialized_algorithms;
-    if (!copy_uint32_array_from_buf(buf_ptr, end, &deserialized_algorithms, &algorithms_length))
-        return false;
-    algorithms = deserialized_algorithms.release();
-    return true;
-}
-
 GenerateKeyResponse::~GenerateKeyResponse() {
     delete[] key_blob.key_material;
 }
