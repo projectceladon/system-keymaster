@@ -600,10 +600,9 @@ TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, EcdsaSuccess) {
@@ -632,8 +631,8 @@ TEST_P(SigningOperationsTest, AesEcbSign) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().AesEncryptionKey(128).Authorization(
                   TAG_BLOCK_MODE, KM_MODE_ECB)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_VERIFY));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1797,18 +1796,17 @@ TEST_P(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
     ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
 TEST_P(EncryptionOperationsTest, EcdsaEncrypt) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
@@ -1819,8 +1817,8 @@ TEST_P(EncryptionOperationsTest, HmacEncrypt) {
         KM_ERROR_OK,
         GenerateKey(
             AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE).Padding(KM_PAD_NONE)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }

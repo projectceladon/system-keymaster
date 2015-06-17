@@ -416,6 +416,9 @@ bool AesEvpOperation::InternalUpdate(const uint8_t* input, size_t input_length, 
     assert(output);
     assert(error);
 
+    if (!input_length)
+        return true;
+
     if (!output->reserve(input_length + AES_BLOCK_SIZE)) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return false;

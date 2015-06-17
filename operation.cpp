@@ -49,6 +49,41 @@ bool OperationFactory::supported(keymaster_digest_t digest) const {
     return false;
 }
 
+inline bool is_public_key_algorithm(keymaster_algorithm_t algorithm) {
+    switch (algorithm) {
+    case KM_ALGORITHM_HMAC:
+    case KM_ALGORITHM_AES:
+        return false;
+    case KM_ALGORITHM_RSA:
+    case KM_ALGORITHM_EC:
+        return true;
+    }
+
+    // Unreachable.
+    assert(false);
+    return false;
+}
+
+bool OperationFactory::is_public_key_operation() const {
+    KeyType key_type = registry_key();
+
+    if (!is_public_key_algorithm(key_type.algorithm))
+        return false;
+
+    switch (key_type.purpose) {
+    case KM_PURPOSE_VERIFY:
+    case KM_PURPOSE_ENCRYPT:
+        return true;
+    case KM_PURPOSE_SIGN:
+    case KM_PURPOSE_DECRYPT:
+        return false;
+    };
+
+    // Unreachable.
+    assert(false);
+    return false;
+}
+
 bool OperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_params, const Key& key,
                                              keymaster_padding_t* padding,
                                              keymaster_error_t* error) const {
@@ -60,6 +95,8 @@ bool OperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_param
         LOG_E("Padding mode %d not supported", *padding);
         return false;
     } else if (
+        // If it's a public key operation, all padding modes are authorized.
+        !is_public_key_operation() &&
         // If key contains KM_PAD_NONE, all padding modes are authorized.
         !key.authorizations().Contains(TAG_PADDING, KM_PAD_NONE) &&
         !key.authorizations().Contains(TAG_PADDING_OLD, KM_PAD_NONE) &&
@@ -86,6 +123,8 @@ bool OperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params
         LOG_E("Digest %d not supported", *digest);
         return false;
     } else if (
+        // If it's a public key operation, all digests are authorized.
+        !is_public_key_operation() &&
         // If key contains KM_DIGEST_NONE, all digests are authorized.
         !key.authorizations().Contains(TAG_DIGEST, KM_DIGEST_NONE) &&
         !key.authorizations().Contains(TAG_DIGEST_OLD, KM_DIGEST_NONE) &&
