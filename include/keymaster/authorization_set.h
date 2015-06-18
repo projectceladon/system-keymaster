@@ -309,7 +309,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      */
     bool reserve_indirect(size_t length);
 
-    bool push_back(const AuthorizationSet& set);
+    bool push_back(const keymaster_key_param_set_t& set);
 
     /**
      * Append the tag and enumerated value to the set.

@@ -60,6 +60,7 @@ LOCAL_SRC_FILES:= \
 		hmac_operation.cpp \
 		integrity_assured_key_blob.cpp \
 		key.cpp \
+		keymaster_enforcement.cpp \
 		ocb.c \
 		ocb_utils.cpp \
 		openssl_err.cpp \
@@ -119,7 +120,6 @@ LOCAL_SRC_FILES := \
 	hkdf_test.cpp \
 	hmac_test.cpp \
 	key_blob_test.cpp \
-	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include

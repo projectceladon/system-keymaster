@@ -14,51 +14,103 @@
  * limitations under the License.
  */
 
-#include <string.h>
-#include <time.h>
+#include <keymaster/keymaster_enforcement.h>
 
-#include "android_keymaster_test_utils.h"
-#include "keymaster_enforcement.h"
+#include <assert.h>
+#include <string.h>
+
+#include <limits>
+
+#include <openssl/evp.h>
+
+#include <hardware/hw_auth_token.h>
+#include <keymaster/android_keymaster_utils.h>
+#include <keymaster/logger.h>
+
+using android::List;
 
 namespace keymaster {
 
-KeymasterEnforcement::KeymasterEnforcement() {
-    last_auth_time = -1;
+bool is_public_key_algorithm(const AuthorizationSet& auth_set) {
+    keymaster_algorithm_t algorithm;
+    return auth_set.GetTagValue(TAG_ALGORITHM, &algorithm) &&
+           (algorithm == KM_ALGORITHM_RSA || algorithm == KM_ALGORITHM_EC);
 }
 
-KeymasterEnforcement::~KeymasterEnforcement() {
+static keymaster_error_t authorized_purpose(const keymaster_purpose_t purpose,
+                                            const AuthorizationSet& auth_set) {
+    switch (purpose) {
+    case KM_PURPOSE_VERIFY:
+    case KM_PURPOSE_ENCRYPT:
+        if (is_public_key_algorithm(auth_set) || auth_set.Contains(TAG_PURPOSE, purpose))
+            return KM_ERROR_OK;
+        return KM_ERROR_INCOMPATIBLE_PURPOSE;
+
+    case KM_PURPOSE_SIGN:
+    case KM_PURPOSE_DECRYPT:
+        if (auth_set.Contains(TAG_PURPOSE, purpose))
+            return KM_ERROR_OK;
+        return KM_ERROR_INCOMPATIBLE_PURPOSE;
+
+    default:
+        return KM_ERROR_UNSUPPORTED_PURPOSE;
+    }
+}
+
+inline bool is_origination_purpose(keymaster_purpose_t purpose) {
+    return purpose == KM_PURPOSE_ENCRYPT || purpose == KM_PURPOSE_SIGN;
+}
+
+inline bool is_usage_purpose(keymaster_purpose_t purpose) {
+    return purpose == KM_PURPOSE_DECRYPT || purpose == KM_PURPOSE_VERIFY;
+}
+
+inline bool can_skip_authentication(bool is_begin_operation, bool is_auth_per_op_key) {
+    // Durign begin with auth-per-op keys, we don't require authentication because it can't be
+    // performed until after begin returns the operation handle used to for the authentication
+    // challenge.
+    return is_begin_operation && is_auth_per_op_key;
 }
 
 keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpose_t purpose,
                                                            const km_id_t keyid,
                                                            const AuthorizationSet& auth_set,
-                                                           const uid_t uid) {
-    time_t current_time;
-    keymaster_error_t return_error;
-
-    /* Pairs of tags that are incompatible and should return an error. */
-    bool tag_all_users_present = false;
-    bool tag_user_id_present = false;
-
-    bool tag_user_auth_id_present = false;
-    bool tag_no_auth_required_present = false;
-
-    bool tag_all_applications_present = false;
-    bool tag_application_id_present = false;
-
-    return_error = KM_ERROR_OK;
-    current_time = get_current_time();
-
-    int auth_timeout_index = auth_set.find(KM_TAG_AUTH_TIMEOUT);
-    if (auth_timeout_index < 0) {
-        /* TODO: Require Authentication. Method TBD. */
+                                                           const AuthorizationSet& operation_params,
+                                                           keymaster_operation_handle_t op_handle,
+                                                           bool is_begin_operation) {
+    // Find some entries that may be needed to handle KM_TAG_USER_SECURE_ID
+    int auth_timeout_index = -1;
+    int auth_type_index = -1;
+    int no_auth_required_index = -1;
+    for (size_t pos = 0; pos < auth_set.size(); ++pos) {
+        switch (auth_set[pos].tag) {
+        case KM_TAG_AUTH_TIMEOUT:
+            auth_timeout_index = pos;
+            break;
+        case KM_TAG_USER_AUTH_TYPE:
+            auth_type_index = pos;
+            break;
+        case KM_TAG_NO_AUTH_REQUIRED:
+            no_auth_required_index = pos;
+            break;
+        default:
+            break;
+        }
     }
 
-    if ((return_error = valid_purpose(purpose, auth_set)) != KM_ERROR_OK)
-        return return_error;
+    keymaster_error_t error = authorized_purpose(purpose, auth_set);
+    if (error != KM_ERROR_OK)
+        return error;
 
-    for (unsigned int i = 0; i < auth_set.size(); i++) {
-        keymaster_key_param_t param = auth_set[i];
+    // If successful, and if key has a min time between ops, this will be set to the time limit
+    uint32_t min_ops_timeout = UINT32_MAX;
+
+    bool update_access_count = false;
+    bool found_caller_nonce = false;
+    bool authentication_required = false;
+    bool auth_token_matched = false;
+
+    for (auto& param : auth_set) {
 
         // KM_TAG_PADDING_OLD and KM_TAG_DIGEST_OLD aren't actually members of the enum, so we can't
         // switch on them.  There's nothing to validate for them, though, so just ignore them.
@@ -66,58 +118,58 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
             continue;
 
         switch (param.tag) {
+
         case KM_TAG_ACTIVE_DATETIME:
-            return_error = Active(param, current_time);
-            break;
-        case KM_TAG_ORIGINATION_EXPIRE_DATETIME:
-            return_error = OriginationNotExpired(param, current_time, purpose);
-            break;
-        case KM_TAG_USAGE_EXPIRE_DATETIME:
-            return_error = UsageNotExpired(param, current_time, purpose);
-            break;
-        case KM_TAG_MIN_SECONDS_BETWEEN_OPS:
-            return_error = MinTimeBetweenOpsPassed(param, keyid, current_time);
-            break;
-        case KM_TAG_MAX_USES_PER_BOOT:
-            return_error = NotUsedSinceBoot(keyid);
-            break;
-        case KM_TAG_ALL_USERS:
-            tag_all_users_present = true;
-            return_error = KM_ERROR_OK;
-            break;
-        case KM_TAG_USER_ID:
-            tag_user_id_present = true;
-            return_error = UserAuthenticated(param, uid);
-            break;
-        case KM_TAG_USER_SECURE_ID:
-            // TODO(swillden): Handle this.
-            break;
-        case KM_TAG_AUTH_TOKEN:
-            // TODO(swillden): Handle this.
-            break;
-        case KM_TAG_NO_AUTH_REQUIRED:
-            return_error = KM_ERROR_OK;
-            tag_no_auth_required_present = true;
-            break;
-        case KM_TAG_USER_AUTH_TYPE:
-            tag_user_auth_id_present = true;
-            return_error = KM_ERROR_OK;
-            break;
-        case KM_TAG_AUTH_TIMEOUT:
-            return_error = AuthenticationIsFresh(param, current_time);
-            break;
-        case KM_TAG_ALL_APPLICATIONS:
-            tag_all_applications_present = true;
-            break;
-        case KM_TAG_APPLICATION_ID:
-            tag_application_id_present = true;
-            break;
-        case KM_TAG_CALLER_NONCE:
-            // TODO(swillden): Handle this tag.  For now it's ignored.
+            if (!activation_date_valid(param.date_time))
+                return KM_ERROR_KEY_NOT_YET_VALID;
             break;
 
-        /* Invalid tag is not used for access control. */
+        case KM_TAG_ORIGINATION_EXPIRE_DATETIME:
+            if (is_origination_purpose(purpose) && expiration_date_passed(param.date_time))
+                return KM_ERROR_KEY_EXPIRED;
+            break;
+
+        case KM_TAG_USAGE_EXPIRE_DATETIME:
+            if (is_usage_purpose(purpose) && expiration_date_passed(param.date_time))
+                return KM_ERROR_KEY_EXPIRED;
+            break;
+
+        case KM_TAG_MIN_SECONDS_BETWEEN_OPS:
+            min_ops_timeout = param.integer;
+            if (!MinTimeBetweenOpsPassed(min_ops_timeout, keyid))
+                return KM_ERROR_KEY_RATE_LIMIT_EXCEEDED;
+            break;
+
+        case KM_TAG_MAX_USES_PER_BOOT:
+            update_access_count = true;
+            if (!MaxUsesPerBootNotExceeded(keyid, param.integer))
+                return KM_ERROR_KEY_MAX_OPS_EXCEEDED;
+            break;
+
+        case KM_TAG_USER_SECURE_ID:
+            if (no_auth_required_index != -1) {
+                // Key has both KM_TAG_USER_SECURE_ID and KM_TAG_NO_AUTH_REQUIRED
+                return KM_ERROR_INVALID_KEY_BLOB;
+            } else if (!can_skip_authentication(is_begin_operation, auth_timeout_index == -1) ||
+                       operation_params.find(KM_TAG_AUTH_TOKEN) != -1) {
+                authentication_required = true;
+                if (AuthTokenMatches(auth_set, operation_params, param.long_integer,
+                                     auth_type_index, auth_timeout_index, op_handle,
+                                     is_begin_operation))
+                    auth_token_matched = true;
+            }
+            break;
+
+        case KM_TAG_CALLER_NONCE:
+            found_caller_nonce = true;
+            break;
+
+        /* Tags should never be in key auths. */
         case KM_TAG_INVALID:
+        case KM_TAG_AUTH_TOKEN:
+        case KM_TAG_ROOT_OF_TRUST:
+        case KM_TAG_APPLICATION_DATA:
+            return KM_ERROR_INVALID_KEY_BLOB;
 
         /* Tags used for cryptographic parameters. */
         case KM_TAG_PURPOSE:
@@ -136,234 +188,237 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         case KM_TAG_RSA_PUBLIC_EXPONENT:
 
         /* Informational tags. */
-        case KM_TAG_APPLICATION_DATA:
         case KM_TAG_CREATION_DATETIME:
         case KM_TAG_ORIGIN:
         case KM_TAG_ROLLBACK_RESISTANT:
-        case KM_TAG_ROOT_OF_TRUST:
+
+        /* Tags handled when KM_TAG_USER_SECURE_ID is handled */
+        case KM_TAG_NO_AUTH_REQUIRED:
+        case KM_TAG_USER_AUTH_TYPE:
+        case KM_TAG_AUTH_TIMEOUT:
 
         /* Tag to provide data to operations. */
         case KM_TAG_ASSOCIATED_DATA:
-            return_error = KM_ERROR_OK;
+
+        /* Ignored pending removal */
+        case KM_TAG_ALL_APPLICATIONS:
+        case KM_TAG_APPLICATION_ID:
+        case KM_TAG_USER_ID:
+        case KM_TAG_ALL_USERS:
             break;
-        default:
-            // TODO(swillden): remove this default case.
-            return_error = KM_ERROR_UNIMPLEMENTED;
-            break;
-        }
 
-        if (return_error != KM_ERROR_OK) {
-            return return_error;
+        case KM_TAG_BOOTLOADER_ONLY:
+            return KM_ERROR_INVALID_KEY_BLOB;
         }
     }
 
-    if ((tag_all_users_present && tag_user_id_present) ||
-        (tag_user_auth_id_present && tag_no_auth_required_present) ||
-        (tag_all_applications_present && tag_application_id_present)) {
-        return_error = KM_ERROR_INVALID_TAG;
-    }
-
-    if (return_error == KM_ERROR_OK) {
-        update_key_access_time(keyid);
-    }
-
-    return return_error;
-}
-
-keymaster_error_t KeymasterEnforcement::Active(const keymaster_key_param_t param,
-                                               const time_t current_time) {
-    time_t activation_time = param.date_time;
-    if (difftime(current_time, activation_time) < 0) {
-        return KM_ERROR_KEY_NOT_YET_VALID;
-    }
-
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t KeymasterEnforcement::is_time_expired(const keymaster_key_param_t param,
-                                                        const time_t current_time) {
-    time_t expire_time = param.date_time;
-    if (difftime(current_time, expire_time) > 0) {
-        return KM_ERROR_KEY_EXPIRED;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t KeymasterEnforcement::UsageNotExpired(const keymaster_key_param_t param,
-                                                        const time_t current_time,
-                                                        const keymaster_purpose_t purpose) {
-    switch (purpose) {
-    case KM_PURPOSE_VERIFY:
-    case KM_PURPOSE_DECRYPT:
-        break;
-    case KM_PURPOSE_SIGN:
-    case KM_PURPOSE_ENCRYPT:
-        return KM_ERROR_OK;
-    }
-
-    return is_time_expired(param, current_time);
-}
-
-keymaster_error_t KeymasterEnforcement::OriginationNotExpired(const keymaster_key_param_t param,
-                                                              const time_t current_time,
-                                                              const keymaster_purpose_t purpose) {
-    switch (purpose) {
-    case KM_PURPOSE_SIGN:
-    case KM_PURPOSE_ENCRYPT:
-        break;
-    case KM_PURPOSE_DECRYPT:
-    case KM_PURPOSE_VERIFY:
-        return KM_ERROR_OK;
-    }
-    return is_time_expired(param, current_time);
-}
-
-keymaster_error_t KeymasterEnforcement::MinTimeBetweenOpsPassed(const keymaster_key_param_t param,
-                                                                const km_id_t keyid,
-                                                                const time_t current_time) {
-    uint32_t min_time_between = param.integer;
-
-    if (difftime(current_time, get_last_access_time(keyid)) < min_time_between) {
-        return KM_ERROR_TOO_MANY_OPERATIONS;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t KeymasterEnforcement::NotUsedSinceBoot(const km_id_t keyid) {
-    if (get_last_access_time(keyid) > -1) {
-        return KM_ERROR_TOO_MANY_OPERATIONS;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t KeymasterEnforcement::UserAuthenticated(const keymaster_key_param_t param,
-                                                          const uid_t uid) {
-    uint32_t valid_user_id = param.integer;
-    uint32_t user_id_to_test = get_user_id_from_uid(uid);
-
-    if (valid_user_id == user_id_to_test) {
-        return KM_ERROR_OK;
-    } else {
-        return KM_ERROR_INVALID_USER_ID;
-    }
-}
-
-keymaster_error_t KeymasterEnforcement::AuthenticationIsFresh(const keymaster_key_param_t param,
-                                                              const time_t current_time) const {
-    time_t last_auth_time = get_last_auth_time();
-    time_t required_time = param.integer;
-    if (difftime(current_time, last_auth_time) > required_time) {
-        return KM_ERROR_OK;
-    } else {
+    if (authentication_required && !auth_token_matched) {
+        LOG_E("Auth required but no matching auth token found", 0);
         return KM_ERROR_KEY_USER_NOT_AUTHENTICATED;
     }
-}
 
-void KeymasterEnforcement::update_key_access_time(const km_id_t keyid) {
-    accessTimeMap.update_key_access_time(keyid, get_current_time());
-}
+    if (!found_caller_nonce && operation_params.find(KM_TAG_NONCE) != -1)
+        return KM_ERROR_CALLER_NONCE_PROHIBITED;
 
-time_t KeymasterEnforcement::get_current_time() const {
-    return time(NULL);
-}
-
-time_t KeymasterEnforcement::get_last_access_time(km_id_t keyid) {
-    return accessTimeMap.last_key_access_time(keyid);
-}
-
-uint32_t KeymasterEnforcement::get_user_id_from_uid(uid_t uid) {
-    uint32_t userId = uid / MULTIUSER_APP_PER_USER_RANGE;
-    return userId;
-}
-
-time_t KeymasterEnforcement::get_last_auth_time() const {
-    return last_auth_time;
-}
-
-void KeymasterEnforcement::UpdateUserAuthenticationTime() {
-    last_auth_time = get_current_time();
-}
-
-bool KeymasterEnforcement::supported_purpose(const keymaster_purpose_t purpose) {
-    switch (purpose) {
-    case KM_PURPOSE_ENCRYPT:
-    case KM_PURPOSE_DECRYPT:
-    case KM_PURPOSE_SIGN:
-    case KM_PURPOSE_VERIFY:
-        return true;
-        break;
+    if (min_ops_timeout != UINT32_MAX &&
+        !access_time_map_.UpdateKeyAccessTime(keyid, get_current_time(), min_ops_timeout)) {
+        LOG_E("Rate-limited keys table full.  Entries will time out.", 0);
+        return KM_ERROR_TOO_MANY_OPERATIONS;
     }
+
+    if (update_access_count && !access_count_map_.IncrementKeyAccessCount(keyid)) {
+        LOG_E("Usage count-limited keys table full, until reboot.", 0);
+        return KM_ERROR_TOO_MANY_OPERATIONS;
+    }
+
+    return KM_ERROR_OK;
+}
+
+class EvpMdCtx {
+  public:
+    EvpMdCtx() { EVP_MD_CTX_init(&ctx_); }
+    ~EvpMdCtx() { EVP_MD_CTX_cleanup(&ctx_); }
+
+    EVP_MD_CTX* get() { return &ctx_; }
+
+  private:
+    EVP_MD_CTX ctx_;
+};
+
+/* static */
+bool KeymasterEnforcement::CreateKeyId(const keymaster_key_blob_t& key_blob, km_id_t* keyid) {
+    EvpMdCtx ctx;
+
+    uint8_t hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    if (EVP_DigestInit_ex(ctx.get(), EVP_sha256(), nullptr /* ENGINE */) &&
+        EVP_DigestUpdate(ctx.get(), key_blob.key_material, key_blob.key_material_size) &&
+        EVP_DigestFinal_ex(ctx.get(), hash, &hash_len)) {
+        assert(hash_len >= sizeof(*keyid));
+        memcpy(keyid, hash, sizeof(*keyid));
+        return true;
+    }
+
     return false;
 }
 
-bool KeymasterEnforcement::supported_purposes(const AuthorizationSet& auth_set) {
-    int purpose_index;
-    keymaster_purpose_t test_purpose;
+bool KeymasterEnforcement::MinTimeBetweenOpsPassed(uint32_t min_time_between, const km_id_t keyid) {
+    uint32_t last_access_time;
+    if (!access_time_map_.LastKeyAccessTime(keyid, &last_access_time))
+        return true;
+    return min_time_between <= static_cast<int64_t>(get_current_time()) - last_access_time;
+}
 
-    purpose_index = auth_set.find(KM_TAG_PURPOSE);
-    for (; purpose_index >= 0; purpose_index = auth_set.find(KM_TAG_PURPOSE, purpose_index)) {
-        test_purpose = static_cast<keymaster_purpose_t>(auth_set[purpose_index].enumerated);
-        if (!supported_purpose(test_purpose)) {
+bool KeymasterEnforcement::MaxUsesPerBootNotExceeded(const km_id_t keyid, uint32_t max_uses) {
+    uint32_t key_access_count;
+    if (!access_count_map_.KeyAccessCount(keyid, &key_access_count))
+        return true;
+    return key_access_count < max_uses;
+}
+
+bool KeymasterEnforcement::AuthTokenMatches(const AuthorizationSet& auth_set,
+                                            const AuthorizationSet& operation_params,
+                                            const uint64_t user_secure_id,
+                                            const int auth_type_index, const int auth_timeout_index,
+                                            const keymaster_operation_handle_t op_handle,
+                                            bool is_begin_operation) const {
+    assert(auth_type_index < static_cast<int>(auth_set.size()));
+    assert(auth_timeout_index < static_cast<int>(auth_set.size()));
+
+    keymaster_blob_t auth_token_blob;
+    if (!operation_params.GetTagValue(TAG_AUTH_TOKEN, &auth_token_blob)) {
+        LOG_E("Authentication required, but auth token not provided", 0);
+        return false;
+    }
+
+    if (auth_token_blob.data_length != sizeof(hw_auth_token_t)) {
+        LOG_E("Bug: Auth token is the wrong size (%d expected, %d found)", sizeof(hw_auth_token_t),
+              auth_token_blob.data_length);
+        return false;
+    }
+
+    hw_auth_token_t auth_token;
+    memcpy(&auth_token, auth_token_blob.data, sizeof(hw_auth_token_t));
+    if (auth_token.version != HW_AUTH_TOKEN_VERSION) {
+        LOG_E("Bug: Auth token is the version %d (or is not an auth token). Expected %d",
+              auth_token.version, HW_AUTH_TOKEN_VERSION);
+        return false;
+    }
+
+    if (!ValidateTokenSignature(auth_token)) {
+        LOG_E("Auth token signature invalid", 0);
+        return false;
+    }
+
+    if (auth_timeout_index == -1 && op_handle && op_handle != auth_token.challenge) {
+        LOG_E("Auth token has the challenge %llu, need %llu", auth_token.challenge, op_handle);
+        return false;
+    }
+
+    if (user_secure_id != auth_token.user_id && user_secure_id != auth_token.authenticator_id) {
+        LOG_I("Auth token SIDs %llu and %llu do not match key SID %llu", auth_token.user_id,
+              auth_token.authenticator_id, user_secure_id);
+        return false;
+    }
+
+    if (auth_type_index < 0 || auth_type_index > static_cast<int>(auth_set.size())) {
+        LOG_E("Auth required but no auth type found", 0);
+        return false;
+    }
+
+    assert(auth_set[auth_type_index].tag == KM_TAG_USER_AUTH_TYPE);
+    if (auth_set[auth_type_index].tag != KM_TAG_USER_AUTH_TYPE)
+        return false;
+
+    uint32_t key_auth_type_mask = auth_set[auth_type_index].integer;
+    uint32_t token_auth_type = ntoh(auth_token.authenticator_type);
+    if ((key_auth_type_mask & token_auth_type) == 0) {
+        LOG_E("Key requires match of auth type mask 0%uo, but token contained 0%uo",
+              key_auth_type_mask, token_auth_type);
+        return false;
+    }
+
+    if (auth_timeout_index != -1 && is_begin_operation) {
+        assert(auth_set[auth_timeout_index].tag == KM_TAG_AUTH_TIMEOUT);
+        if (auth_set[auth_timeout_index].tag != KM_TAG_AUTH_TIMEOUT)
+            return false;
+
+        if (auth_token_timed_out(auth_token, auth_set[auth_timeout_index].integer)) {
+            LOG_E("Auth token has timed out", 0);
             return false;
         }
     }
 
+    // Survived the whole gauntlet.  We have authentage!
     return true;
 }
 
-keymaster_error_t KeymasterEnforcement::valid_purpose(const keymaster_purpose_t purpose,
-                                                      const AuthorizationSet& auth_set) {
-    if (!supported_purpose(purpose) || !supported_purposes(auth_set)) {
-        return KM_ERROR_UNSUPPORTED_PURPOSE;
-    }
-
-    keymaster_purpose_t test_purpose;
-    for (int purpose_index = auth_set.find(KM_TAG_PURPOSE); purpose_index >= 0;
-         purpose_index = auth_set.find(KM_TAG_PURPOSE, purpose_index)) {
-        test_purpose = static_cast<keymaster_purpose_t>(auth_set[purpose_index].enumerated);
-        if (test_purpose == purpose) {
-            return KM_ERROR_OK;
+bool KeymasterEnforcement::AccessTimeMap::LastKeyAccessTime(km_id_t keyid,
+                                                            uint32_t* last_access_time) const {
+    for (auto& entry : last_access_list_)
+        if (entry.keyid == keyid) {
+            *last_access_time = entry.access_time;
+            return true;
         }
+    return false;
+}
+
+bool KeymasterEnforcement::AccessTimeMap::UpdateKeyAccessTime(km_id_t keyid, uint32_t current_time,
+                                                              uint32_t timeout) {
+    List<AccessTime>::iterator iter;
+    for (iter = last_access_list_.begin(); iter != last_access_list_.end();) {
+        if (iter->keyid == keyid) {
+            iter->access_time = current_time;
+            return true;
+        }
+
+        // Expire entry if possible.
+        assert(current_time >= iter->access_time);
+        if (current_time - iter->access_time >= iter->timeout)
+            iter = last_access_list_.erase(iter);
+        else
+            ++iter;
     }
 
-    return KM_ERROR_INCOMPATIBLE_PURPOSE;
+    if (last_access_list_.size() >= max_size_)
+        return false;
+
+    AccessTime new_entry;
+    new_entry.keyid = keyid;
+    new_entry.access_time = current_time;
+    new_entry.timeout = timeout;
+    last_access_list_.push_front(new_entry);
+    return true;
 }
 
-KeymasterEnforcement::AccessTimeMap::AccessTimeMap() {
+bool KeymasterEnforcement::AccessCountMap::KeyAccessCount(km_id_t keyid, uint32_t* count) const {
+    for (auto& entry : access_count_list_)
+        if (entry.keyid == keyid) {
+            *count = entry.access_count;
+            return true;
+        }
+    return false;
 }
 
-List<access_time_struct>::iterator KeymasterEnforcement::AccessTimeMap::find(uint32_t key_index) {
-    List<access_time_struct>::iterator posn;
-
-    posn = last_access_list.begin();
-    for (; (*posn).keyid != key_index && posn != last_access_list.end(); posn++) {
-    }
-    return posn;
+template <typename T> T max_value(T) {
+    return std::numeric_limits<T>::max();
 }
 
-void KeymasterEnforcement::AccessTimeMap::update_key_access_time(uint32_t key_index,
-                                                                 time_t current_time) {
-    List<access_time_struct>::iterator posn;
+bool KeymasterEnforcement::AccessCountMap::IncrementKeyAccessCount(km_id_t keyid) {
+    for (auto& entry : access_count_list_)
+        if (entry.keyid == keyid) {
+            if (entry.access_count < max_value(entry.access_count))
+                ++entry.access_count;
+            return true;
+        }
 
-    posn = find(key_index);
-    if (posn != last_access_list.end()) {
-        (*posn).access_time = current_time;
-    } else {
-        access_time_struct ac;
-        ac.keyid = key_index;
-        ac.access_time = current_time;
-        last_access_list.push_front(ac);
-    }
+    if (access_count_list_.size() >= max_size_)
+        return false;
+
+    AccessCount new_entry;
+    new_entry.keyid = keyid;
+    new_entry.access_count = 1;
+    access_count_list_.push_front(new_entry);
+    return true;
 }
-
-time_t KeymasterEnforcement::AccessTimeMap::last_key_access_time(uint32_t key_index) {
-    List<access_time_struct>::iterator posn;
-
-    posn = find(key_index);
-    if (posn != last_access_list.end()) {
-        return (*posn).access_time;
-    }
-    return -1;
-}
-
 }; /* namespace keymaster */
