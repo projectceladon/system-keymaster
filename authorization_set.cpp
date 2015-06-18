@@ -197,18 +197,18 @@ keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     return empty;
 }
 
-bool AuthorizationSet::push_back(const AuthorizationSet& set) {
+bool AuthorizationSet::push_back(const keymaster_key_param_set_t& set) {
     if (is_valid() != OK)
         return false;
 
-    if (!reserve_elems(elems_size_ + set.elems_size_))
+    if (!reserve_elems(elems_size_ + set.length))
         return false;
 
-    if (!reserve_indirect(indirect_data_size_ + set.indirect_data_size_))
+    if (!reserve_indirect(indirect_data_size_ + ComputeIndirectDataSize(set.params, set.length)))
         return false;
 
-    for (size_t i = 0; i < set.size(); ++i)
-        if (!push_back(set[i]))
+    for (size_t i = 0; i < set.length; ++i)
+        if (!push_back(set.params[i]))
             return false;
 
     return true;
