@@ -14,18 +14,60 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
-
 #include <errno.h>
-#include <keymaster/authorization_set.h>
-#include <keymaster/android_keymaster.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "keymaster_enforcement.h"
+#include <keymaster/android_keymaster.h>
+#include <keymaster/authorization_set.h>
+#include <keymaster/keymaster_enforcement.h>
+
+#include "android_keymaster_test_utils.h"
 
 namespace keymaster {
 namespace test {
+
+class TestKeymasterEnforcement : public KeymasterEnforcement {
+  public:
+    TestKeymasterEnforcement()
+        : KeymasterEnforcement(3, 3), current_time_(10000), report_token_valid_(true) {}
+
+    keymaster_error_t AuthorizeOperation(const keymaster_purpose_t purpose, const km_id_t keyid,
+                                         const AuthorizationSet& auth_set) {
+        AuthorizationSet empty_set;
+        return KeymasterEnforcement::AuthorizeOperation(
+            purpose, keyid, auth_set, empty_set, 0 /* op_handle */, false /* is_begin_operation */);
+    }
+    using KeymasterEnforcement::AuthorizeOperation;
+
+    uint32_t get_current_time() const override { return current_time_; }
+    bool activation_date_valid(uint64_t activation_date) const override {
+        // Convert java date to time_t, non-portably.
+        time_t activation_time = activation_date / 1000;
+        return difftime(time(NULL), activation_time) >= 0;
+    }
+    bool expiration_date_passed(uint64_t expiration_date) const override {
+        // Convert jave date to time_t, non-portably.
+        time_t expiration_time = expiration_date / 1000;
+        return difftime(time(NULL), expiration_time) > 0;
+    }
+    bool auth_token_timed_out(const hw_auth_token_t& token, uint32_t timeout) const {
+        return current_time_ > ntoh(token.timestamp) + timeout;
+    }
+    bool ValidateTokenSignature(const hw_auth_token_t&) const override {
+        return report_token_valid_;
+    }
+
+    void tick(unsigned seconds = 1) { current_time_ += seconds; }
+    uint32_t current_time() { return current_time_; }
+    void set_report_token_valid(bool report_token_valid) {
+        report_token_valid_ = report_token_valid;
+    }
+
+  private:
+    uint32_t current_time_;
+    bool report_token_valid_;
+};
 
 class KeymasterBaseTest : public ::testing::Test {
   protected:
@@ -35,331 +77,685 @@ class KeymasterBaseTest : public ::testing::Test {
         time_t t = time(NULL);
         future_tm = localtime(&t);
         future_tm->tm_year += 1;
-        future_time = mktime(future_tm);
+        future_time = static_cast<uint64_t>(mktime(future_tm)) * 1000;
         sign_param = Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN);
     }
     virtual ~KeymasterBaseTest() {}
 
+    TestKeymasterEnforcement kmen;
+
     tm past_tm;
     tm* future_tm;
-    time_t past_time;
-    time_t future_time;
+    uint64_t past_time;
+    uint64_t future_time;
     static const km_id_t key_id = 0xa;
     static const uid_t uid = 0xf;
     keymaster_key_param_t sign_param;
-    keymaster_blob_t def_app_id;
-    size_t def_app_id_size;
-
-    static const uint32_t valid_user_id = 25;
-    static const uint32_t invalid_user_id1 = 37;
-    static const uint32_t invalid_user_id2 = 50;
-    static const uint32_t appId1 = 51;
-    static const uint32_t appId2 = 52;
-
-    static const uint32_t validuid1 =
-        valid_user_id * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId1 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
-    static const uint32_t validuid2 =
-        valid_user_id * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId1 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
-
-    static const uint32_t invaliduid1 =
-        invalid_user_id1 * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId1 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
-    static const uint32_t invaliduid2 =
-        invalid_user_id1 * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId2 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
-    static const uint32_t invaliduid3 =
-        invalid_user_id2 * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId1 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
-    static const uint32_t invaliduid4 =
-        invalid_user_id2 * KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE +
-        (appId2 % KeymasterEnforcement::MULTIUSER_APP_PER_USER_RANGE);
 };
 
-TEST_F(KeymasterBaseTest, TEST_VALID_KEY_PERIOD_NO_TAGS) {
+TEST_F(KeymasterBaseTest, TestValidKeyPeriodNoTags) {
     keymaster_key_param_t params[] = {
         sign_param,
     };
-    AuthorizationSet single_auth_set(params, 1);
-    KeymasterEnforcement kmen;
+    AuthorizationSet single_auth_set(params, array_length(params));
 
-    keymaster_error_t kmer = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, single_auth_set, uid);
+    keymaster_error_t kmer = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, single_auth_set);
     ASSERT_EQ(KM_ERROR_OK, kmer);
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_ACTIVE_TIME) {
+TEST_F(KeymasterBaseTest, TestInvalidActiveTime) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_NO_AUTH_REQUIRED), Authorization(TAG_ACTIVE_DATETIME, future_time),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_NO_AUTH_REQUIRED),
+        Authorization(TAG_ACTIVE_DATETIME, future_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+    AuthorizationSet auth_set(params, array_length(params));
 
     keymaster_error_t kmer_invalid_time =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
     ASSERT_EQ(KM_ERROR_KEY_NOT_YET_VALID, kmer_invalid_time);
 }
 
-TEST_F(KeymasterBaseTest, TEST_VALID_ACTIVE_TIME) {
+TEST_F(KeymasterBaseTest, TestValidActiveTime) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ACTIVE_DATETIME, past_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 3);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t kmer_valid_time =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+    keymaster_error_t kmer_valid_time = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
     ASSERT_EQ(KM_ERROR_OK, kmer_valid_time);
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_ORIGINATION_EXPIRE_TIME) {
+TEST_F(KeymasterBaseTest, TestInvalidOriginationExpireTime) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
         Authorization(TAG_ORIGINATION_EXPIRE_DATETIME, past_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+    AuthorizationSet auth_set(params, array_length(params));
 
     keymaster_error_t kmer_invalid_origination =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
     ASSERT_EQ(KM_ERROR_KEY_EXPIRED, kmer_invalid_origination);
 }
 
-TEST_F(KeymasterBaseTest, TEST_VALID_ORIGINATION_EXPIRE_TIME) {
+TEST_F(KeymasterBaseTest, TestInvalidOriginationExpireTimeOnUsgae) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
+        Authorization(TAG_ORIGINATION_EXPIRE_DATETIME, past_time),
+    };
+
+    AuthorizationSet auth_set(params, array_length(params));
+
+    keymaster_error_t kmer_invalid_origination =
+        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set);
+    ASSERT_EQ(KM_ERROR_OK, kmer_invalid_origination);
+}
+
+TEST_F(KeymasterBaseTest, TestValidOriginationExpireTime) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
         Authorization(TAG_ORIGINATION_EXPIRE_DATETIME, future_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+    AuthorizationSet auth_set(params, array_length(params));
 
     keymaster_error_t kmer_valid_origination =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
     ASSERT_EQ(KM_ERROR_OK, kmer_valid_origination);
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_USAGE_EXPIRE_TIME) {
+TEST_F(KeymasterBaseTest, TestInvalidUsageExpireTime) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
+        Authorization(TAG_USAGE_EXPIRE_DATETIME, past_time),
+    };
+
+    AuthorizationSet auth_set(params, array_length(params));
+
+    keymaster_error_t kmer_invalid_origination =
+        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set);
+    ASSERT_EQ(KM_ERROR_KEY_EXPIRED, kmer_invalid_origination);
+}
+
+TEST_F(KeymasterBaseTest, TestInvalidUsageExpireTimeOnOrigination) {
+    keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
         Authorization(TAG_USAGE_EXPIRE_DATETIME, past_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 5);
+    AuthorizationSet auth_set(params, array_length(params));
 
     keymaster_error_t kmer_invalid_origination =
-        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set, uid);
-    ASSERT_EQ(KM_ERROR_KEY_EXPIRED, kmer_invalid_origination);
+        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
+    ASSERT_EQ(KM_ERROR_OK, kmer_invalid_origination);
 }
 
-TEST_F(KeymasterBaseTest, TEST_VALID_USAGE_EXPIRE_TIME) {
+TEST_F(KeymasterBaseTest, TestValidUsageExpireTime) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
         Authorization(TAG_USAGE_EXPIRE_DATETIME, future_time),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+    AuthorizationSet auth_set(params, array_length(params));
 
     keymaster_error_t kmer_valid_usage =
-        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set, uid);
+        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set);
     ASSERT_EQ(KM_ERROR_OK, kmer_valid_usage);
 }
 
-TEST_F(KeymasterBaseTest, TEST_VALID_SINGLE_USE_ACCESSES) {
+TEST_F(KeymasterBaseTest, TestValidSingleUseAccesses) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 3);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
+    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
 
     ASSERT_EQ(KM_ERROR_OK, kmer1);
     ASSERT_EQ(KM_ERROR_OK, kmer2);
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_SINGLE_USE_ACCESSES) {
+TEST_F(KeymasterBaseTest, TestInvalidMaxOps) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time), Authorization(TAG_MAX_USES_PER_BOOT, 1),
+        Authorization(TAG_MAX_USES_PER_BOOT, 4),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-
-    ASSERT_EQ(KM_ERROR_OK, kmer1);
-    ASSERT_EQ(KM_ERROR_TOO_MANY_OPERATIONS, kmer2);
+    ASSERT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    ASSERT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    ASSERT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    ASSERT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    ASSERT_EQ(KM_ERROR_KEY_MAX_OPS_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_TIME_BETWEEN_OPS) {
+TEST_F(KeymasterBaseTest, TestOverFlowMaxOpsTable) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_ALL_USERS), Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
-        Authorization(TAG_MIN_SECONDS_BETWEEN_OPS, 10),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_MAX_USES_PER_BOOT, 2),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 5);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 1 /* key_id */, auth_set));
 
-    ASSERT_EQ(KM_ERROR_OK, kmer1);
-    sleep(2);
-    ASSERT_EQ(KM_ERROR_TOO_MANY_OPERATIONS, kmer2);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 2 /* key_id */, auth_set));
+
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 3 /* key_id */, auth_set));
+
+    // Key 4 should fail, because table is full.
+    EXPECT_EQ(KM_ERROR_TOO_MANY_OPERATIONS,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 4 /* key_id */, auth_set));
+
+    // Key 1 still works, because it's already in the table and hasn't reached max.
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 1 /* key_id */, auth_set));
+
+    // Key 1 no longer works, because it's reached max.
+    EXPECT_EQ(KM_ERROR_KEY_MAX_OPS_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 1 /* key_id */, auth_set));
+
+    // Key 4 should fail, because table is (still and forever) full.
+    EXPECT_EQ(KM_ERROR_TOO_MANY_OPERATIONS,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, 4 /* key_id */, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_VALID_TIME_BETWEEN_OPS) {
+TEST_F(KeymasterBaseTest, TestInvalidTimeBetweenOps) {
+    keymaster_key_param_t params[] = {
+        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_MIN_SECONDS_BETWEEN_OPS, 10),
+    };
+
+    AuthorizationSet auth_set(params, array_length(params));
+
+    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
+    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set);
+
+    ASSERT_EQ(KM_ERROR_OK, kmer1);
+    kmen.tick(2);
+    ASSERT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED, kmer2);
+}
+
+TEST_F(KeymasterBaseTest, TestValidTimeBetweenOps) {
     keymaster_key_param_t params[] = {
         Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_USAGE_EXPIRE_DATETIME, future_time),
-        Authorization(TAG_ORIGINATION_EXPIRE_DATETIME, future_time),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
         Authorization(TAG_MIN_SECONDS_BETWEEN_OPS, 2),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 7);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t kmer1 = kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set, uid);
-    sleep(3);
-    keymaster_error_t kmer2 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-
-    ASSERT_EQ(KM_ERROR_OK, kmer1);
-    ASSERT_EQ(KM_ERROR_OK, kmer2);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set));
+    kmen.tick();
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    kmen.tick();
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_USER_ID) {
+TEST_F(KeymasterBaseTest, TestOptTimeoutTableOverflow) {
     keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN), Authorization(TAG_USER_ID, valid_user_id),
+        Authorization(TAG_MIN_SECONDS_BETWEEN_OPS, 4),
+        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
     };
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 2);
+    AuthorizationSet auth_set(params, array_length(params));
 
-    keymaster_error_t valid_kmer1 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, validuid1);
-    keymaster_error_t valid_kmer2 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, validuid2);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
 
-    keymaster_error_t invalid_kmer1 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, invaliduid1);
-    keymaster_error_t invalid_kmer2 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, invaliduid2);
-    keymaster_error_t invalid_kmer3 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, invaliduid3);
-    keymaster_error_t invalid_kmer4 =
-        kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, invaliduid4);
+    kmen.tick();
 
-    ASSERT_EQ(KM_ERROR_OK, valid_kmer1);
-    ASSERT_EQ(KM_ERROR_OK, valid_kmer2);
+    // Key 1 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
 
-    ASSERT_EQ(KM_ERROR_INVALID_USER_ID, invalid_kmer1);
-    ASSERT_EQ(KM_ERROR_INVALID_USER_ID, invalid_kmer2);
-    ASSERT_EQ(KM_ERROR_INVALID_USER_ID, invalid_kmer3);
-    ASSERT_EQ(KM_ERROR_INVALID_USER_ID, invalid_kmer4);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+
+    kmen.tick();
+
+    // Key 1 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
+    // Key 2 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 3 /* key_id */, auth_set));
+
+    kmen.tick();
+
+    // Key 1 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
+    // Key 2 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+    // Key 3 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 3 /* key_id */, auth_set));
+    // Key 4 fails because the table is full
+    EXPECT_EQ(KM_ERROR_TOO_MANY_OPERATIONS,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 4 /* key_id */, auth_set));
+
+    kmen.tick();
+
+    // Key 4 succeeds because key 1 expired.
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 4 /* key_id */, auth_set));
+
+    // Key 1 fails because the table is full... and key 1 is no longer in it.
+    EXPECT_EQ(KM_ERROR_TOO_MANY_OPERATIONS,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
+    // Key 2 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+    // Key 3 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 3 /* key_id */, auth_set));
+
+    kmen.tick();
+
+    // Key 1 succeeds because key 2 expired
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
+    // Key 2 fails because the table is full... and key 2 is no longer in it.
+    EXPECT_EQ(KM_ERROR_TOO_MANY_OPERATIONS,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+    // Key 3 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 3 /* key_id */, auth_set));
+    // Key 4 fails because it's too soon
+    EXPECT_EQ(KM_ERROR_KEY_RATE_LIMIT_EXCEEDED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 4 /* key_id */, auth_set));
+
+    kmen.tick(4);
+
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 1 /* key_id */, auth_set));
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 2 /* key_id */, auth_set));
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, 3 /* key_id */, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_PURPOSE) {
+TEST_F(KeymasterBaseTest, TestInvalidPurpose) {
     keymaster_purpose_t invalidPurpose1 = static_cast<keymaster_purpose_t>(-1);
     keymaster_purpose_t invalidPurpose2 = static_cast<keymaster_purpose_t>(4);
 
-    keymaster_key_param_t params1[] = {
-        Authorization(TAG_PURPOSE, invalidPurpose1), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
-    };
+    AuthorizationSet auth_set(
+        AuthorizationSetBuilder().Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY));
 
-    keymaster_key_param_t params2[] = {
-        Authorization(TAG_PURPOSE, invalidPurpose2), Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time),
-    };
-
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set1(params1, 3);
-    AuthorizationSet auth_set2(params2, 3);
-
-    keymaster_error_t kmer1 = kmen.AuthorizeOperation(invalidPurpose1, key_id, auth_set1, uid);
-    keymaster_error_t kmer2 = kmen.AuthorizeOperation(invalidPurpose2, key_id, auth_set2, uid);
-    keymaster_error_t kmer3 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set2, uid);
-
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, kmer1);
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, kmer2);
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, kmer3);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
+              kmen.AuthorizeOperation(invalidPurpose1, key_id, auth_set));
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
+              kmen.AuthorizeOperation(invalidPurpose2, key_id, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_INCOMPATIBLE_PURPOSE) {
-    keymaster_key_param_t params[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time), Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-    };
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set(params, 4);
+TEST_F(KeymasterBaseTest, TestIncompatiblePurposeSymmetricKey) {
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
 
-    keymaster_error_t kmer_invalid1 =
-        kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, auth_set, uid);
-    keymaster_error_t kmer_invalid2 =
-        kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, auth_set, uid);
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set));
 
-    keymaster_error_t kmer_valid1 = kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, uid);
-    keymaster_error_t kmer_valid2 =
-        kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set, uid);
-
-    ASSERT_EQ(KM_ERROR_OK, kmer_valid1);
-    ASSERT_EQ(KM_ERROR_OK, kmer_valid2);
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, kmer_invalid1);
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, kmer_invalid2);
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE,
+              kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, auth_set));
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE,
+              kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, auth_set));
 }
 
-TEST_F(KeymasterBaseTest, TEST_INVALID_TAG_PAIRS) {
-    const uint8_t* app_id = reinterpret_cast<const uint8_t*>("com.app");
-    const size_t app_size = 7;
-    keymaster_key_param_t params1[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time), Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        // Can't have "all users" and a specific user.
-        Authorization(TAG_ALL_USERS), Authorization(TAG_USER_ID, valid_user_id),
-    };
+TEST_F(KeymasterBaseTest, TestIncompatiblePurposeAssymmetricKey) {
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
 
-    keymaster_key_param_t params2[] = {
-        Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY),
-        Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA),
-        Authorization(TAG_ACTIVE_DATETIME, past_time), Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN),
-        // Can't have "all applications" and a specific app ID.
-        Authorization(TAG_ALL_APPLICATIONS), Authorization(TAG_APPLICATION_ID, app_id, app_size),
-    };
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set));
 
-    KeymasterEnforcement kmen;
-    AuthorizationSet auth_set1(params1, array_length(params1));
-    AuthorizationSet auth_set2(params2, array_length(params2));
+    // This one is allowed because it's a pubkey op.
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, auth_set));
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE,
+              kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, auth_set));
+}
 
-    EXPECT_EQ(KM_ERROR_INVALID_TAG,
-              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set1, validuid1));
-    EXPECT_EQ(KM_ERROR_INVALID_TAG,
-              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, auth_set2, validuid1));
+TEST_F(KeymasterBaseTest, TestInvalidCallerNonce) {
+    AuthorizationSet no_caller_nonce(AuthorizationSetBuilder()
+                                         .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                                         .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA));
+    AuthorizationSet caller_nonce(AuthorizationSetBuilder()
+                                      .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
+                                      .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                                      .Authorization(TAG_CALLER_NONCE));
+    AuthorizationSet begin_params(AuthorizationSetBuilder().Authorization(TAG_NONCE, "foo", 3));
+
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, caller_nonce, begin_params,
+                                      0 /* challenge */, false /* is_begin_operation */));
+    EXPECT_EQ(KM_ERROR_CALLER_NONCE_PROHIBITED,
+              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, no_caller_nonce, begin_params,
+                                      0 /* challenge */, false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestBootloaderOnly) {
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN)
+                                  .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                                  .Authorization(TAG_BOOTLOADER_ONLY));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+}
+
+TEST_F(KeymasterBaseTest, TestInvalidTag) {
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_INVALID)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpSuccess) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpInvalidTokenSignature) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    kmen.set_report_token_valid(false);
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpWrongChallenge) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      token.challenge + 1 /* doesn't match token */,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpNoAuthType) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpWrongAuthType) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(
+        AuthorizationSetBuilder()
+            .Authorization(TAG_USER_SECURE_ID, token.user_id)
+            .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_FINGERPRINT /* doesn't match token */)
+            .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpWrongSid) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(
+        AuthorizationSetBuilder()
+            .Authorization(TAG_USER_SECURE_ID, token.user_id + 1 /* doesn't match token */)
+            .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+            .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpSuccessAlternateSid) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 10;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.authenticator_id)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthPerOpMissingToken) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = 0;
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+
+    // During begin we can skip the auth token
+    EXPECT_EQ(KM_ERROR_OK, kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                                   token.challenge, true /* is_begin_operation */));
+    // Afterwards we must have authentication
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestAuthAndNoAuth) {
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, 1)
+                                  .Authorization(TAG_NO_AUTH_REQUIRED)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set));
+}
+
+TEST_F(KeymasterBaseTest, TestTimedAuthSuccess) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = hton(kmen.current_time());
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_AUTH_TIMEOUT, 1)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      0 /* irrelevant */, false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestTimedAuthTimedOut) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = hton(static_cast<uint64_t>(kmen.current_time()));
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_AUTH_TIMEOUT, 1)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+    op_params.push_back(Authorization(TAG_AUTH_TOKEN, &token, sizeof(token)));
+
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      0 /* irrelevant */, false /* is_begin_operation */));
+
+    kmen.tick(1);
+
+    // token still good
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      0 /* irrelevant */, false /* is_begin_operation */));
+
+    kmen.tick(1);
+
+    // token expired, not allowed during begin.
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      0 /* irrelevant */, true /* is_begin_operation */));
+
+    // token expired, afterwards it's okay.
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params,
+                                      0 /* irrelevant */, false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestTimedAuthMissingToken) {
+    hw_auth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.version = HW_AUTH_TOKEN_VERSION;
+    token.challenge = 99;
+    token.user_id = 9;
+    token.authenticator_id = 0;
+    token.authenticator_type = hton(static_cast<uint32_t>(HW_AUTH_PASSWORD));
+    token.timestamp = hton(static_cast<uint64_t>(kmen.current_time()));
+
+    AuthorizationSet auth_set(AuthorizationSetBuilder()
+                                  .Authorization(TAG_USER_SECURE_ID, token.user_id)
+                                  .Authorization(TAG_AUTH_TIMEOUT, 1)
+                                  .Authorization(TAG_USER_AUTH_TYPE, HW_AUTH_ANY)
+                                  .Authorization(TAG_PURPOSE, KM_PURPOSE_SIGN));
+
+    AuthorizationSet op_params;
+
+    // Unlike auth-per-op, must have the auth token during begin.
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      true /* is_begin_operation */));
+
+    // And later (though begin would fail, so there wouldn't be a later).
+    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+              kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
+                                      false /* is_begin_operation */));
+}
+
+TEST_F(KeymasterBaseTest, TestCreateKeyId) {
+    keymaster_key_blob_t blob = {reinterpret_cast<const uint8_t*>("foobar"), 6};
+
+    km_id_t key_id = 0;
+    EXPECT_TRUE(KeymasterEnforcement::CreateKeyId(blob, &key_id));
+    EXPECT_NE(0U, key_id);
 }
 
 }; /* namespace test */
