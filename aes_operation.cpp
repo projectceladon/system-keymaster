@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+#include "aes_operation.h"
+
 #include <stdio.h>
+
+#include <new>
 
 #include <UniquePtr.h>
 
@@ -25,7 +29,6 @@
 #include <keymaster/logger.h>
 
 #include "aes_key.h"
-#include "aes_operation.h"
 #include "openssl_err.h"
 
 namespace keymaster {
@@ -96,12 +99,14 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
     Operation* op = NULL;
     switch (purpose()) {
     case KM_PURPOSE_ENCRYPT:
-        op = new AesEvpEncryptOperation(block_mode, padding, caller_nonce, tag_length,
-                                        symmetric_key->key_data(), symmetric_key->key_data_size());
+        op = new (std::nothrow)
+            AesEvpEncryptOperation(block_mode, padding, caller_nonce, tag_length,
+                                   symmetric_key->key_data(), symmetric_key->key_data_size());
         break;
     case KM_PURPOSE_DECRYPT:
-        op = new AesEvpDecryptOperation(block_mode, padding, tag_length, symmetric_key->key_data(),
-                                        symmetric_key->key_data_size());
+        op = new (std::nothrow)
+            AesEvpDecryptOperation(block_mode, padding, tag_length, symmetric_key->key_data(),
+                                   symmetric_key->key_data_size());
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_PURPOSE;
@@ -147,7 +152,7 @@ keymaster_error_t AesEvpOperation::Begin(const AuthorizationSet& /* input_params
                                          AuthorizationSet* /* output_params */) {
     if (block_mode_ == KM_MODE_GCM) {
         aad_block_buf_length_ = 0;
-        aad_block_buf_.reset(new uint8_t[AES_BLOCK_SIZE]);
+        aad_block_buf_.reset(new (std::nothrow) uint8_t[AES_BLOCK_SIZE]);
         if (!aad_block_buf_.get())
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }
@@ -197,7 +202,8 @@ keymaster_error_t AesEvpOperation::Finish(const AuthorizationSet& /* additional_
     }
 
     assert(output_written <= AES_BLOCK_SIZE);
-    output->advance_write(output_written);
+    if (!output->advance_write(output_written))
+        return KM_ERROR_UNKNOWN_ERROR;
     return KM_ERROR_OK;
 }
 
@@ -299,7 +305,7 @@ keymaster_error_t AesEvpOperation::InitializeCipher() {
 
     if (block_mode_ == KM_MODE_GCM) {
         aad_block_buf_length_ = 0;
-        aad_block_buf_.reset(new uint8_t[AES_BLOCK_SIZE]);
+        aad_block_buf_.reset(new (std::nothrow) uint8_t[AES_BLOCK_SIZE]);
         if (!aad_block_buf_.get())
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }
@@ -425,8 +431,7 @@ bool AesEvpOperation::InternalUpdate(const uint8_t* input, size_t input_length, 
         *error = TranslateLastOpenSslError();
         return false;
     }
-    output->advance_write(output_written);
-    return true;
+    return output->advance_write(output_written);
 }
 
 keymaster_error_t AesEvpEncryptOperation::Begin(const AuthorizationSet& input_params,
@@ -469,7 +474,8 @@ keymaster_error_t AesEvpEncryptOperation::Finish(const AuthorizationSet& additio
 
         if (!EVP_CIPHER_CTX_ctrl(&ctx_, EVP_CTRL_GCM_GET_TAG, tag_length_, output->peek_write()))
             return TranslateLastOpenSslError();
-        output->advance_write(tag_length_);
+        if (!output->advance_write(tag_length_))
+            return KM_ERROR_UNKNOWN_ERROR;
     }
 
     return KM_ERROR_OK;
@@ -477,7 +483,7 @@ keymaster_error_t AesEvpEncryptOperation::Finish(const AuthorizationSet& additio
 
 keymaster_error_t AesEvpEncryptOperation::GenerateIv() {
     iv_length_ = (block_mode_ == KM_MODE_GCM) ? GCM_NONCE_SIZE : AES_BLOCK_SIZE;
-    iv_.reset(new uint8_t[iv_length_]);
+    iv_.reset(new (std::nothrow) uint8_t[iv_length_]);
     if (!iv_.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     if (RAND_bytes(iv_.get(), iv_length_) != 1)
@@ -495,7 +501,7 @@ keymaster_error_t AesEvpDecryptOperation::Begin(const AuthorizationSet& input_pa
 
     if (tag_length_ > 0) {
         tag_buf_length_ = 0;
-        tag_buf_.reset(new uint8_t[tag_length_]);
+        tag_buf_.reset(new (std::nothrow) uint8_t[tag_length_]);
         if (!tag_buf_.get())
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }

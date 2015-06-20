@@ -16,6 +16,8 @@
 
 #include "hmac_operation.h"
 
+#include <new>
+
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
@@ -54,9 +56,9 @@ Operation* HmacOperationFactory::CreateOperation(const Key& key,
     }
 
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
-    UniquePtr<HmacOperation> op(new HmacOperation(purpose(), symmetric_key->key_data(),
-                                                  symmetric_key->key_data_size(), digest,
-                                                  tag_length / 8));
+    UniquePtr<HmacOperation> op(
+        new (std::nothrow) HmacOperation(purpose(), symmetric_key->key_data(),
+                                         symmetric_key->key_data_size(), digest, tag_length / 8));
     if (!op.get())
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     else

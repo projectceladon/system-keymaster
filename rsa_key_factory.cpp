@@ -16,6 +16,8 @@
 
 #include <keymaster/rsa_key_factory.h>
 
+#include <new>
+
 #include <keymaster/keymaster_context.h>
 
 #include "openssl_err.h"
@@ -163,7 +165,7 @@ keymaster_error_t RsaKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enfor
                                                 const AuthorizationSet& sw_enforced,
                                                 UniquePtr<AsymmetricKey>* key) const {
     keymaster_error_t error;
-    key->reset(new RsaKey(hw_enforced, sw_enforced, &error));
+    key->reset(new (std::nothrow) RsaKey(hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return error;

@@ -109,7 +109,8 @@ keymaster_error_t EcdsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key
         return KM_ERROR_UNKNOWN_ERROR;
 
     keymaster_error_t error;
-    key->reset(new EcKeymaster0Key(ec_key.release(), hw_enforced, sw_enforced, engine_, &error));
+    key->reset(new (std::nothrow)
+                   EcKeymaster0Key(ec_key.release(), hw_enforced, sw_enforced, engine_, &error));
     if (error != KM_ERROR_OK)
         return error;
 
@@ -132,10 +133,9 @@ keymaster_error_t EcKeymaster0Key::key_material(UniquePtr<uint8_t[]>* material,
         return KM_ERROR_UNKNOWN_ERROR;
 
     *size = blob->key_material_size;
-    material->reset(new uint8_t[*size]);
+    material->reset(dup_buffer(blob->key_material, *size));
     if (!material->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(material->get(), blob->key_material, *size);
     return KM_ERROR_OK;
 }
 

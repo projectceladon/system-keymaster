@@ -123,7 +123,7 @@ SymmetricKey::~SymmetricKey() {
 keymaster_error_t SymmetricKey::key_material(UniquePtr<uint8_t[]>* key_material,
                                              size_t* size) const {
     *size = key_data_size_;
-    key_material->reset(new uint8_t[*size]);
+    key_material->reset(new (std::nothrow) uint8_t[*size]);
     if (!key_material->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memcpy(key_material->get(), key_data_.get(), *size);
