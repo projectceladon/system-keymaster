@@ -18,6 +18,8 @@
 
 #include <limits.h>
 
+#include <new>
+
 #include <openssl/err.h>
 
 #include <keymaster/logger.h>
@@ -290,8 +292,9 @@ keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
     }
 
     if (bytes_encrypted <= 0)
+        return TranslateLastOpenSslError();
+    if (!output->advance_write(bytes_encrypted))
         return KM_ERROR_UNKNOWN_ERROR;
-    output->advance_write(bytes_encrypted);
     return KM_ERROR_OK;
 }
 
@@ -305,7 +308,8 @@ keymaster_error_t RsaSignOperation::SignDigested(Buffer* output) {
 
     if (EVP_DigestSignFinal(&digest_ctx_, output->peek_write(), &siglen) <= 0)
         return TranslateLastOpenSslError();
-    output->advance_write(siglen);
+    if (!output->advance_write(siglen))
+        return KM_ERROR_UNKNOWN_ERROR;
 
     return KM_ERROR_OK;
 }
@@ -371,7 +375,9 @@ keymaster_error_t RsaVerifyOperation::VerifyUndigested(const Buffer& signature) 
         return KM_ERROR_UNSUPPORTED_PADDING_MODE;
     }
 
-    UniquePtr<uint8_t[]> decrypted_data(new uint8_t[key_len]);
+    UniquePtr<uint8_t[]> decrypted_data(new (std::nothrow) uint8_t[key_len]);
+    if (!decrypted_data.get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     int bytes_decrypted = RSA_public_decrypt(signature.available_read(), signature.peek_read(),
                                              decrypted_data.get(), rsa.get(), openssl_padding);
     if (bytes_decrypted < 0)
@@ -435,7 +441,8 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     if (EVP_PKEY_encrypt(ctx.get(), output->peek_write(), &outlen, data_.peek_read(),
                          data_.available_read()) <= 0)
         return TranslateLastOpenSslError();
-    output->advance_write(outlen);
+    if (!output->advance_write(outlen))
+        return KM_ERROR_UNKNOWN_ERROR;
 
     return KM_ERROR_OK;
 }
@@ -469,7 +476,8 @@ keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additio
     if (EVP_PKEY_decrypt(ctx.get(), output->peek_write(), &outlen, data_.peek_read(),
                          data_.available_read()) <= 0)
         return TranslateLastOpenSslError();
-    output->advance_write(outlen);
+    if (!output->advance_write(outlen))
+        return KM_ERROR_UNKNOWN_ERROR;
 
     return KM_ERROR_OK;
 }

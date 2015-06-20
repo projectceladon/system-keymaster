@@ -88,7 +88,7 @@ class EcdsaSignOperationFactory : public EcdsaOperationFactory {
   private:
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
     Operation* InstantiateOperation(keymaster_digest_t digest, EVP_PKEY* key) {
-        return new EcdsaSignOperation(purpose(), digest, key);
+        return new (std::nothrow) EcdsaSignOperation(purpose(), digest, key);
     }
 };
 
@@ -96,7 +96,7 @@ class EcdsaVerifyOperationFactory : public EcdsaOperationFactory {
   public:
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
     Operation* InstantiateOperation(keymaster_digest_t digest, EVP_PKEY* key) {
-        return new EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, key);
+        return new (std::nothrow) EcdsaVerifyOperation(KM_PURPOSE_VERIFY, digest, key);
     }
 };
 

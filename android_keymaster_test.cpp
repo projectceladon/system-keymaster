@@ -587,7 +587,7 @@ TEST_P(SigningOperationsTest, RsaTooShortMessage) {
     EXPECT_EQ(31U, input_consumed);
 
     string signature;
-    ASSERT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&signature));
+    ASSERT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&signature));
     EXPECT_EQ(0U, signature.length());
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))

@@ -17,13 +17,13 @@
 #include "hmac.h"
 
 #include <assert.h>
+
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/mem.h>
 #include <openssl/sha.h>
 
-#if defined(OPENSSL_IS_BORINGSSL)
-#include <openssl/mem.h>
-#endif
+#include <keymaster/android_keymaster_utils.h>
 
 namespace keymaster {
 
@@ -40,11 +40,10 @@ bool HmacSha256::Init(const uint8_t* key, size_t key_len) {
         return false;
 
     key_len_ = key_len;
-    key_.reset(new uint8_t[key_len]);
+    key_.reset(dup_buffer(key, key_len));
     if (!key_.get()) {
         return false;
     }
-    memcpy(key_.get(), key, key_len);
     return true;
 }
 
