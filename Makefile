@@ -34,20 +34,26 @@ INCLUDES=$(foreach dir,$(SUBS),-I $(BASE)/$(dir)/include) \
 	-I $(BASE)/libnativehelper/include/nativehelper \
 	-I $(GTEST) -Iinclude -I$(BASE)/../boringssl/include
 
+ifdef FORCE_32_BIT
+ARCH_FLAGS = -m32
+endif
+
 ifdef USE_CLANG
 CC=/usr/bin/clang
 CXX=/usr/bin/clang
-CLANG_TEST_DEFINE=-DKEYMASTER_CLANG_TEST_BUILD
-COMPILER_SPECIFIC_ARGS=-std=c++11 $(CLANG_TEST_DEFINE)
+CXXFLAGS +=-std=c++11 -DKEYMASTER_CLANG_TEST_BUILD
+CFLAGS += -DKEYMASTER_CLANG_TEST_BUILD
 else
-COMPILER_SPECIFIC_ARGS=-std=c++0x -fprofile-arcs
+CXXFLAGS +=-std=c++0x -fprofile-arcs
+CFLAGS += -fprofile-arcs
 endif
 
-CPPFLAGS=$(INCLUDES) -g -O0 -MD -MP
-CXXFLAGS=-Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
+LDFLAGS += $(ARCH_FLAGS)
+CPPFLAGS = $(INCLUDES) -g -O0 -MD -MP
+CXXFLAGS += -Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
 	-Werror=sign-compare -ftest-coverage -fno-permissive \
-	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS \
-	$(COMPILER_SPECIFIC_ARGS)
+	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS $(ARCH_FLAGS)
+CFLAGS += $(ARCH_FLAGS)
 
 # Uncomment to enable debug logging.
 # CXXFLAGS += -DDEBUG
@@ -165,6 +171,7 @@ GTEST_OBJS = $(GTEST)/src/gtest-all.o gtest_main.o
 
 hmac_test: hmac_test.o \
 	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	authorization_set.o \
 	hmac.o \
 	logger.o \
@@ -173,6 +180,7 @@ hmac_test: hmac_test.o \
 
 hkdf_test: hkdf_test.o \
 	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	authorization_set.o \
 	hkdf.o \
 	hmac.o \
@@ -192,6 +200,7 @@ key_blob_test: key_blob_test.o \
 	android_keymaster_utils.o \
 	auth_encrypted_key_blob.o \
 	authorization_set.o \
+	integrity_assured_key_blob.o \
 	logger.o \
 	ocb.o \
 	ocb_utils.o \
@@ -258,7 +267,6 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 	$(GTEST_OBJS)
 
 $(GTEST)/src/gtest-all.o: CXXFLAGS:=$(subst -Wmissing-declarations,,$(CXXFLAGS))
-ocb.o: CFLAGS=$(CLANG_TEST_DEFINE)
 
 clean:
 	rm -f $(OBJS) $(DEPS) $(BINARIES) \

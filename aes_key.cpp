@@ -18,6 +18,8 @@
 
 #include <assert.h>
 
+#include <new>
+
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
@@ -47,7 +49,7 @@ keymaster_error_t AesKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     keymaster_error_t error = KM_ERROR_OK;
-    key->reset(new AesKey(key_material, hw_enforced, sw_enforced, &error));
+    key->reset(new (std::nothrow) AesKey(key_material, hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return error;

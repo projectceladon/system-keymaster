@@ -22,12 +22,6 @@
 
 namespace keymaster {
 
-void convert_bn_to_blob(BIGNUM* bn, keymaster_blob_t* blob) {
-    blob->data_length = BN_num_bytes(bn);
-    blob->data = new uint8_t[blob->data_length];
-    BN_bn2bin(bn, const_cast<uint8_t*>(blob->data));
-}
-
 static int convert_to_evp(keymaster_algorithm_t algorithm) {
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
@@ -79,8 +73,7 @@ keymaster_error_t EvpKeyToKeyMaterial(const EVP_PKEY* pkey, KeymasterKeyBlob* ke
     if (key_data_size <= 0)
         return TranslateLastOpenSslError();
 
-    key_blob->Reset(key_data_size);
-    if (!key_blob->key_material)
+    if (!key_blob->Reset(key_data_size))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     uint8_t* tmp = key_blob->writable_data();
