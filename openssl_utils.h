@@ -39,6 +39,10 @@ struct BIGNUM_Delete {
     void operator()(BIGNUM* p) const { BN_free(p); }
 };
 
+struct BN_CTX_Delete {
+    void operator()(BN_CTX* p) const { BN_CTX_free(p); }
+};
+
 struct PKCS8_PRIV_KEY_INFO_Delete {
     void operator()(PKCS8_PRIV_KEY_INFO* p) const { PKCS8_PRIV_KEY_INFO_free(p); }
 };
