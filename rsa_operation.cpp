@@ -57,70 +57,83 @@ EVP_PKEY* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* erro
 static const keymaster_digest_t supported_digests[] = {
     KM_DIGEST_NONE,      KM_DIGEST_MD5,       KM_DIGEST_SHA1,     KM_DIGEST_SHA_2_224,
     KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512};
-static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN,
-                                                            KM_PAD_RSA_PSS};
 
-const keymaster_digest_t*
-RsaDigestingOperationFactory::SupportedDigests(size_t* digest_count) const {
+const keymaster_digest_t* RsaOperationFactory::SupportedDigests(size_t* digest_count) const {
     *digest_count = array_length(supported_digests);
     return supported_digests;
 }
 
+RsaOperation* RsaOperationFactory::CreateRsaOperation(const Key& key,
+                                                      const AuthorizationSet& begin_params,
+                                                      keymaster_error_t* error) {
+    keymaster_padding_t padding;
+    keymaster_digest_t digest = KM_DIGEST_NONE;
+    if (!GetAndValidatePadding(begin_params, key, &padding, error))
+        return nullptr;
+
+    bool require_digest = (purpose() == KM_PURPOSE_SIGN || purpose() == KM_PURPOSE_VERIFY ||
+                           padding == KM_PAD_RSA_OAEP);
+
+    if (require_digest && !GetAndValidateDigest(begin_params, key, &digest, error))
+        return nullptr;
+    if (!require_digest && begin_params.find(TAG_DIGEST) != -1) {
+        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+        return nullptr;
+    }
+
+    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> rsa(GetRsaKey(key, error));
+    if (!rsa.get())
+        return nullptr;
+
+    RsaOperation* op = InstantiateOperation(digest, padding, rsa.release());
+    if (!op)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return op;
+}
+
+static const keymaster_padding_t supported_sig_padding[] = {KM_PAD_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN,
+                                                            KM_PAD_RSA_PSS};
 const keymaster_padding_t*
 RsaDigestingOperationFactory::SupportedPaddingModes(size_t* padding_mode_count) const {
     *padding_mode_count = array_length(supported_sig_padding);
     return supported_sig_padding;
 }
 
-Operation* RsaDigestingOperationFactory::CreateOperation(const Key& key,
-                                                         const AuthorizationSet& begin_params,
-                                                         keymaster_error_t* error) {
-    keymaster_padding_t padding;
-    keymaster_digest_t digest;
-    if (!GetAndValidateDigest(begin_params, key, &digest, error) ||
-        !GetAndValidatePadding(begin_params, key, &padding, error))
-        return nullptr;
+RsaOperation* RsaCryptingOperationFactory::CreateRsaOperation(const Key& key,
+                                                              const AuthorizationSet& begin_params,
+                                                              keymaster_error_t* error) {
+    UniquePtr<RsaOperation> op(RsaOperationFactory::CreateRsaOperation(key, begin_params, error));
+    if (op.get()) {
+        switch (op->padding()) {
+        case KM_PAD_NONE:
+        case KM_PAD_RSA_PKCS1_1_5_ENCRYPT:
+            if (op->digest() != KM_DIGEST_NONE) {
+                *error = KM_ERROR_INCOMPATIBLE_DIGEST;
+                return nullptr;
+            }
+            break;
 
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> rsa(GetRsaKey(key, error));
-    if (!rsa.get())
-        return nullptr;
+        case KM_PAD_RSA_OAEP:
+            if (op->digest() == KM_DIGEST_NONE) {
+                *error = KM_ERROR_INCOMPATIBLE_DIGEST;
+                return nullptr;
+            }
+            break;
 
-    Operation* op = InstantiateOperation(digest, padding, rsa.release());
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return op;
+        default:
+            *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
+            return nullptr;
+        }
+    }
+    return op.release();
 }
 
 static const keymaster_padding_t supported_crypt_padding[] = {KM_PAD_NONE, KM_PAD_RSA_OAEP,
                                                               KM_PAD_RSA_PKCS1_1_5_ENCRYPT};
-
-Operation* RsaCryptingOperationFactory::CreateOperation(const Key& key,
-                                                        const AuthorizationSet& begin_params,
-                                                        keymaster_error_t* error) {
-    keymaster_padding_t padding;
-    if (!GetAndValidatePadding(begin_params, key, &padding, error))
-        return nullptr;
-
-    UniquePtr<EVP_PKEY, EVP_PKEY_Delete> rsa(GetRsaKey(key, error));
-    if (!rsa.get())
-        return nullptr;
-
-    Operation* op = InstantiateOperation(padding, rsa.release());
-    if (!op)
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    return op;
-}
-
 const keymaster_padding_t*
 RsaCryptingOperationFactory::SupportedPaddingModes(size_t* padding_mode_count) const {
     *padding_mode_count = array_length(supported_crypt_padding);
     return supported_crypt_padding;
-}
-
-const keymaster_digest_t*
-RsaCryptingOperationFactory::SupportedDigests(size_t* digest_count) const {
-    *digest_count = 0;
-    return NULL;
 }
 
 RsaOperation::~RsaOperation() {
@@ -170,16 +183,7 @@ keymaster_error_t RsaOperation::SetRsaPaddingInEvpContext(EVP_PKEY_CTX* pkey_ctx
     return KM_ERROR_OK;
 }
 
-RsaDigestingOperation::RsaDigestingOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
-                                             keymaster_padding_t padding, EVP_PKEY* key)
-    : RsaOperation(purpose, padding, key), digest_(digest), digest_algorithm_(NULL) {
-    EVP_MD_CTX_init(&digest_ctx_);
-}
-RsaDigestingOperation::~RsaDigestingOperation() {
-    EVP_MD_CTX_cleanup(&digest_ctx_);
-}
-
-keymaster_error_t RsaDigestingOperation::InitDigest() {
+keymaster_error_t RsaOperation::InitDigest() {
     if (digest_ == KM_DIGEST_NONE) {
         if (require_digest())
             return KM_ERROR_INCOMPATIBLE_DIGEST;
@@ -210,6 +214,15 @@ keymaster_error_t RsaDigestingOperation::InitDigest() {
     default:
         return KM_ERROR_UNSUPPORTED_DIGEST;
     }
+}
+
+RsaDigestingOperation::RsaDigestingOperation(keymaster_purpose_t purpose, keymaster_digest_t digest,
+                                             keymaster_padding_t padding, EVP_PKEY* key)
+    : RsaOperation(purpose, digest, padding, key) {
+    EVP_MD_CTX_init(&digest_ctx_);
+}
+RsaDigestingOperation::~RsaDigestingOperation() {
+    EVP_MD_CTX_cleanup(&digest_ctx_);
 }
 
 int RsaDigestingOperation::GetOpensslPadding(keymaster_error_t* error) {
