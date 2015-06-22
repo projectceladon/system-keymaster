@@ -123,7 +123,7 @@ keymaster_error_t RsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_m
     keymaster_error_t error;
     key->reset(new (std::nothrow)
                    RsaKeymaster0Key(rsa.release(), hw_enforced, sw_enforced, engine_, &error));
-    if (!key.get())
+    if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     if (error != KM_ERROR_OK)

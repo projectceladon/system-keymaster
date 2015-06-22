@@ -30,6 +30,13 @@
 
 namespace keymaster {
 
+const size_t kPssOverhead = 2;
+const size_t kMinPssSaltSize = 8;
+
+// Overhead for PKCS#1 v1.5 signature padding of undigested messages.  Digested messages have
+// additional overhead, for the digest algorithmIdentifier required by PKCS#1.
+const size_t kPkcs1UndigestedSignaturePaddingOverhead = 11;
+
 /* static */
 EVP_PKEY* RsaOperationFactory::GetRsaKey(const Key& key, keymaster_error_t* error) {
     const RsaKey* rsa_key = static_cast<const RsaKey*>(&key);
@@ -138,9 +145,16 @@ keymaster_error_t RsaOperation::Update(const AuthorizationSet& /* additional_par
 
 keymaster_error_t RsaOperation::StoreData(const Buffer& input, size_t* input_consumed) {
     assert(input_consumed);
-    if (!data_.reserve(data_.available_read() + input.available_read()) ||
-        !data_.write(input.peek_read(), input.available_read()))
+
+    if (!data_.reserve(EVP_PKEY_size(rsa_key_)))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    // If the write fails, it's because input length exceeds key size.
+    if (!data_.write(input.peek_read(), input.available_read())) {
+        LOG_E("Input too long: cannot operate on %u bytes of data with %u-bit RSA key",
+              input.available_read() + data_.available_read());
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
+
     *input_consumed = input.available_read();
     return KM_ERROR_OK;
 }
@@ -198,25 +212,22 @@ keymaster_error_t RsaDigestingOperation::InitDigest() {
     }
 }
 
-const size_t PSS_OVERHEAD = 2;
-const size_t MIN_SALT_SIZE = 8;
-
 int RsaDigestingOperation::GetOpensslPadding(keymaster_error_t* error) {
     *error = KM_ERROR_OK;
     switch (padding_) {
     case KM_PAD_NONE:
         return RSA_NO_PADDING;
     case KM_PAD_RSA_PKCS1_1_5_SIGN:
-
         return RSA_PKCS1_PADDING;
     case KM_PAD_RSA_PSS:
         if (digest_ == KM_DIGEST_NONE) {
             *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
             return -1;
         }
-        if (EVP_MD_size(digest_algorithm_) + PSS_OVERHEAD + MIN_SALT_SIZE >
+        if (EVP_MD_size(digest_algorithm_) + kPssOverhead + kMinPssSaltSize >
             (size_t)EVP_PKEY_size(rsa_key_)) {
-            LOG_E("%d-byte digest cannot be used with %d-byte RSA key in PSS padding mode",
+            LOG_E("Input too long: %d-byte digest cannot be used with %d-byte RSA key in PSS "
+                  "padding mode",
                   EVP_MD_size(digest_algorithm_), EVP_PKEY_size(rsa_key_));
             *error = KM_ERROR_INCOMPATIBLE_DIGEST;
             return -1;
@@ -284,6 +295,12 @@ keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
         break;
     case KM_PAD_RSA_PKCS1_1_5_SIGN:
         // Does PKCS1 padding without digesting even make sense?  Dunno.  We'll support it.
+        if (data_.available_read() + kPkcs1UndigestedSignaturePaddingOverhead >
+            static_cast<size_t>(EVP_PKEY_size(rsa_key_))) {
+            LOG_E("Input too long: cannot sign %u-byte message with PKCS1 padding with %u-bit key",
+                  data_.available_read(), EVP_PKEY_size(rsa_key_) * 8);
+            return KM_ERROR_INVALID_INPUT_LENGTH;
+        }
         bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
                                               output->peek_write(), rsa.get(), RSA_PKCS1_PADDING);
         break;
@@ -369,6 +386,11 @@ keymaster_error_t RsaVerifyOperation::VerifyUndigested(const Buffer& signature) 
         openssl_padding = RSA_NO_PADDING;
         break;
     case KM_PAD_RSA_PKCS1_1_5_SIGN:
+        if (data_.available_read() + kPkcs1UndigestedSignaturePaddingOverhead > key_len) {
+            LOG_E("Input too long: cannot verify %u-byte message with PKCS1 padding && %u-bit key",
+                  data_.available_read(), key_len * 8);
+            return KM_ERROR_INVALID_INPUT_LENGTH;
+        }
         openssl_padding = RSA_PKCS1_PADDING;
         break;
     default:
