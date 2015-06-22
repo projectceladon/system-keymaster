@@ -74,9 +74,8 @@ static keymaster_error_t DeserializeUnversionedBlob(const KeymasterKeyBlob& key_
         LOG_E("Failed to deserialize unversioned blob", 0);
         return KM_ERROR_INVALID_KEY_BLOB;
     }
-    nonce->advance_write(OCB_NONCE_LENGTH);
-    tag->advance_write(OCB_TAG_LENGTH);
-
+    if (!nonce->advance_write(OCB_NONCE_LENGTH) || !tag->advance_write(OCB_TAG_LENGTH))
+        return KM_ERROR_UNKNOWN_ERROR;
     return KM_ERROR_OK;
 }
 
@@ -85,9 +84,15 @@ keymaster_error_t DeserializeAuthEncryptedBlob(const KeymasterKeyBlob& key_blob,
                                                AuthorizationSet* hw_enforced,
                                                AuthorizationSet* sw_enforced, Buffer* nonce,
                                                Buffer* tag) {
+    if (!key_blob.key_material || key_blob.key_material_size == 0)
+        return KM_ERROR_INVALID_KEY_BLOB;
+
     const uint8_t* tmp = key_blob.key_material;
     const uint8_t** buf_ptr = &tmp;
     const uint8_t* end = tmp + key_blob.key_material_size;
+
+    if (end <= *buf_ptr)
+        return KM_ERROR_INVALID_KEY_BLOB;
 
     uint8_t version = *(*buf_ptr)++;
     if (version != CURRENT_BLOB_VERSION ||  //

@@ -14,10 +14,15 @@
  * limitations under the License.
  */
 
-#include "hmac.h"
 #include "hkdf.h"
 
 #include <assert.h>
+
+#include <new>
+
+#include <keymaster/android_keymaster_utils.h>
+
+#include "hmac.h"
 
 namespace keymaster {
 
@@ -48,7 +53,7 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
     }
     assert(result);
     // avoid the unused variable warning if asserts are disabled.
-    (void) result;
+    (void)result;
 
     // |prk| is a pseudorandom key (of kSHA256HashLength octets).
     uint8_t prk[kSHA256HashLength];
@@ -60,7 +65,7 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
     // https://tools.ietf.org/html/rfc5869#section-2.3
     const size_t n = (key_bytes_to_generate + kSHA256HashLength - 1) / kSHA256HashLength;
     assert(n < 256u);
-    output_.reset(new uint8_t[n * kSHA256HashLength]);
+    output_.reset(new (std::nothrow) uint8_t[n * kSHA256HashLength]);
     if (!output_.get()) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return;
@@ -88,12 +93,11 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
 
     if (key_bytes_to_generate) {
         secret_key_len_ = key_bytes_to_generate;
-        secret_key_.reset(new uint8_t[key_bytes_to_generate]);
+        secret_key_.reset(dup_buffer(output_.get(), key_bytes_to_generate));
         if (!secret_key_.get()) {
             *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
             return;
         }
-        memcpy(secret_key_.get(), output_.get(), key_bytes_to_generate);
     }
     *error = KM_ERROR_OK;
 }

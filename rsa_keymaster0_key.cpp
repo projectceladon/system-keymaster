@@ -34,8 +34,7 @@ namespace keymaster {
 
 RsaKeymaster0KeyFactory::RsaKeymaster0KeyFactory(const SoftKeymasterContext* context,
                                                  const Keymaster0Engine* engine)
-    : RsaKeyFactory(context), engine_(engine) {
-}
+    : RsaKeyFactory(context), engine_(engine) {}
 
 keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                                        KeymasterKeyBlob* key_blob,
@@ -122,7 +121,11 @@ keymaster_error_t RsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_m
         return KM_ERROR_UNKNOWN_ERROR;
 
     keymaster_error_t error;
-    key->reset(new RsaKeymaster0Key(rsa.release(), hw_enforced, sw_enforced, engine_, &error));
+    key->reset(new (std::nothrow)
+                   RsaKeymaster0Key(rsa.release(), hw_enforced, sw_enforced, engine_, &error));
+    if (!key->get())
+        error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
     if (error != KM_ERROR_OK)
         return error;
 
@@ -132,8 +135,7 @@ keymaster_error_t RsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key_m
 RsaKeymaster0Key::RsaKeymaster0Key(RSA* rsa_key, const AuthorizationSet& hw_enforced,
                                    const AuthorizationSet& sw_enforced,
                                    const Keymaster0Engine* engine, keymaster_error_t* error)
-    : RsaKey(rsa_key, hw_enforced, sw_enforced, error), engine_(engine) {
-}
+    : RsaKey(rsa_key, hw_enforced, sw_enforced, error), engine_(engine) {}
 
 keymaster_error_t RsaKeymaster0Key::key_material(UniquePtr<uint8_t[]>* material,
                                                  size_t* size) const {
@@ -145,10 +147,9 @@ keymaster_error_t RsaKeymaster0Key::key_material(UniquePtr<uint8_t[]>* material,
         return KM_ERROR_UNKNOWN_ERROR;
 
     *size = blob->key_material_size;
-    material->reset(new uint8_t[*size]);
+    material->reset(dup_buffer(blob->key_material, *size));
     if (!material->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-    memcpy(material->get(), blob->key_material, *size);
     return KM_ERROR_OK;
 }
 

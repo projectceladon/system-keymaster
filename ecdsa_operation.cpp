@@ -156,7 +156,8 @@ keymaster_error_t EcdsaSignOperation::Finish(const AuthorizationSet& /* addition
         if (EVP_DigestSignFinal(&digest_ctx_, output->peek_write(), &siglen) <= 0)
             return TranslateLastOpenSslError();
     }
-    output->advance_write(siglen);
+    if (!output->advance_write(siglen))
+        return KM_ERROR_UNKNOWN_ERROR;
     return KM_ERROR_OK;
 }
 

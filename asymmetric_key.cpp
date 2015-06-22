@@ -16,6 +16,8 @@
 
 #include "asymmetric_key.h"
 
+#include <new>
+
 #include <openssl/x509.h>
 
 #include "openssl_err.h"
@@ -38,7 +40,7 @@ keymaster_error_t AsymmetricKey::key_material(UniquePtr<uint8_t[]>* material, si
     if (*size <= 0)
         return TranslateLastOpenSslError();
 
-    material->reset(new uint8_t[*size]);
+    material->reset(new (std::nothrow) uint8_t[*size]);
     uint8_t* tmp = material->get();
     i2d_PrivateKey(pkey.get(), &tmp);
 
@@ -62,7 +64,7 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
     if (key_data_length <= 0)
         return TranslateLastOpenSslError();
 
-    material->reset(new uint8_t[key_data_length]);
+    material->reset(new (std::nothrow) uint8_t[key_data_length]);
     if (material->get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
