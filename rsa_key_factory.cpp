@@ -25,13 +25,9 @@
 #include "rsa_key.h"
 #include "rsa_operation.h"
 
-#if defined(OPENSSL_IS_BORINGSSL)
-typedef size_t openssl_size_t;
-#else
-typedef int openssl_size_t;
-#endif
-
 namespace keymaster {
+
+const int kMaximumRsaKeySize = 16 * 1024;  // 16kbits should be enough for anyone.
 
 static RsaSigningOperationFactory sign_factory;
 static RsaVerificationOperationFactory verify_factory;
@@ -70,7 +66,11 @@ keymaster_error_t RsaKeyFactory::GenerateKey(const AuthorizationSet& key_descrip
 
     uint32_t key_size;
     if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
-        LOG_E("%s", "No key size specified for RSA key generation");
+        LOG_E("No key size specified for RSA key generation", 0);
+        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+    }
+    if (key_size % 8 != 0 || key_size > kMaximumRsaKeySize) {
+        LOG_E("Invalid key size of %u bits specified for RSA key generation", key_size);
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
@@ -143,14 +143,20 @@ keymaster_error_t RsaKeyFactory::UpdateImportKeyDescription(const AuthorizationS
         return KM_ERROR_INVALID_KEY_BLOB;
     if (!updated_description->GetTagValue(TAG_RSA_PUBLIC_EXPONENT, public_exponent))
         updated_description->push_back(TAG_RSA_PUBLIC_EXPONENT, *public_exponent);
-    if (*public_exponent != BN_get_word(rsa_key->e))
+    if (*public_exponent != BN_get_word(rsa_key->e)) {
+        LOG_E("Imported public exponent (%u) does not match specified public exponent (%u)",
+              *public_exponent, BN_get_word(rsa_key->e));
         return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+    }
 
     *key_size = RSA_size(rsa_key.get()) * 8;
     if (!updated_description->GetTagValue(TAG_KEY_SIZE, key_size))
         updated_description->push_back(TAG_KEY_SIZE, *key_size);
-    if (RSA_size(rsa_key.get()) * 8 != (openssl_size_t)*key_size)
+    if (RSA_size(rsa_key.get()) * 8 != *key_size) {
+        LOG_E("Imported key size (%u bits) does not match specified key size (%u bits)",
+              RSA_size(rsa_key.get()) * 8, *key_size);
         return KM_ERROR_IMPORT_PARAMETER_MISMATCH;
+    }
 
     keymaster_algorithm_t algorithm = KM_ALGORITHM_RSA;
     if (!updated_description->GetTagValue(TAG_ALGORITHM, &algorithm))

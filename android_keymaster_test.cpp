@@ -485,6 +485,40 @@ TEST_P(SigningOperationsTest, RsaPkcs1Sha256Success) {
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
 }
 
+TEST_P(SigningOperationsTest, RsaPkcs1NoDigestSuccess) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    string message(53, 'a');
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_RSA_PKCS1_1_5_SIGN);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, RsaPkcs1NoDigestTooLarge) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(512, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    string message(54, 'a');
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    string signature;
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&signature));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
+
 TEST_P(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     // Key must be at least 10 bytes larger than hash, to provide eight bytes of random salt, so
     // verify that nine bytes larger than hash won't work.
@@ -499,6 +533,25 @@ TEST_P(SigningOperationsTest, RsaPssSha256TooSmallKey) {
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
     begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PSS);
     EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+}
+
+TEST_P(SigningOperationsTest, RsaNoPaddingHugeData) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaSigningKey(256, 3)
+                                           .Digest(KM_DIGEST_NONE)
+                                           .Padding(KM_PAD_RSA_PKCS1_1_5_SIGN)));
+    string message(64 * 1024, 'a');
+    string signature;
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, UpdateOperation(message, &result, &input_consumed));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, RsaAbort) {
@@ -608,7 +661,7 @@ TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
 TEST_P(SigningOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
-    string message(1024, 'a');
+    string message(224 / 8, 'a');
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
 
@@ -625,6 +678,22 @@ TEST_P(SigningOperationsTest, EcdsaSha256Success) {
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, EcdsaNoPaddingHugeData) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(224).Digest(KM_DIGEST_NONE)));
+    string message(64 * 1024, 'a');
+    string signature;
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, UpdateOperation(message, &result, &input_consumed));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, AesEcbSign) {
@@ -1227,7 +1296,7 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
 TEST_P(VerificationOperationsTest, EcdsaSuccess) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
-    string message = "123456789012345678901234567890123456789012345678";
+    string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
     VerifyMessage(message, signature, KM_DIGEST_NONE);
@@ -1241,7 +1310,7 @@ TEST_P(VerificationOperationsTest, EcdsaSha256Success) {
                                            .EcdsaSigningKey(256)
                                            .Digest(KM_DIGEST_SHA_2_256)
                                            .Digest(KM_DIGEST_NONE)));
-    string message = "123456789012345678901234567890123456789012345678";
+    string message = "12345678901234567890123456789012";
     string signature;
     SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
@@ -1496,7 +1565,7 @@ TEST_P(ImportKeyTest, EcdsaSuccess) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
-    string message(1024 / 8, 'a');
+    string message(32, 'a');
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
     VerifyMessage(message, signature, KM_DIGEST_NONE);
@@ -1525,7 +1594,7 @@ TEST_P(ImportKeyTest, EcdsaSizeSpecified) {
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
-    string message(1024 / 8, 'a');
+    string message(32, 'a');
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE);
     VerifyMessage(message, signature, KM_DIGEST_NONE);
@@ -1638,9 +1707,7 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLong) {
 
     string result;
     size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
-    EXPECT_EQ(0U, result.size());
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, UpdateOperation(message, &result, &input_consumed));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
@@ -2666,7 +2733,7 @@ TEST_P(Keymaster0AdapterTest, OldSoftwareKeymaster1EcdsaBlob) {
     memcpy(key_data, km1_sw.data(), km1_sw.length());
     set_key_blob(key_data, km1_sw.length());
 
-    string message(64, 'a');
+    string message(32, static_cast<char>(0xFF));
     string signature;
     SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
 
