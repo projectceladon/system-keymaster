@@ -420,19 +420,27 @@ TEST_F(KeymasterBaseTest, TestIncompatiblePurposeAssymmetricKey) {
 
 TEST_F(KeymasterBaseTest, TestInvalidCallerNonce) {
     AuthorizationSet no_caller_nonce(AuthorizationSetBuilder()
-                                         .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
-                                         .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA));
+                                         .Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT)
+                                         .Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT)
+                                         .Authorization(TAG_ALGORITHM, KM_ALGORITHM_AES));
     AuthorizationSet caller_nonce(AuthorizationSetBuilder()
-                                      .Authorization(TAG_PURPOSE, KM_PURPOSE_VERIFY)
-                                      .Authorization(TAG_ALGORITHM, KM_ALGORITHM_RSA)
+                                      .Authorization(TAG_PURPOSE, KM_PURPOSE_ENCRYPT)
+                                      .Authorization(TAG_PURPOSE, KM_PURPOSE_DECRYPT)
+                                      .Authorization(TAG_ALGORITHM, KM_ALGORITHM_HMAC)
                                       .Authorization(TAG_CALLER_NONCE));
     AuthorizationSet begin_params(AuthorizationSetBuilder().Authorization(TAG_NONCE, "foo", 3));
 
     EXPECT_EQ(KM_ERROR_OK,
-              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, caller_nonce, begin_params,
+              kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, caller_nonce, begin_params,
+                                      0 /* challenge */, false /* is_begin_operation */));
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, caller_nonce, begin_params,
                                       0 /* challenge */, false /* is_begin_operation */));
     EXPECT_EQ(KM_ERROR_CALLER_NONCE_PROHIBITED,
-              kmen.AuthorizeOperation(KM_PURPOSE_VERIFY, key_id, no_caller_nonce, begin_params,
+              kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, no_caller_nonce, begin_params,
+                                      0 /* challenge */, false /* is_begin_operation */));
+    EXPECT_EQ(KM_ERROR_OK,
+              kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, no_caller_nonce, begin_params,
                                       0 /* challenge */, false /* is_begin_operation */));
 }
 
