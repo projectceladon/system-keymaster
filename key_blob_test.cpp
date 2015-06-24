@@ -328,29 +328,33 @@ TEST_F(KeyBlobTest, FuzzTest) {
 TEST_F(KeyBlobTest, UnderflowTest) {
     uint8_t buf[0];
     keymaster_key_blob_t blob = {buf, 0};
-    KeymasterKeyBlob key_blob1(blob);
-    EXPECT_NE(nullptr, key_blob1.key_material);
-    EXPECT_EQ(0U, key_blob1.key_material_size);
+    KeymasterKeyBlob key_blob(blob);
+    EXPECT_NE(nullptr, key_blob.key_material);
+    EXPECT_EQ(0U, key_blob.key_material_size);
 
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeIntegrityAssuredBlob(key_blob1, hidden_, &key_material_, &hw_enforced_,
+              DeserializeIntegrityAssuredBlob(key_blob, hidden_, &key_material_, &hw_enforced_,
                                               &sw_enforced_));
 
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeAuthEncryptedBlob(key_blob1, &ciphertext_, &hw_enforced_, &sw_enforced_,
+              DeserializeAuthEncryptedBlob(key_blob, &ciphertext_, &hw_enforced_, &sw_enforced_,
                                            &nonce_, &tag_));
+}
 
-    blob.key_material_size = UINT32_MAX;
-    KeymasterKeyBlob key_blob2(blob);
-    EXPECT_EQ(nullptr, key_blob2.key_material);
-    EXPECT_EQ(0U, key_blob2.key_material_size);
+TEST_F(KeyBlobTest, DupBufferToolarge) {
+    uint8_t buf[0];
+    keymaster_key_blob_t blob = {buf, 0};
+    blob.key_material_size = 16 * 1024 * 1024 + 1;
+    KeymasterKeyBlob key_blob(blob);
+    EXPECT_EQ(nullptr, key_blob.key_material);
+    EXPECT_EQ(0U, key_blob.key_material_size);
 
     ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeIntegrityAssuredBlob(key_blob2, hidden_, &key_material_, &hw_enforced_,
+              DeserializeIntegrityAssuredBlob(key_blob, hidden_, &key_material_, &hw_enforced_,
                                               &sw_enforced_));
 
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeAuthEncryptedBlob(key_blob2, &ciphertext_, &hw_enforced_, &sw_enforced_,
+              DeserializeAuthEncryptedBlob(key_blob, &ciphertext_, &hw_enforced_, &sw_enforced_,
                                            &nonce_, &tag_));
 }
 
