@@ -187,7 +187,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
     template <keymaster_tag_t T>
-    inline bool GetTagValue(TypedTag<KM_INT, T> tag, uint32_t* val) const {
+    inline bool GetTagValue(TypedTag<KM_UINT, T> tag, uint32_t* val) const {
         return GetTagValueInt(tag, val);
     }
 
@@ -197,7 +197,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * false.
      */
     template <keymaster_tag_t Tag>
-    bool GetTagValue(TypedTag<KM_INT_REP, Tag> tag, size_t instance, uint32_t* val) const {
+    bool GetTagValue(TypedTag<KM_UINT_REP, Tag> tag, size_t instance, uint32_t* val) const {
         return GetTagValueIntRep(tag, instance, val);
     }
 
@@ -206,7 +206,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
     template <keymaster_tag_t T>
-    inline bool GetTagValue(TypedTag<KM_LONG, T> tag, uint64_t* val) const {
+    inline bool GetTagValue(TypedTag<KM_ULONG, T> tag, uint64_t* val) const {
         return GetTagValueLong(tag, val);
     }
 
@@ -216,7 +216,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * false.
      */
     template <keymaster_tag_t Tag>
-    bool GetTagValue(TypedTag<KM_LONG_REP, Tag> tag, size_t instance, uint64_t* val) const {
+    bool GetTagValue(TypedTag<KM_ULONG_REP, Tag> tag, size_t instance, uint64_t* val) const {
         return GetTagValueLongRep(tag, instance, val);
     }
 
@@ -256,8 +256,8 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * true.  If \p tag is not present, leaves \p val unmodified and returns false.
      */
     template <keymaster_tag_t Tag>
-    bool GetTagValue(TypedTag<KM_INT_REP, Tag> tag, size_t instance,
-                     typename TypedTag<KM_INT_REP, Tag>::value_type* val) const {
+    bool GetTagValue(TypedTag<KM_UINT_REP, Tag> tag, size_t instance,
+                     typename TypedTag<KM_UINT_REP, Tag>::value_type* val) const {
         return GetTagValueIntRep(tag, instance, val);
     }
 

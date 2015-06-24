@@ -86,11 +86,11 @@ class Void {
  * types.  For each tag type we define a specialized struct that contains a typedef "value_type".
  */
 template <keymaster_tag_type_t tag_type> struct TagValueType {};
-template <> struct TagValueType<KM_LONG> { typedef uint64_t value_type; };
-template <> struct TagValueType<KM_LONG_REP> { typedef uint64_t value_type; };
+template <> struct TagValueType<KM_ULONG> { typedef uint64_t value_type; };
+template <> struct TagValueType<KM_ULONG_REP> { typedef uint64_t value_type; };
 template <> struct TagValueType<KM_DATE> { typedef uint64_t value_type; };
-template <> struct TagValueType<KM_INT> { typedef uint32_t value_type; };
-template <> struct TagValueType<KM_INT_REP> { typedef uint32_t value_type; };
+template <> struct TagValueType<KM_UINT> { typedef uint32_t value_type; };
+template <> struct TagValueType<KM_UINT_REP> { typedef uint32_t value_type; };
 template <> struct TagValueType<KM_INVALID> { typedef Void value_type; };
 template <> struct TagValueType<KM_BOOL> { typedef bool value_type; };
 template <> struct TagValueType<KM_BYTES> { typedef keymaster_blob_t value_type; };
@@ -159,20 +159,20 @@ class TypedEnumTag {
 #endif
 
 DEFINE_KEYMASTER_TAG(KM_INVALID, TAG_INVALID);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_KEY_SIZE);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_MAC_LENGTH);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_KEY_SIZE);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MAC_LENGTH);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_CALLER_NONCE);
-DEFINE_KEYMASTER_TAG(KM_LONG, TAG_RSA_PUBLIC_EXPONENT);
+DEFINE_KEYMASTER_TAG(KM_ULONG, TAG_RSA_PUBLIC_EXPONENT);
 DEFINE_KEYMASTER_TAG(KM_DATE, TAG_ACTIVE_DATETIME);
 DEFINE_KEYMASTER_TAG(KM_DATE, TAG_ORIGINATION_EXPIRE_DATETIME);
 DEFINE_KEYMASTER_TAG(KM_DATE, TAG_USAGE_EXPIRE_DATETIME);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_MIN_SECONDS_BETWEEN_OPS);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_MAX_USES_PER_BOOT);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MIN_SECONDS_BETWEEN_OPS);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MAX_USES_PER_BOOT);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_USERS);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_USER_ID);
-DEFINE_KEYMASTER_TAG(KM_LONG_REP, TAG_USER_SECURE_ID);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_USER_ID);
+DEFINE_KEYMASTER_TAG(KM_ULONG_REP, TAG_USER_SECURE_ID);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_NO_AUTH_REQUIRED);
-DEFINE_KEYMASTER_TAG(KM_INT, TAG_AUTH_TIMEOUT);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_AUTH_TIMEOUT);
 DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_APPLICATIONS);
 DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_APPLICATION_ID);
 DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_APPLICATION_DATA);
@@ -214,22 +214,22 @@ inline keymaster_key_param_t Authorization(TypedTag<KM_BOOL, Tag> tag) {
 }
 
 template <keymaster_tag_t Tag>
-inline keymaster_key_param_t Authorization(TypedTag<KM_INT, Tag> tag, uint32_t value) {
+inline keymaster_key_param_t Authorization(TypedTag<KM_UINT, Tag> tag, uint32_t value) {
     return keymaster_param_int(tag, value);
 }
 
 template <keymaster_tag_t Tag>
-inline keymaster_key_param_t Authorization(TypedTag<KM_INT_REP, Tag> tag, uint32_t value) {
+inline keymaster_key_param_t Authorization(TypedTag<KM_UINT_REP, Tag> tag, uint32_t value) {
     return keymaster_param_int(tag, value);
 }
 
 template <keymaster_tag_t Tag>
-inline keymaster_key_param_t Authorization(TypedTag<KM_LONG, Tag> tag, uint64_t value) {
+inline keymaster_key_param_t Authorization(TypedTag<KM_ULONG, Tag> tag, uint64_t value) {
     return keymaster_param_long(tag, value);
 }
 
 template <keymaster_tag_t Tag>
-inline keymaster_key_param_t Authorization(TypedTag<KM_LONG_REP, Tag> tag, uint64_t value) {
+inline keymaster_key_param_t Authorization(TypedTag<KM_ULONG_REP, Tag> tag, uint64_t value) {
     return keymaster_param_long(tag, value);
 }
 

@@ -69,13 +69,13 @@ bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM_REP, Tag, Keymas
 }
 
 template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_INT, Tag> tag, uint32_t val) {
+bool contains(const AuthorizationSet& set, TypedTag<KM_UINT, Tag> tag, uint32_t val) {
     int pos = set.find(tag);
     return pos != -1 && set[pos].integer == val;
 }
 
 template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_INT_REP, Tag> tag, uint32_t val) {
+bool contains(const AuthorizationSet& set, TypedTag<KM_UINT_REP, Tag> tag, uint32_t val) {
     int pos = -1;
     while ((pos = set.find(tag, pos)) != -1)
         if (set[pos].integer == val)
@@ -84,7 +84,7 @@ bool contains(const AuthorizationSet& set, TypedTag<KM_INT_REP, Tag> tag, uint32
 }
 
 template <keymaster_tag_t Tag>
-bool contains(const AuthorizationSet& set, TypedTag<KM_LONG, Tag> tag, uint64_t val) {
+bool contains(const AuthorizationSet& set, TypedTag<KM_ULONG, Tag> tag, uint64_t val) {
     int pos = set.find(tag);
     return pos != -1 && set[pos].long_integer == val;
 }
