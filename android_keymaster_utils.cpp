@@ -20,7 +20,13 @@
 
 namespace keymaster {
 
+// Keymaster never manages enormous buffers, so anything particularly large is bad data or the
+// result of a bug.  We arbitrarily set a 16 MiB limit.
+const size_t kMaxDupBufferSize = 16 * 1024 * 1024;
+
 uint8_t* dup_buffer(const void* buf, size_t size) {
+    if (size >= kMaxDupBufferSize)
+        return nullptr;
     uint8_t* retval = new (std::nothrow) uint8_t[size];
     if (retval)
         memcpy(retval, buf, size);
