@@ -93,7 +93,7 @@ keymaster_error_t EcdsaOperation::InitDigest() {
 }
 
 keymaster_error_t EcdsaOperation::StoreData(const Buffer& input, size_t* input_consumed) {
-    if (!data_.reserve(EVP_PKEY_bits(ecdsa_key_) / 8))
+    if (!data_.reserve((EVP_PKEY_bits(ecdsa_key_) + 7) / 8))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     // If the write fails, it's because input length exceeds key size.
