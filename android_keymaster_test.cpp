@@ -1294,6 +1294,52 @@ TEST_P(VerificationOperationsTest, EcdsaSuccess) {
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
 }
 
+TEST_P(VerificationOperationsTest, EcdsaTooShort) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
+    string message = "12345678901234567890";
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(4, GetParam()->keymaster0_calls());
+}
+
+TEST_P(VerificationOperationsTest, EcdsaTooLong) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(KM_DIGEST_NONE)));
+    string message = "1234567890123456789012345678901234";
+    string signature;
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+    string output;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, UpdateOperation(message, &output, &input_consumed));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
+
+TEST_P(VerificationOperationsTest, EcdsaSlightlyTooLong) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(521).Digest(KM_DIGEST_NONE)));
+
+    string message(66, 'a');
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_NONE);
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
+
+    // Modifying low-order bits doesn't matter, because they didn't get signed.  Ugh.
+    message[65] ^= 7;
+    VerifyMessage(message, signature, KM_DIGEST_NONE);
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(5, GetParam()->keymaster0_calls());
+}
+
 TEST_P(VerificationOperationsTest, EcdsaSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .EcdsaSigningKey(256)

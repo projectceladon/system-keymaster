@@ -163,8 +163,8 @@ keymaster_error_t RsaOperation::StoreData(const Buffer& input, size_t* input_con
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     // If the write fails, it's because input length exceeds key size.
     if (!data_.write(input.peek_read(), input.available_read())) {
-        LOG_E("Input too long: cannot operate on %u bytes of data with %u-bit RSA key",
-              input.available_read() + data_.available_read());
+        LOG_E("Input too long: cannot operate on %u bytes of data with %u-byte RSA key",
+              input.available_read() + data_.available_read(), EVP_PKEY_size(rsa_key_));
         return KM_ERROR_INVALID_INPUT_LENGTH;
     }
 
