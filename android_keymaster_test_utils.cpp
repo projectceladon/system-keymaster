@@ -34,10 +34,10 @@ std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
     case KM_INVALID:
         os << " Invalid";
         break;
-    case KM_INT_REP:
+    case KM_UINT_REP:
         os << " (Rep)";
     /* Falls through */
-    case KM_INT:
+    case KM_UINT:
         os << " Int: " << param.integer;
         break;
     case KM_ENUM_REP:
@@ -46,10 +46,10 @@ std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
     case KM_ENUM:
         os << " Enum: " << param.enumerated;
         break;
-    case KM_LONG_REP:
+    case KM_ULONG_REP:
         os << " (Rep)";
     /* Falls through */
-    case KM_LONG:
+    case KM_ULONG:
         os << " Long: " << param.long_integer;
         break;
     case KM_DATE:
@@ -76,14 +76,14 @@ bool operator==(const keymaster_key_param_t& a, const keymaster_key_param_t& b) 
     switch (keymaster_tag_get_type(a.tag)) {
     case KM_INVALID:
         return true;
-    case KM_INT_REP:
-    case KM_INT:
+    case KM_UINT_REP:
+    case KM_UINT:
         return a.integer == b.integer;
     case KM_ENUM_REP:
     case KM_ENUM:
         return a.enumerated == b.enumerated;
-    case KM_LONG:
-    case KM_LONG_REP:
+    case KM_ULONG:
+    case KM_ULONG_REP:
         return a.long_integer == b.long_integer;
     case KM_DATE:
         return a.date_time == b.date_time;
