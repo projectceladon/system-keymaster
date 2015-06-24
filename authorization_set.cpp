@@ -84,7 +84,7 @@ bool AuthorizationSet::reserve_indirect(size_t length) {
         return false;
 
     if (length > indirect_data_capacity_) {
-        uint8_t* new_data = new  (std::nothrow) uint8_t[length];
+        uint8_t* new_data = new (std::nothrow) uint8_t[length];
         if (new_data == NULL) {
             set_invalid(ALLOCATION_FAILURE);
             return false;
@@ -244,11 +244,11 @@ static size_t serialized_size(const keymaster_key_param_t& param) {
         return sizeof(uint32_t);
     case KM_ENUM:
     case KM_ENUM_REP:
-    case KM_INT:
-    case KM_INT_REP:
+    case KM_UINT:
+    case KM_UINT_REP:
         return sizeof(uint32_t) * 2;
-    case KM_LONG:
-    case KM_LONG_REP:
+    case KM_ULONG:
+    case KM_ULONG_REP:
     case KM_DATE:
         return sizeof(uint32_t) + sizeof(uint64_t);
     case KM_BOOL:
@@ -271,12 +271,12 @@ static uint8_t* serialize(const keymaster_key_param_t& param, uint8_t* buf, cons
     case KM_ENUM_REP:
         buf = append_uint32_to_buf(buf, end, param.enumerated);
         break;
-    case KM_INT:
-    case KM_INT_REP:
+    case KM_UINT:
+    case KM_UINT_REP:
         buf = append_uint32_to_buf(buf, end, param.integer);
         break;
-    case KM_LONG:
-    case KM_LONG_REP:
+    case KM_ULONG:
+    case KM_ULONG_REP:
         buf = append_uint64_to_buf(buf, end, param.long_integer);
         break;
     case KM_DATE:
@@ -307,11 +307,11 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, c
     case KM_ENUM:
     case KM_ENUM_REP:
         return copy_uint32_from_buf(buf_ptr, end, &param->enumerated);
-    case KM_INT:
-    case KM_INT_REP:
+    case KM_UINT:
+    case KM_UINT_REP:
         return copy_uint32_from_buf(buf_ptr, end, &param->integer);
-    case KM_LONG:
-    case KM_LONG_REP:
+    case KM_ULONG:
+    case KM_ULONG_REP:
         return copy_uint64_from_buf(buf_ptr, end, &param->long_integer);
     case KM_DATE:
         return copy_uint64_from_buf(buf_ptr, end, &param->date_time);
