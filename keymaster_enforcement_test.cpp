@@ -36,7 +36,7 @@ class TestKeymasterEnforcement : public KeymasterEnforcement {
                                          const AuthorizationSet& auth_set) {
         AuthorizationSet empty_set;
         return KeymasterEnforcement::AuthorizeOperation(
-            purpose, keyid, auth_set, empty_set, 0 /* op_handle */, false /* is_begin_operation */);
+            purpose, keyid, auth_set, empty_set, 0 /* op_handle */, true /* is_begin_operation */);
     }
     using KeymasterEnforcement::AuthorizeOperation;
 
@@ -432,16 +432,16 @@ TEST_F(KeymasterBaseTest, TestInvalidCallerNonce) {
 
     EXPECT_EQ(KM_ERROR_OK,
               kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, caller_nonce, begin_params,
-                                      0 /* challenge */, false /* is_begin_operation */));
+                                      0 /* challenge */, true /* is_begin_operation */));
     EXPECT_EQ(KM_ERROR_OK,
               kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, caller_nonce, begin_params,
-                                      0 /* challenge */, false /* is_begin_operation */));
+                                      0 /* challenge */, true /* is_begin_operation */));
     EXPECT_EQ(KM_ERROR_CALLER_NONCE_PROHIBITED,
               kmen.AuthorizeOperation(KM_PURPOSE_ENCRYPT, key_id, no_caller_nonce, begin_params,
-                                      0 /* challenge */, false /* is_begin_operation */));
+                                      0 /* challenge */, true /* is_begin_operation */));
     EXPECT_EQ(KM_ERROR_OK,
               kmen.AuthorizeOperation(KM_PURPOSE_DECRYPT, key_id, no_caller_nonce, begin_params,
-                                      0 /* challenge */, false /* is_begin_operation */));
+                                      0 /* challenge */, true /* is_begin_operation */));
 }
 
 TEST_F(KeymasterBaseTest, TestBootloaderOnly) {
@@ -752,8 +752,8 @@ TEST_F(KeymasterBaseTest, TestTimedAuthMissingToken) {
               kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
                                       true /* is_begin_operation */));
 
-    // And later (though begin would fail, so there wouldn't be a later).
-    EXPECT_EQ(KM_ERROR_KEY_USER_NOT_AUTHENTICATED,
+    // Later we don't check (though begin would fail, so there wouldn't be a later).
+    EXPECT_EQ(KM_ERROR_OK,
               kmen.AuthorizeOperation(KM_PURPOSE_SIGN, key_id, auth_set, op_params, token.challenge,
                                       false /* is_begin_operation */));
 }
