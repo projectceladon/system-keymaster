@@ -162,13 +162,12 @@ bool Keymaster0Engine::ImportKey(keymaster_key_format_t key_format,
 }
 
 static keymaster_key_blob_t* duplicate_blob(const uint8_t* key_data, size_t key_data_size) {
-    unique_ptr<uint8_t[]> key_material_copy(dup_buffer(key_data, key_data_size));
+    unique_ptr<uint8_t[]> key_material_copy(new uint8_t[key_data_size]);
     if (!key_material_copy)
         return nullptr;
 
-    unique_ptr<keymaster_key_blob_t> blob_copy(new  (std::nothrow) keymaster_key_blob_t);
-    if (!blob_copy.get())
-        return nullptr;
+    memcpy(key_material_copy.get(), key_data, key_data_size);
+    unique_ptr<keymaster_key_blob_t> blob_copy(new keymaster_key_blob_t);
     blob_copy->key_material_size = key_data_size;
     blob_copy->key_material = key_material_copy.release();
     return blob_copy.release();

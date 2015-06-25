@@ -209,7 +209,7 @@ class RsaSigningOperationFactory : public RsaDigestingOperationFactory {
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_SIGN; }
     Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
                                     EVP_PKEY* key) override {
-        return new (std::nothrow) RsaSignOperation(digest, padding, key);
+        return new RsaSignOperation(digest, padding, key);
     }
 };
 
@@ -220,7 +220,7 @@ class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_VERIFY; }
     Operation* InstantiateOperation(keymaster_digest_t digest, keymaster_padding_t padding,
                                     EVP_PKEY* key) override {
-        return new (std::nothrow) RsaVerifyOperation(digest, padding, key);
+        return new RsaVerifyOperation(digest, padding, key);
     }
 };
 
@@ -230,7 +230,7 @@ class RsaVerificationOperationFactory : public RsaDigestingOperationFactory {
 class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_ENCRYPT; }
     Operation* InstantiateOperation(keymaster_padding_t padding, EVP_PKEY* key) override {
-        return new (std::nothrow) RsaEncryptOperation(padding, key);
+        return new RsaEncryptOperation(padding, key);
     }
 };
 
@@ -240,7 +240,7 @@ class RsaEncryptionOperationFactory : public RsaCryptingOperationFactory {
 class RsaDecryptionOperationFactory : public RsaCryptingOperationFactory {
     keymaster_purpose_t purpose() const override { return KM_PURPOSE_DECRYPT; }
     Operation* InstantiateOperation(keymaster_padding_t padding, EVP_PKEY* key) override {
-        return new (std::nothrow) RsaDecryptOperation(padding, key);
+        return new RsaDecryptOperation(padding, key);
     }
 };
 

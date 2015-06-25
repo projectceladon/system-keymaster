@@ -193,7 +193,7 @@ keymaster_error_t EcKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforc
                                                const AuthorizationSet& sw_enforced,
                                                UniquePtr<AsymmetricKey>* key) const {
     keymaster_error_t error;
-    key->reset(new (std::nothrow) EcKey(hw_enforced, sw_enforced, &error));
+    key->reset(new EcKey(hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return error;

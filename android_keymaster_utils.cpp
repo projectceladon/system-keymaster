@@ -16,13 +16,11 @@
 
 #include <keymaster/android_keymaster_utils.h>
 
-#include <new>
-
 namespace keymaster {
 
 uint8_t* dup_buffer(const void* buf, size_t size) {
-    uint8_t* retval = new (std::nothrow) uint8_t[size];
-    if (retval)
+    uint8_t* retval = new uint8_t[size];
+    if (retval != NULL)
         memcpy(retval, buf, size);
     return retval;
 }

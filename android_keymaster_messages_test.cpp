@@ -575,26 +575,6 @@ template <typename Message> void parse_garbage() {
             msg.Deserialize(&p, end);
         }
     }
-
-    time_t now = time(NULL);
-    std::cout << "Seeding rand() with " << now << " for fuzz test." << std::endl;
-    srand(now);
-
-    // Fill large buffer with random bytes.
-    const int kBufSize = 10000;
-    UniquePtr<uint8_t[]> buf(new uint8_t[kBufSize]);
-    for (size_t i = 0; i < kBufSize; ++i)
-        buf[i] = static_cast<uint8_t>(rand());
-
-    for (uint32_t ver = 0; ver < MAX_MESSAGE_VERSION; ++ver) {
-        Message msg(ver);
-        const uint8_t* end = buf.get() + kBufSize;
-        for (size_t i = 0; i < kBufSize; ++i) {
-            const uint8_t* begin = buf.get() + i;
-            const uint8_t* p = begin;
-            msg.Deserialize(&p, end);
-        }
-    }
 }
 
 #define GARBAGE_TEST(Message)                                                                      \

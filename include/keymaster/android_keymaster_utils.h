@@ -66,8 +66,8 @@ template <typename T, size_t N> inline size_t array_length(const T(&)[N]) {
  * responsibility.
  */
 template <typename T> inline T* dup_array(const T* a, size_t n) {
-    T* dup = new (std::nothrow) T[n];
-    if (dup)
+    T* dup = new T[n];
+    if (dup != NULL)
         for (size_t i = 0; i < n; ++i)
             dup[i] = a[i];
     return dup;
@@ -218,31 +218,23 @@ struct KeymasterKeyBlob : public keymaster_key_blob_t {
     }
 
     KeymasterKeyBlob(const uint8_t* data, size_t size) {
-        key_material_size = 0;
         key_material = dup_buffer(data, size);
-        if (key_material)
-            key_material_size = size;
+        key_material_size = size;
     }
 
     explicit KeymasterKeyBlob(size_t size) {
-        key_material_size = 0;
-        key_material = new (std::nothrow) uint8_t[size];
-        if (key_material)
-            key_material_size = size;
+        key_material = new uint8_t[size];
+        key_material_size = size;
     }
 
     explicit KeymasterKeyBlob(const keymaster_key_blob_t& blob) {
-        key_material_size = 0;
         key_material = dup_buffer(blob.key_material, blob.key_material_size);
-        if (key_material)
-            key_material_size = blob.key_material_size;
+        key_material_size = blob.key_material_size;
     }
 
     KeymasterKeyBlob(const KeymasterKeyBlob& blob) {
-        key_material_size = 0;
         key_material = dup_buffer(blob.key_material, blob.key_material_size);
-        if (key_material)
-            key_material_size = blob.key_material_size;
+        key_material_size = blob.key_material_size;
     }
 
     void operator=(const KeymasterKeyBlob& blob) {
@@ -265,9 +257,8 @@ struct KeymasterKeyBlob : public keymaster_key_blob_t {
 
     const uint8_t* Reset(size_t new_size) {
         Clear();
-        key_material = new (std::nothrow) uint8_t[new_size];
-        if (key_material)
-            key_material_size = new_size;
+        key_material = new uint8_t[new_size];
+        key_material_size = new_size;
         return key_material;
     }
 

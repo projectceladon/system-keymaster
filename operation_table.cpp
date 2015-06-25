@@ -16,8 +16,6 @@
 
 #include "operation_table.h"
 
-#include <new>
-
 #include <openssl/rand.h>
 
 #include "openssl_err.h"
@@ -34,7 +32,7 @@ OperationTable::Entry::~Entry() {
 keymaster_error_t OperationTable::Add(Operation* operation,
                                       keymaster_operation_handle_t* op_handle) {
     if (!table_.get()) {
-        table_.reset(new (std::nothrow) Entry[table_size_]);
+        table_.reset(new Entry[table_size_]);
         if (!table_.get())
             return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }

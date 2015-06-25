@@ -18,8 +18,6 @@
 
 #include <assert.h>
 
-#include <new>
-
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 
@@ -52,7 +50,7 @@ static keymaster_error_t BuildDerivationData(const AuthorizationSet& hw_enforced
                                              size_t* derivation_data_length) {
     *derivation_data_length =
         hidden.SerializedSize() + hw_enforced.SerializedSize() + sw_enforced.SerializedSize();
-    derivation_data->reset(new (std::nothrow) uint8_t[*derivation_data_length]);
+    derivation_data->reset(new uint8_t[*derivation_data_length]);
     if (!derivation_data->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
@@ -78,13 +76,9 @@ static keymaster_error_t InitializeKeyWrappingContext(const AuthorizationSet& hw
         return error;
 
     SHA256_CTX sha256_ctx;
-    UniquePtr<uint8_t[]> hash_buf(new (std::nothrow) uint8_t[SHA256_DIGEST_LENGTH]);
-    if (!hash_buf.get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    UniquePtr<uint8_t[]> hash_buf(new uint8_t[SHA256_DIGEST_LENGTH]);
     Eraser hash_eraser(hash_buf.get(), SHA256_DIGEST_LENGTH);
-    UniquePtr<uint8_t[]> derived_key(new (std::nothrow) uint8_t[AES_BLOCK_SIZE]);
-    if (!derived_key.get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    UniquePtr<uint8_t[]> derived_key(new uint8_t[AES_BLOCK_SIZE]);
     Eraser derived_key_eraser(derived_key.get(), AES_BLOCK_SIZE);
 
     if (!ctx->get() || !hash_buf.get() || !derived_key.get())
@@ -126,15 +120,13 @@ keymaster_error_t OcbEncryptKey(const AuthorizationSet& hw_enforced,
         return KM_ERROR_INVALID_ARGUMENT;
 
     AeCtx ctx;
-    if (!ctx.get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     keymaster_error_t error =
         InitializeKeyWrappingContext(hw_enforced, sw_enforced, hidden, master_key, &ctx);
     if (error != KM_ERROR_OK)
         return error;
 
-    if (!ciphertext->Reset(plaintext.key_material_size))
+    ciphertext->Reset(plaintext.key_material_size);
+    if (!ciphertext->key_material)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     int ae_err = ae_encrypt(ctx.get(), nonce.peek_read(), plaintext.key_material,
@@ -145,8 +137,7 @@ keymaster_error_t OcbEncryptKey(const AuthorizationSet& hw_enforced,
         LOG_E("Error %d while encrypting key", ae_err);
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    if (!tag->advance_write(OCB_TAG_LENGTH))
-        return KM_ERROR_UNKNOWN_ERROR;
+    tag->advance_write(OCB_TAG_LENGTH);
     assert(ae_err == static_cast<int>(plaintext.key_material_size));
     return KM_ERROR_OK;
 }
@@ -162,15 +153,13 @@ keymaster_error_t OcbDecryptKey(const AuthorizationSet& hw_enforced,
         return KM_ERROR_INVALID_ARGUMENT;
 
     AeCtx ctx;
-    if (!ctx.get())
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     keymaster_error_t error =
         InitializeKeyWrappingContext(hw_enforced, sw_enforced, hidden, master_key, &ctx);
     if (error != KM_ERROR_OK)
         return error;
 
-    if (!plaintext->Reset(ciphertext.key_material_size))
+    plaintext->Reset(ciphertext.key_material_size);
+    if (!plaintext->key_material)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     int ae_err = ae_decrypt(ctx.get(), nonce.peek_read(), ciphertext.key_material,

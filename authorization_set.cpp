@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-#include <keymaster/authorization_set.h>
-
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
 
-#include <new>
+#include <assert.h>
 
+#include <keymaster/authorization_set.h>
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/logger.h>
 
@@ -66,7 +64,7 @@ bool AuthorizationSet::reserve_elems(size_t count) {
         return false;
 
     if (count >= elems_capacity_) {
-        keymaster_key_param_t* new_elems = new (std::nothrow) keymaster_key_param_t[count];
+        keymaster_key_param_t* new_elems = new keymaster_key_param_t[count];
         if (new_elems == NULL) {
             set_invalid(ALLOCATION_FAILURE);
             return false;
@@ -84,7 +82,7 @@ bool AuthorizationSet::reserve_indirect(size_t length) {
         return false;
 
     if (length > indirect_data_capacity_) {
-        uint8_t* new_data = new  (std::nothrow) uint8_t[length];
+        uint8_t* new_data = new uint8_t[length];
         if (new_data == NULL) {
             set_invalid(ALLOCATION_FAILURE);
             return false;
@@ -391,8 +389,7 @@ bool AuthorizationSet::DeserializeElementsData(const uint8_t** buf_ptr, const ui
     // Note that the following validation of elements_count is weak, but it prevents allocation of
     // elems_ arrays which are clearly too large to be reasonable.
     if (static_cast<ptrdiff_t>(elements_size) > end - *buf_ptr ||
-        elements_count * sizeof(uint32_t) > elements_size ||
-        *buf_ptr + (elements_count * sizeof(*elems_)) < *buf_ptr) {
+        elements_count * sizeof(uint32_t) > elements_size) {
         LOG_E("Malformed data found in AuthorizationSet deserialization", 0);
         set_invalid(MALFORMED_DATA);
         return false;

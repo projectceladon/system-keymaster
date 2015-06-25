@@ -27,7 +27,6 @@
 
 #include "android_keymaster_test_utils.h"
 #include "auth_encrypted_key_blob.h"
-#include "integrity_assured_key_blob.h"
 #include "ocb_utils.h"
 
 namespace keymaster {
@@ -286,72 +285,6 @@ TEST_F(KeyBlobTest, WrongAppId) {
     EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
               OcbDecryptKey(hw_enforced_, sw_enforced_, wrong_hidden, master_key_, ciphertext_,
                             nonce_, tag_, &decrypted_plaintext_));
-}
-
-// This test is especially useful when compiled for 32-bit mode and run under valgrind.
-TEST_F(KeyBlobTest, FuzzTest) {
-    time_t now = time(NULL);
-    std::cout << "Seeding rand() with " << now << " for fuzz test." << std::endl;
-    srand(now);
-
-    // Fill large buffer with random bytes.
-    const int kBufSize = 10000;
-    UniquePtr<uint8_t[]> buf(new uint8_t[kBufSize]);
-    for (size_t i = 0; i < kBufSize; ++i)
-        buf[i] = static_cast<uint8_t>(rand());
-
-    // Try to deserialize every offset with multiple methods.
-    size_t deserialize_auth_encrypted_success = 0;
-    for (size_t i = 0; i < kBufSize; ++i) {
-        keymaster_key_blob_t blob = {buf.get() + i, kBufSize - i};
-        KeymasterKeyBlob key_blob(blob);
-
-        // Integrity-assured blob.
-        ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-                  DeserializeIntegrityAssuredBlob(key_blob, hidden_, &key_material_, &hw_enforced_,
-                                                  &sw_enforced_));
-
-        // Auth-encrypted OCB blob.
-        keymaster_error_t error = DeserializeAuthEncryptedBlob(
-            key_blob, &ciphertext_, &hw_enforced_, &sw_enforced_, &nonce_, &tag_);
-        if (error == KM_ERROR_OK) {
-            // It's possible to deserialize successfully.  Decryption should always fail.
-            ++deserialize_auth_encrypted_success;
-            error = OcbDecryptKey(hw_enforced_, sw_enforced_, hidden_, master_key_, ciphertext_,
-                                  nonce_, tag_, &decrypted_plaintext_);
-        }
-        ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB, error)
-            << "Somehow sucessfully parsed a blob with seed " << now << " at offset " << i;
-    }
-}
-
-TEST_F(KeyBlobTest, UnderflowTest) {
-    uint8_t buf[0];
-    keymaster_key_blob_t blob = {buf, 0};
-    KeymasterKeyBlob key_blob1(blob);
-    EXPECT_NE(nullptr, key_blob1.key_material);
-    EXPECT_EQ(0U, key_blob1.key_material_size);
-
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeIntegrityAssuredBlob(key_blob1, hidden_, &key_material_, &hw_enforced_,
-                                              &sw_enforced_));
-
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeAuthEncryptedBlob(key_blob1, &ciphertext_, &hw_enforced_, &sw_enforced_,
-                                           &nonce_, &tag_));
-
-    blob.key_material_size = UINT32_MAX;
-    KeymasterKeyBlob key_blob2(blob);
-    EXPECT_EQ(nullptr, key_blob2.key_material);
-    EXPECT_EQ(0U, key_blob2.key_material_size);
-
-    ASSERT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeIntegrityAssuredBlob(key_blob2, hidden_, &key_material_, &hw_enforced_,
-                                              &sw_enforced_));
-
-    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB,
-              DeserializeAuthEncryptedBlob(key_blob2, &ciphertext_, &hw_enforced_, &sw_enforced_,
-                                           &nonce_, &tag_));
 }
 
 }  // namespace test

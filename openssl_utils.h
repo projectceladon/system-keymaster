@@ -65,6 +65,8 @@ inline void release_because_ownership_transferred(UniquePtr<T, Delete_T>& p) {
     T* val __attribute__((unused)) = p.release();
 }
 
+void convert_bn_to_blob(BIGNUM* bn, keymaster_blob_t* blob);
+
 keymaster_error_t convert_pkcs8_blob_to_evp(const uint8_t* key_data, size_t key_length,
                                             keymaster_algorithm_t expected_algorithm,
                                             UniquePtr<EVP_PKEY, EVP_PKEY_Delete>* pkey);
