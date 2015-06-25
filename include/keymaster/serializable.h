@@ -173,7 +173,7 @@ inline bool copy_uint32_array_from_buf(const uint8_t** buf_ptr, const uint8_t* e
         return false;
 
     const uint8_t* array_end = *buf_ptr + *count * sizeof(uint32_t);
-    if (array_end < *buf_ptr || array_end > end)
+    if (*count >= UINT32_MAX / sizeof(uint32_t) || array_end < *buf_ptr || array_end > end)
         return false;
 
     data->reset(new (std::nothrow) T[*count]);
