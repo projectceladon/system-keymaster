@@ -71,7 +71,7 @@ static keymaster_error_t DeserializeUnversionedBlob(const KeymasterKeyBlob& key_
         !copy_from_buf(buf_ptr, end, tag->peek_write(), OCB_TAG_LENGTH) ||
         !hw_enforced->Deserialize(buf_ptr, end) ||  //
         !sw_enforced->Deserialize(buf_ptr, end)) {
-        LOG_E("Failed to deserialize unversioned blob", 0);
+        LOG_I("Failed to deserialize unversioned blob (may be a HW-backed key)", 0);
         return KM_ERROR_INVALID_KEY_BLOB;
     }
     if (!nonce->advance_write(OCB_NONCE_LENGTH) || !tag->advance_write(OCB_TAG_LENGTH))
