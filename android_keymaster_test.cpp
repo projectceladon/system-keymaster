@@ -19,10 +19,13 @@
 #include <vector>
 
 #include <hardware/keymaster0.h>
+#include <keymaster/key_factory.h>
+#include <keymaster/soft_keymaster_context.h>
 #include <keymaster/soft_keymaster_device.h>
 #include <keymaster/softkeymaster.h>
 
 #include "android_keymaster_test_utils.h"
+#include "keymaster0_engine.h"
 
 using std::ifstream;
 using std::istreambuf_iterator;
@@ -43,11 +46,36 @@ namespace test {
 
 StdoutLogger logger;
 
+class TestKeymasterEnforcement : public KeymasterEnforcement {
+  public:
+    TestKeymasterEnforcement() : KeymasterEnforcement(3, 3) {}
+
+    virtual bool activation_date_valid(uint64_t /* activation_date */) const { return true; }
+    virtual bool expiration_date_passed(uint64_t /* expiration_date */) const { return false; }
+    virtual bool auth_token_timed_out(const hw_auth_token_t& /* token */,
+                                      uint32_t /* timeout */) const {
+        return false;
+    }
+    virtual uint32_t get_current_time() const { return 0; }
+    virtual bool ValidateTokenSignature(const hw_auth_token_t& /* token */) const { return true; }
+};
+
+class TestKeymasterContext : public SoftKeymasterContext {
+  public:
+    TestKeymasterContext(keymaster0_device_t* keymaster0 = nullptr)
+        : SoftKeymasterContext(keymaster0) {}
+
+    KeymasterEnforcement* enforcement_policy() override { return &test_policy_; }
+
+  private:
+    TestKeymasterEnforcement test_policy_;
+};
+
 class SoftKeymasterTestInstanceCreator : public Keymaster1TestInstanceCreator {
   public:
     keymaster1_device_t* CreateDevice() const override {
         std::cerr << "Creating software-only device" << std::endl;
-        SoftKeymasterDevice* device = new SoftKeymasterDevice;
+        SoftKeymasterDevice* device = new SoftKeymasterDevice(new TestKeymasterContext);
         return device->keymaster_device();
     }
 
@@ -77,7 +105,8 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster1TestInstanceCreato
 
         counting_keymaster0_device_ = new Keymaster0CountingWrapper(keymaster0_device);
 
-        SoftKeymasterDevice* keymaster = new SoftKeymasterDevice(counting_keymaster0_device_);
+        SoftKeymasterDevice* keymaster =
+            new SoftKeymasterDevice(new TestKeymasterContext(counting_keymaster0_device_));
         return keymaster->keymaster_device();
     }
 
@@ -641,7 +670,10 @@ TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
                                            .RsaEncryptionKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
@@ -1939,7 +1971,10 @@ TEST_P(EncryptionOperationsTest, RsaPkcs1CorruptedDecrypt) {
 TEST_P(EncryptionOperationsTest, RsaEncryptWithSigningKey) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().RsaSigningKey(256, 3).Padding(KM_PAD_NONE)));
-    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    ASSERT_EQ(KM_ERROR_INCOMPATIBLE_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
@@ -2743,6 +2778,51 @@ TEST_P(EncryptionOperationsTest, AesGcmCorruptTag) {
     EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(&plaintext));
 
     EXPECT_EQ(message, plaintext);
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+typedef Keymaster1Test MaxOperationsTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, MaxOperationsTest, test_params);
+
+TEST_P(MaxOperationsTest, TestLimit) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .EcbMode()
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MAX_USES_PER_BOOT, 3)));
+
+    string message = "1234567890123456";
+    string ciphertext1 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    string ciphertext2 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    string ciphertext3 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+
+    // Fourth time should fail.
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_KEY_MAX_OPS_EXCEEDED, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(MaxOperationsTest, TestAbort) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .EcbMode()
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MAX_USES_PER_BOOT, 3)));
+
+    string message = "1234567890123456";
+    string ciphertext1 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    string ciphertext2 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    string ciphertext3 = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+
+    // Fourth time should fail.
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_KEY_MAX_OPS_EXCEEDED, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 

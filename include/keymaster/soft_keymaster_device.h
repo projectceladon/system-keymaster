@@ -45,7 +45,19 @@ class AuthorizationSet;
  */
 class SoftKeymasterDevice {
   public:
+    /**
+     * Create a SoftKeymasterDevice wrapping the specified HW keymaster0 device, which may be NULL.
+     *
+     * Uses SoftKeymaserContext.
+     */
     SoftKeymasterDevice(keymaster0_device_t* keymaster0_device = nullptr);
+
+    /**
+     * Create a SoftKeymasterDevice that uses the specified KeymasterContext.
+     *
+     * TODO(swillden): Refactor SoftKeymasterDevice construction to make all components injectable.
+     */
+    SoftKeymasterDevice(KeymasterContext* context);
 
     hw_device_t* hw_device();
     keymaster1_device_t* keymaster_device();
@@ -56,6 +68,8 @@ class SoftKeymasterDevice {
     }
 
   private:
+    void initialize(keymaster0_device_t* keymaster0_device);
+
     static void StoreDefaultNewKeyParams(AuthorizationSet* auth_set);
     static keymaster_error_t GetPkcs8KeyAlgorithm(const uint8_t* key, size_t key_length,
                                                   keymaster_algorithm_t* algorithm);
