@@ -106,7 +106,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
     uint32_t min_ops_timeout = UINT32_MAX;
 
     bool update_access_count = false;
-    bool found_caller_nonce = false;
+    bool caller_nonce_authorized_by_key = false;
     bool authentication_required = false;
     bool auth_token_matched = false;
 
@@ -161,7 +161,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
             break;
 
         case KM_TAG_CALLER_NONCE:
-            found_caller_nonce = true;
+            caller_nonce_authorized_by_key = true;
             break;
 
         /* Tags should never be in key auths. */
@@ -217,7 +217,8 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         return KM_ERROR_KEY_USER_NOT_AUTHENTICATED;
     }
 
-    if (!found_caller_nonce && operation_params.find(KM_TAG_NONCE) != -1)
+    if (!caller_nonce_authorized_by_key && is_origination_purpose(purpose) &&
+        operation_params.find(KM_TAG_NONCE) != -1)
         return KM_ERROR_CALLER_NONCE_PROHIBITED;
 
     if (min_ops_timeout != UINT32_MAX &&
