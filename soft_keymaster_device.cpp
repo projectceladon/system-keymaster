@@ -60,6 +60,15 @@ namespace keymaster {
 
 SoftKeymasterDevice::SoftKeymasterDevice(keymaster0_device_t* keymaster0_device)
     : impl_(new AndroidKeymaster(new SoftKeymasterContext(keymaster0_device), 16)) {
+    initialize(keymaster0_device);
+}
+
+SoftKeymasterDevice::SoftKeymasterDevice(KeymasterContext* context)
+    : impl_(new AndroidKeymaster(context, 16)) {
+    initialize(nullptr);
+}
+
+void SoftKeymasterDevice::initialize(keymaster0_device_t* keymaster0_device) {
     static_assert(std::is_standard_layout<SoftKeymasterDevice>::value,
                   "SoftKeymasterDevice must be standard layout");
     static_assert(offsetof(SoftKeymasterDevice, device_) == 0,

@@ -237,6 +237,7 @@ android_keymaster_test: android_keymaster_test.o \
 	integrity_assured_key_blob.o \
 	key.o \
 	keymaster0_engine.o \
+	keymaster_enforcement.o \
 	logger.o \
 	ocb.o \
 	ocb_utils.o \
