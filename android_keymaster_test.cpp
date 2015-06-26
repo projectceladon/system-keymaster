@@ -782,6 +782,29 @@ TEST_P(SigningOperationsTest, HmacSha512Success) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(SigningOperationsTest, HmacAnyDigestSuccess) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE)));
+    string message = "12345678901234567890123456789012";
+    string signature;
+
+    size_t len;
+    keymaster_digest_t* digests;
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
+                                                           KM_PURPOSE_SIGN, &digests, &len));
+    for (size_t i = 0; i < len; ++i)
+        MacMessage(message, &signature, digests[i], 128 /* small MAC to work with all digests */);
+    free(digests);
+
+    // Ensure that we can't actually try to do an HMAC with no digest
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 128);
+    EXPECT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
 TEST_P(SigningOperationsTest, HmacLengthInKey) {
     // TODO(swillden): unified API should generate an error on key generation.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
@@ -1443,6 +1466,36 @@ TEST_P(VerificationOperationsTest, HmacSha512Success) {
     string signature;
     MacMessage(message, &signature, KM_DIGEST_SHA_2_512, 512);
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_512);
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(VerificationOperationsTest, HmacAnyDigestSuccess) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE)));
+    string message = "12345678901234567890123456789012";
+    string signature;
+
+    size_t len;
+    keymaster_digest_t* digests;
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
+                                                           KM_PURPOSE_SIGN, &digests, &len));
+    for (size_t i = 0; i < len; ++i) {
+        MacMessage(message, &signature, digests[i], 128 /* small MAC to work with all digests */);
+        VerifyMessage(message, signature, digests[i]);
+        if (len > 1) {
+            size_t wrong_digest_index = (i == 0) ? 1 : 0;
+            AuthorizationSet begin_params(client_params());
+            begin_params.push_back(TAG_DIGEST, digests[wrong_digest_index]);
+            begin_params.push_back(TAG_MAC_LENGTH, 128);
+            EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
+            string output;
+            size_t input_consumed;
+            EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &output, &input_consumed));
+            EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &output));
+        }
+    }
+    free(digests);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
