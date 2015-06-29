@@ -59,6 +59,37 @@ class KeymasterEnforcement {
                                          bool is_begin_operation);
 
     /**
+     * Iterates through the authorization set and returns the corresponding keymaster error. Will
+     * return KM_ERROR_OK if all criteria is met for the given purpose in the authorization set with
+     * the given operation params. Used for encrypt, decrypt sign, and verify.
+     */
+    keymaster_error_t AuthorizeBegin(const keymaster_purpose_t purpose, const km_id_t keyid,
+                                     const AuthorizationSet& auth_set,
+                                     const AuthorizationSet& operation_params);
+
+    /**
+     * Iterates through the authorization set and returns the corresponding keymaster error. Will
+     * return KM_ERROR_OK if all criteria is met for the given purpose in the authorization set with
+     * the given operation params and handle. Used for encrypt, decrypt sign, and verify.
+     */
+    keymaster_error_t AuthorizeUpdate(const AuthorizationSet& auth_set,
+                                      const AuthorizationSet& operation_params,
+                                      keymaster_operation_handle_t op_handle) {
+        return AuthorizeUpdateOrFinish(auth_set, operation_params, op_handle);
+    }
+
+    /**
+     * Iterates through the authorization set and returns the corresponding keymaster error. Will
+     * return KM_ERROR_OK if all criteria is met for the given purpose in the authorization set with
+     * the given operation params and handle. Used for encrypt, decrypt sign, and verify.
+     */
+    keymaster_error_t AuthorizeFinish(const AuthorizationSet& auth_set,
+                                      const AuthorizationSet& operation_params,
+                                      keymaster_operation_handle_t op_handle) {
+        return AuthorizeUpdateOrFinish(auth_set, operation_params, op_handle);
+    }
+
+    /**
      * Creates a key ID for use in subsequent calls to AuthorizeOperation.  Clients needn't use this
      * method of creating key IDs, as long as they use something consistent and unique.  This method
      * hashes the key blob.
@@ -116,6 +147,10 @@ class KeymasterEnforcement {
     virtual bool ValidateTokenSignature(const hw_auth_token_t& token) const = 0;
 
   private:
+    keymaster_error_t AuthorizeUpdateOrFinish(const AuthorizationSet& auth_set,
+                                              const AuthorizationSet& operation_params,
+                                              keymaster_operation_handle_t op_handle);
+
     bool MinTimeBetweenOpsPassed(uint32_t min_time_between, const km_id_t keyid);
     bool MaxUsesPerBootNotExceeded(const km_id_t keyid, uint32_t max_uses);
     bool AuthTokenMatches(const AuthorizationSet& auth_set,

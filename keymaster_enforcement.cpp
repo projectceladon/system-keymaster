@@ -65,19 +65,70 @@ inline bool is_usage_purpose(keymaster_purpose_t purpose) {
     return purpose == KM_PURPOSE_DECRYPT || purpose == KM_PURPOSE_VERIFY;
 }
 
-inline bool can_skip_authentication(bool is_begin_operation, bool is_auth_per_op_key) {
-    // Durign begin with auth-per-op keys, we don't require authentication because it can't be
-    // performed until after begin returns the operation handle used to for the authentication
-    // challenge.
-    return is_begin_operation && is_auth_per_op_key;
-}
-
 keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpose_t purpose,
                                                            const km_id_t keyid,
                                                            const AuthorizationSet& auth_set,
                                                            const AuthorizationSet& operation_params,
                                                            keymaster_operation_handle_t op_handle,
                                                            bool is_begin_operation) {
+    if (is_begin_operation)
+        return AuthorizeBegin(purpose, keyid, auth_set, operation_params);
+    else
+        return AuthorizeUpdateOrFinish(auth_set, operation_params, op_handle);
+}
+
+// For update and finish the only thing to check is user authentication, and then only if it's not
+// timeout-based.
+keymaster_error_t
+KeymasterEnforcement::AuthorizeUpdateOrFinish(const AuthorizationSet& auth_set,
+                                              const AuthorizationSet& operation_params,
+                                              keymaster_operation_handle_t op_handle) {
+    int auth_type_index = -1;
+    for (size_t pos = 0; pos < auth_set.size(); ++pos) {
+        switch (auth_set[pos].tag) {
+        case KM_TAG_NO_AUTH_REQUIRED:
+        case KM_TAG_AUTH_TIMEOUT:
+            // If no auth is required or if auth is timeout-based, we have nothing to check.
+            return KM_ERROR_OK;
+
+        case KM_TAG_USER_AUTH_TYPE:
+            auth_type_index = pos;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    // Note that at this point we should be able to assume that authentication is required, because
+    // authentication is required if KM_TAG_NO_AUTH_REQUIRED is absent.  However, there are legacy
+    // keys which have no authentication-related tags, so we assume that absence is equivalent to
+    // presence of KM_TAG_NO_AUTH_REQUIRED.
+    //
+    // So, if we found KM_TAG_USER_AUTH_TYPE or if we find KM_TAG_USER_SECURE_ID then authentication
+    // is required.  If we find neither, then we assume authentication is not required and return
+    // success.
+    bool authentication_required = (auth_type_index != -1);
+    for (auto& param : auth_set) {
+        if (param.tag == KM_TAG_USER_SECURE_ID) {
+            authentication_required = true;
+            int auth_timeout_index = -1;
+            if (AuthTokenMatches(auth_set, operation_params, param.long_integer, auth_type_index,
+                                 auth_timeout_index, op_handle, false /* is_begin_operation */))
+                return KM_ERROR_OK;
+        }
+    }
+
+    if (authentication_required)
+        return KM_ERROR_KEY_USER_NOT_AUTHENTICATED;
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t purpose,
+                                                       const km_id_t keyid,
+                                                       const AuthorizationSet& auth_set,
+                                                       const AuthorizationSet& operation_params) {
     // Find some entries that may be needed to handle KM_TAG_USER_SECURE_ID
     int auth_timeout_index = -1;
     int auth_type_index = -1;
@@ -150,12 +201,13 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
             if (no_auth_required_index != -1) {
                 // Key has both KM_TAG_USER_SECURE_ID and KM_TAG_NO_AUTH_REQUIRED
                 return KM_ERROR_INVALID_KEY_BLOB;
-            } else if (!can_skip_authentication(is_begin_operation, auth_timeout_index == -1) ||
-                       operation_params.find(KM_TAG_AUTH_TOKEN) != -1) {
+            }
+
+            if (auth_timeout_index != -1) {
                 authentication_required = true;
                 if (AuthTokenMatches(auth_set, operation_params, param.long_integer,
-                                     auth_type_index, auth_timeout_index, op_handle,
-                                     is_begin_operation))
+                                     auth_type_index, auth_timeout_index, 0 /* op_handle */,
+                                     true /* is_begin_operation */))
                     auth_token_matched = true;
             }
             break;
