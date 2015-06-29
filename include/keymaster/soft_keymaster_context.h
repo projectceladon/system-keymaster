@@ -52,6 +52,11 @@ class SoftKeymasterContext : public KeymasterContext {
     keymaster_error_t AddRngEntropy(const uint8_t* buf, size_t length) const override;
     keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const override;
 
+    KeymasterEnforcement* enforcement_policy() override {
+        // SoftKeymaster does no enforcement; it's all done by Keystore.
+        return nullptr;
+    }
+
   private:
     keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
                                                 KeymasterKeyBlob* key_material,

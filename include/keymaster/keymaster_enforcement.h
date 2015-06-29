@@ -19,8 +19,6 @@
 
 #include <stdio.h>
 
-#include <utils/List.h>
-
 #include <keymaster/authorization_set.h>
 
 namespace keymaster {
@@ -35,17 +33,16 @@ class KeymasterEnforcementContext {
      */
 };
 
-class KeymasterEnforcement {
+class AccessTimeMap;
+class AccessCountMap;
 
+class KeymasterEnforcement {
   public:
     /**
-     * Construct a KeymasterEnforcement.  Takes ownership of the context.
+     * Construct a KeymasterEnforcement.
      */
-    explicit KeymasterEnforcement(uint32_t max_access_time_map_size,
-                                  uint32_t max_access_count_map_size)
-        : access_time_map_(max_access_time_map_size), access_count_map_(max_access_count_map_size) {
-    }
-    virtual ~KeymasterEnforcement() {}
+    KeymasterEnforcement(uint32_t max_access_time_map_size, uint32_t max_access_count_map_size);
+    virtual ~KeymasterEnforcement();
 
     /**
      * Iterates through the authorization set and returns the corresponding keymaster error. Will
@@ -159,52 +156,10 @@ class KeymasterEnforcement {
                           const keymaster_operation_handle_t op_handle,
                           bool is_begin_operation) const;
 
-    class AccessTimeMap {
-      public:
-        AccessTimeMap(uint32_t max_size) : max_size_(max_size) {}
-
-        /* If the key is found, returns true and fills \p last_access_time.  If not found returns
-         * false. */
-        bool LastKeyAccessTime(km_id_t keyid, uint32_t* last_access_time) const;
-
-        /* Updates the last key access time with the currentTime parameter.  Adds the key if
-         * needed, returning false if key cannot be added because list is full. */
-        bool UpdateKeyAccessTime(km_id_t keyid, uint32_t current_time, uint32_t timeout);
-
-      private:
-        struct AccessTime {
-            km_id_t keyid;
-            uint32_t access_time;
-            uint32_t timeout;
-        };
-        android::List<AccessTime> last_access_list_;
-        const uint32_t max_size_;
-    };
-
-    class AccessCountMap {
-      public:
-        AccessCountMap(uint32_t max_size) : max_size_(max_size) {}
-
-        /* If the key is found, returns true and fills \p count.  If not found returns
-         * false. */
-        bool KeyAccessCount(km_id_t keyid, uint32_t* count) const;
-
-        /* Increments key access count, adding an entry if the key has never been used.  Returns
-         * false if the list has reached maximum size. */
-        bool IncrementKeyAccessCount(km_id_t keyid);
-
-      private:
-        struct AccessCount {
-            km_id_t keyid;
-            uint64_t access_count;
-        };
-        android::List<AccessCount> access_count_list_;
-        const uint32_t max_size_;
-    };
-
-    AccessTimeMap access_time_map_;
-    AccessCountMap access_count_map_;
+    AccessTimeMap* access_time_map_;
+    AccessCountMap* access_count_map_;
 };
+
 }; /* namespace keymaster */
 
 #endif  // ANDROID_LIBRARY_KEYMASTER_ENFORCEMENT_H

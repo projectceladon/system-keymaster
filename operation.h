@@ -21,8 +21,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <keymaster/android_keymaster_utils.h>
 #include <hardware/keymaster_defs.h>
+#include <keymaster/android_keymaster_utils.h>
+#include <keymaster/authorization_set.h>
 #include <keymaster/logger.h>
 
 namespace keymaster {
@@ -91,6 +92,14 @@ class Operation {
 
     keymaster_purpose_t purpose() const { return purpose_; }
 
+    void set_key_id(uint64_t key_id) { key_id_ = key_id; }
+    uint64_t key_id() const { return key_id_; }
+
+    void SetAuthorizations(const AuthorizationSet& auths) {
+        key_auths_.Reinitialize(auths.data(), auths.size());
+    }
+    const AuthorizationSet authorizations() { return key_auths_; }
+
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
                                     AuthorizationSet* output_params) = 0;
     virtual keymaster_error_t Update(const AuthorizationSet& input_params, const Buffer& input,
@@ -102,6 +111,8 @@ class Operation {
 
   private:
     const keymaster_purpose_t purpose_;
+    AuthorizationSet key_auths_;
+    uint64_t key_id_;
 };
 
 }  // namespace keymaster

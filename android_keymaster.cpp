@@ -234,21 +234,30 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (!factory)
         return;
 
-    response->error = KM_ERROR_INCOMPATIBLE_PURPOSE;
-    if (!key->authorizations().Contains(TAG_PURPOSE, request.purpose) &&
-        !factory->is_public_key_operation())
-        return;
-
     UniquePtr<Operation> operation(
         factory->CreateOperation(*key, request.additional_params, &response->error));
     if (operation.get() == NULL)
         return;
+
+    if (context_->enforcement_policy()) {
+        km_id_t key_id;
+        response->error = KM_ERROR_UNKNOWN_ERROR;
+        if (!context_->enforcement_policy()->CreateKeyId(request.key_blob, &key_id))
+            return;
+        operation->set_key_id(key_id);
+        response->error = context_->enforcement_policy()->AuthorizeOperation(
+            request.purpose, key_id, key->authorizations(), request.additional_params,
+            0 /* op_handle */, true /* is_begin_operation */);
+        if (response->error != KM_ERROR_OK)
+            return;
+    }
 
     response->output_params.Clear();
     response->error = operation->Begin(request.additional_params, &response->output_params);
     if (response->error != KM_ERROR_OK)
         return;
 
+    operation->SetAuthorizations(key->authorizations());
     response->error = operation_table_->Add(operation.release(), &response->op_handle);
 }
 
@@ -261,6 +270,14 @@ void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
     Operation* operation = operation_table_->Find(request.op_handle);
     if (operation == NULL)
         return;
+
+    if (context_->enforcement_policy()) {
+        response->error = context_->enforcement_policy()->AuthorizeOperation(
+            operation->purpose(), operation->key_id(), operation->authorizations(),
+            request.additional_params, request.op_handle, false /* is_begin_operation */);
+        if (response->error != KM_ERROR_OK)
+            return;
+    }
 
     response->error =
         operation->Update(request.additional_params, request.input, &response->output_params,
@@ -280,6 +297,14 @@ void AndroidKeymaster::FinishOperation(const FinishOperationRequest& request,
     Operation* operation = operation_table_->Find(request.op_handle);
     if (operation == NULL)
         return;
+
+    if (context_->enforcement_policy()) {
+        response->error = context_->enforcement_policy()->AuthorizeOperation(
+            operation->purpose(), operation->key_id(), operation->authorizations(),
+            request.additional_params, request.op_handle, false /* is_begin_operation */);
+        if (response->error != KM_ERROR_OK)
+            return;
+    }
 
     response->error = operation->Finish(request.additional_params, request.signature,
                                         &response->output_params, &response->output);

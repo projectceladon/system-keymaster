@@ -20,6 +20,7 @@
 #include <assert.h>
 
 #include <hardware/keymaster_defs.h>
+#include <keymaster/keymaster_enforcement.h>
 
 namespace keymaster {
 
@@ -120,6 +121,11 @@ class KeymasterContext {
      * Generates \p length random bytes, placing them in \p buf.
      */
     virtual keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const = 0;
+
+    /**
+     * Return the enforcement policy for this context, or null if no enforcement should be done.
+     */
+    virtual KeymasterEnforcement* enforcement_policy() = 0;
 
   private:
     // Uncopyable.
