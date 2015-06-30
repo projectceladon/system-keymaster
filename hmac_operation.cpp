@@ -45,15 +45,8 @@ Operation* HmacOperationFactory::CreateOperation(const Key& key,
     }
 
     keymaster_digest_t digest;
-    if (!begin_params.GetTagValue(TAG_DIGEST, &digest)) {
-        LOG_E("%d digests specified in begin params", begin_params.GetTagCount(TAG_DIGEST));
-        *error = KM_ERROR_UNSUPPORTED_DIGEST;
+    if (!GetAndValidateDigest(begin_params, key, &digest, error))
         return nullptr;
-    } else if (!key.authorizations().Contains(TAG_DIGEST, digest)) {
-        LOG_E("Digest %d was specified, but not authorized by key", digest);
-        *error = KM_ERROR_INCOMPATIBLE_DIGEST;
-        return nullptr;
-    }
 
     const SymmetricKey* symmetric_key = static_cast<const SymmetricKey*>(&key);
     UniquePtr<HmacOperation> op(
