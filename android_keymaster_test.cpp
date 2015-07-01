@@ -2115,6 +2115,24 @@ TEST_P(EncryptionOperationsTest, AesEcbPkcs7Padding) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(EncryptionOperationsTest, AesEcbNoPaddingKeyWithPkcs7Padding) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+
+    // Try various message lengths; all should work.
+    for (size_t i = 0; i < 32; ++i) {
+        string message(i, 'a');
+        string ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_PKCS7);
+        EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
+        string plaintext = DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_PKCS7);
+        EXPECT_EQ(message, plaintext);
+    }
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
 TEST_P(EncryptionOperationsTest, AesEcbPkcs7PaddingCorrupted) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
