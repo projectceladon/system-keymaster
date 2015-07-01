@@ -38,7 +38,16 @@ static const size_t GCM_MAX_TAG_LENGTH = 16;
 static const size_t GCM_MIN_TAG_LENGTH = 12;
 
 inline bool allows_padding(keymaster_block_mode_t block_mode) {
-    return (block_mode == KM_MODE_CTR || block_mode == KM_MODE_GCM);
+    switch (block_mode) {
+    case KM_MODE_CTR:
+    case KM_MODE_GCM:
+        return false;
+    case KM_MODE_ECB:
+    case KM_MODE_CBC:
+        return true;
+    }
+    assert(false /* Can't get here */);
+    return false;
 }
 
 Operation* AesOperationFactory::CreateOperation(const Key& key,
@@ -81,17 +90,10 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
     }
 
     keymaster_padding_t padding;
-    if (!begin_params.GetTagValue(TAG_PADDING, &padding)) {
-        LOG_E("%d padding modes specified in begin params", begin_params.GetTagCount(TAG_PADDING));
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    } else if (!supported(padding)) {
-        LOG_E("Padding mode %d not supported", padding);
-        *error = KM_ERROR_UNSUPPORTED_PADDING_MODE;
-    } else if (allows_padding(block_mode) && padding != KM_PAD_NONE) {
+    if (!GetAndValidatePadding(begin_params, key, &padding, error))
+        return nullptr;
+    if (!allows_padding(block_mode) && padding != KM_PAD_NONE) {
         LOG_E("Mode does not support padding", 0);
-        *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
-    } else if (!key.authorizations().Contains(TAG_PADDING, padding)) {
-        LOG_E("Padding mode %d was specified, but not authorized by key", padding);
         *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
     }
 
