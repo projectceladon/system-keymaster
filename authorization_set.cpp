@@ -330,7 +330,8 @@ static bool deserialize(keymaster_key_param_t* param, const uint8_t** buf_ptr, c
         if (!copy_uint32_from_buf(buf_ptr, end, &param->blob.data_length) ||
             !copy_uint32_from_buf(buf_ptr, end, &offset))
             return false;
-        if (static_cast<ptrdiff_t>(offset) > indirect_end - indirect_base ||
+        if (param->blob.data_length + offset < param->blob.data_length ||  // Overflow check
+            static_cast<ptrdiff_t>(offset) > indirect_end - indirect_base ||
             static_cast<ptrdiff_t>(offset + param->blob.data_length) > indirect_end - indirect_base)
             return false;
         param->blob.data = indirect_base + offset;
