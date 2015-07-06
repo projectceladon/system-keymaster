@@ -59,7 +59,8 @@ struct keystore_module soft_keymaster_device_module = {
 namespace keymaster {
 
 SoftKeymasterDevice::SoftKeymasterDevice(keymaster0_device_t* keymaster0_device)
-    : impl_(new AndroidKeymaster(new SoftKeymasterContext(keymaster0_device), 16)) {
+    : wrapped_device_(keymaster0_device),
+      impl_(new AndroidKeymaster(new SoftKeymasterContext(keymaster0_device), 16)) {
     initialize(keymaster0_device);
 }
 
@@ -790,14 +791,30 @@ keymaster_error_t SoftKeymasterDevice::export_key(const keymaster1_device_t* dev
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::delete_key(const struct keymaster1_device* /* dev */,
-                                                  const keymaster_key_blob_t* /* key */) {
-    return KM_ERROR_UNIMPLEMENTED;
+keymaster_error_t SoftKeymasterDevice::delete_key(const struct keymaster1_device* dev,
+                                                  const keymaster_key_blob_t* key) {
+    if (!dev || !key || !key->key_material)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    keymaster0_device_t* wrapped = convert_device(dev)->wrapped_device_;
+
+    if (wrapped && wrapped->delete_keypair)
+        if (wrapped->delete_keypair(wrapped, key->key_material, key->key_material_size) < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+    return KM_ERROR_OK;
 }
 
 /* static */
-keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_device* /* dev */) {
-    return KM_ERROR_UNIMPLEMENTED;
+keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_device* dev) {
+    if (!dev)
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    keymaster0_device_t* wrapped = convert_device(dev)->wrapped_device_;
+
+    if (wrapped && wrapped->delete_all)
+        if (wrapped->delete_all(wrapped) < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+    return KM_ERROR_OK;
 }
 
 /* static */
