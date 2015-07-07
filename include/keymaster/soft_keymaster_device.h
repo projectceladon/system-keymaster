@@ -173,6 +173,7 @@ class SoftKeymasterDevice {
                                    keymaster_operation_handle_t operation_handle);
 
     keymaster1_device_t device_;
+    keymaster0_device_t* wrapped_device_;
     UniquePtr<AndroidKeymaster> impl_;
 };
 
