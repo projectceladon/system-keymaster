@@ -2076,6 +2076,21 @@ TEST_P(EncryptionOperationsTest, AesEcbRoundTripSuccess) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(EncryptionOperationsTest, AesEcbNotAuthorized) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_CBC)
+                                           .Padding(KM_PAD_NONE)));
+    // Two-block message.
+    string message = "12345678901234567890123456789012";
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_BLOCK_MODE, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
 TEST_P(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)

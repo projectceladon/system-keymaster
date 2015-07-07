@@ -70,23 +70,30 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
     if (!begin_params.GetTagValue(TAG_BLOCK_MODE, &block_mode)) {
         LOG_E("%d block modes specified in begin params", begin_params.GetTagCount(TAG_BLOCK_MODE));
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
+        return nullptr;
     } else if (!supported(block_mode)) {
         LOG_E("Block mode %d not supported", block_mode);
         *error = KM_ERROR_UNSUPPORTED_BLOCK_MODE;
+        return nullptr;
     } else if (!key.authorizations().Contains(TAG_BLOCK_MODE, block_mode)) {
         LOG_E("Block mode %d was specified, but not authorized by key", block_mode);
         *error = KM_ERROR_INCOMPATIBLE_BLOCK_MODE;
+        return nullptr;
     }
 
     size_t tag_length = 0;
     if (block_mode == KM_MODE_GCM) {
         uint32_t tag_length_bits;
-        if (!begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length_bits))
+        if (!begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length_bits)) {
             *error = KM_ERROR_MISSING_MAC_LENGTH;
+            return nullptr;
+        }
         tag_length = tag_length_bits / 8;
         if (tag_length_bits % 8 != 0 || tag_length > GCM_MAX_TAG_LENGTH ||
-            tag_length < GCM_MIN_TAG_LENGTH)
+            tag_length < GCM_MIN_TAG_LENGTH) {
             *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+            return nullptr;
+        }
     }
 
     keymaster_padding_t padding;
@@ -95,14 +102,12 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
     if (!allows_padding(block_mode) && padding != KM_PAD_NONE) {
         LOG_E("Mode does not support padding", 0);
         *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;
+        return nullptr;
     }
 
     bool caller_nonce = key.authorizations().GetTagValue(TAG_CALLER_NONCE);
 
-    if (*error != KM_ERROR_OK)
-        return nullptr;
-
-    Operation* op = NULL;
+    Operation* op = nullptr;
     switch (purpose()) {
     case KM_PURPOSE_ENCRYPT:
         op = new (std::nothrow)
@@ -116,7 +121,7 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
         break;
     default:
         *error = KM_ERROR_UNSUPPORTED_PURPOSE;
-        return NULL;
+        return nullptr;
     }
 
     if (!op)
