@@ -46,6 +46,10 @@ namespace test {
 
 StdoutLogger logger;
 
+template <typename T> vector<T> make_vector(const T* array, size_t len) {
+    return vector<T>(array, array + len);
+}
+
 class TestKeymasterEnforcement : public KeymasterEnforcement {
   public:
     TestKeymasterEnforcement() : KeymasterEnforcement(3, 3) {}
@@ -221,10 +225,9 @@ TEST_P(CheckSupported, SupportedDigests) {
 
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
-    EXPECT_TRUE(
-        ResponseContains({KM_DIGEST_NONE, KM_DIGEST_MD5, KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
-                          KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512},
-                         digests, len));
+    EXPECT_TRUE(ResponseContains({KM_DIGEST_NONE, KM_DIGEST_SHA1, KM_DIGEST_SHA_2_224,
+                                  KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512},
+                                 digests, len));
     free(digests);
 
     EXPECT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE,
@@ -715,6 +718,34 @@ TEST_P(SigningOperationsTest, EcdsaNoPaddingHugeData) {
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, EcsdaAllSizesAndHashes) {
+    size_t len;
+    keymaster_digest_t* digest_arr;
+    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_EC,
+                                                           KM_PURPOSE_SIGN, &digest_arr, &len));
+    vector<int> key_sizes = {224, 256, 384, 521};
+    vector<keymaster_digest_t> digests = make_vector(digest_arr, len);
+    free(digest_arr);
+
+    for (int key_size : key_sizes) {
+        for (keymaster_digest_t digest : digests) {
+            ASSERT_EQ(
+                KM_ERROR_OK,
+                GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(key_size).Digest(digest)));
+
+            string message(1024, 'a');
+            string signature;
+            if (digest == KM_DIGEST_NONE)
+                message.resize(key_size / 8);
+            SignMessage(message, &signature, digest);
+        }
+    }
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(digests.size() * key_sizes.size() * 3,
+                  static_cast<size_t>(GetParam()->keymaster0_calls()));
 }
 
 TEST_P(SigningOperationsTest, AesEcbSign) {
@@ -1231,10 +1262,6 @@ TEST_P(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
-}
-
-template <typename T> vector<T> make_vector(const T* array, size_t len) {
-    return vector<T>(array, array + len);
 }
 
 TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
