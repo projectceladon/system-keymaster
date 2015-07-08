@@ -24,9 +24,9 @@
 
 namespace keymaster {
 
-static const keymaster_digest_t supported_digests[] = {
-    KM_DIGEST_NONE,      KM_DIGEST_MD5,       KM_DIGEST_SHA1,     KM_DIGEST_SHA_2_224,
-    KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512};
+static const keymaster_digest_t supported_digests[] = {KM_DIGEST_NONE,      KM_DIGEST_SHA1,
+                                                       KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256,
+                                                       KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512};
 
 Operation* EcdsaOperationFactory::CreateOperation(const Key& key,
                                                   const AuthorizationSet& begin_params,
@@ -70,8 +70,7 @@ keymaster_error_t EcdsaOperation::InitDigest() {
     case KM_DIGEST_NONE:
         return KM_ERROR_OK;
     case KM_DIGEST_MD5:
-        digest_algorithm_ = EVP_md5();
-        return KM_ERROR_OK;
+        return KM_ERROR_UNSUPPORTED_DIGEST;
     case KM_DIGEST_SHA1:
         digest_algorithm_ = EVP_sha1();
         return KM_ERROR_OK;
