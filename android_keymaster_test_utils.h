@@ -221,13 +221,13 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
     void SignMessage(const std::string& message, std::string* signature, keymaster_digest_t digest);
     void SignMessage(const std::string& message, std::string* signature, keymaster_digest_t digest,
                      keymaster_padding_t padding);
-    void MacMessage(const std::string& message, std::string* signature, keymaster_digest_t digest,
-                    size_t mac_length);
+    void MacMessage(const std::string& message, std::string* signature, size_t mac_length);
 
     void VerifyMessage(const std::string& message, const std::string& signature,
                        keymaster_digest_t digest);
     void VerifyMessage(const std::string& message, const std::string& signature,
                        keymaster_digest_t digest, keymaster_padding_t padding);
+    void VerifyMac(const std::string& message, const std::string& signature);
 
     std::string EncryptMessage(const std::string& message, keymaster_padding_t padding,
                                std::string* generated_nonce = NULL);
