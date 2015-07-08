@@ -86,10 +86,6 @@ static keymaster_error_t authorized_purpose(const keymaster_purpose_t purpose,
     switch (purpose) {
     case KM_PURPOSE_VERIFY:
     case KM_PURPOSE_ENCRYPT:
-        if (is_public_key_algorithm(auth_set) || auth_set.Contains(TAG_PURPOSE, purpose))
-            return KM_ERROR_OK;
-        return KM_ERROR_INCOMPATIBLE_PURPOSE;
-
     case KM_PURPOSE_SIGN:
     case KM_PURPOSE_DECRYPT:
         if (auth_set.Contains(TAG_PURPOSE, purpose))
@@ -125,6 +121,19 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
                                                            const AuthorizationSet& operation_params,
                                                            keymaster_operation_handle_t op_handle,
                                                            bool is_begin_operation) {
+    if (is_public_key_algorithm(auth_set)) {
+        switch (purpose) {
+        case KM_PURPOSE_ENCRYPT:
+        case KM_PURPOSE_VERIFY:
+            /* Public key operations are always authorized. */
+            return KM_ERROR_OK;
+
+        case KM_PURPOSE_DECRYPT:
+        case KM_PURPOSE_SIGN:
+            break;
+        };
+    };
+
     if (is_begin_operation)
         return AuthorizeBegin(purpose, keyid, auth_set, operation_params);
     else
