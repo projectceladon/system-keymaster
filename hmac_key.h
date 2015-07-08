@@ -21,6 +21,8 @@
 
 namespace keymaster {
 
+const size_t kMinHmacLengthBits = 64;
+
 class HmacKeyFactory : public SymmetricKeyFactory {
   public:
     HmacKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
@@ -37,6 +39,8 @@ class HmacKeyFactory : public SymmetricKeyFactory {
         return key_size_bits > 0 && key_size_bits % 8 == 00 &&
                key_size_bits <= 2048 /* Some RFC test cases require >1024-bit keys */;
     }
+    keymaster_error_t validate_algorithm_specific_new_key_params(
+        const AuthorizationSet& key_description) const override;
 };
 
 class HmacKey : public SymmetricKey {

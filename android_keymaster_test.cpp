@@ -438,8 +438,61 @@ TEST_P(NewKeyGeneration, EcdsaAllValidSizes) {
 }
 
 TEST_P(NewKeyGeneration, HmacSha256) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 256)));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(NewKeyGeneration, HmacMultipleDigests) {
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST,
+              GenerateKey(AuthorizationSetBuilder()
+                              .HmacKey(128)
+                              .Digest(KM_DIGEST_SHA1)
+                              .Digest(KM_DIGEST_SHA_2_256)
+                              .Authorization(TAG_MIN_MAC_LENGTH, 128)));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(NewKeyGeneration, HmacDigestNone) {
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_DIGEST,
+              GenerateKey(AuthorizationSetBuilder()
+                              .HmacKey(128)
+                              .Digest(KM_DIGEST_NONE)
+                              .Authorization(TAG_MIN_MAC_LENGTH, 128)));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(NewKeyGeneration, HmacSha256TooShortMacLength) {
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MIN_MAC_LENGTH,
+              GenerateKey(AuthorizationSetBuilder()
+                              .HmacKey(128)
+                              .Digest(KM_DIGEST_SHA_2_256)
+                              .Authorization(TAG_MIN_MAC_LENGTH, 48)));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(NewKeyGeneration, HmacSha256NonIntegralOctetMacLength) {
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MIN_MAC_LENGTH,
+              GenerateKey(AuthorizationSetBuilder()
+                              .HmacKey(128)
+                              .Digest(KM_DIGEST_SHA_2_256)
+                              .Authorization(TAG_MIN_MAC_LENGTH, 130)));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(NewKeyGeneration, HmacSha256TooLongMacLength) {
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MIN_MAC_LENGTH,
+              GenerateKey(AuthorizationSetBuilder()
+                              .HmacKey(128)
+                              .Digest(KM_DIGEST_SHA_2_256)
+                              .Authorization(TAG_MIN_MAC_LENGTH, 384)));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -759,94 +812,67 @@ TEST_P(SigningOperationsTest, AesEcbSign) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA1)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 160));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA1, 160);
+    MacMessage(message, &signature, 160);
     ASSERT_EQ(20U, signature.size());
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, HmacSha224Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_224)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 160)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_224, 224);
+    MacMessage(message, &signature, 224);
     ASSERT_EQ(28U, signature.size());
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, HmacSha256Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 256)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 256);
+    MacMessage(message, &signature, 256);
     ASSERT_EQ(32U, signature.size());
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, HmacSha384Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_384)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 384)));
 
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_384, 384);
+    MacMessage(message, &signature, 384);
     ASSERT_EQ(48U, signature.size());
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, HmacSha512Success) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512)));
-    string message = "12345678901234567890123456789012";
-    string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_512, 512);
-    ASSERT_EQ(64U, signature.size());
-
-    EXPECT_EQ(0, GetParam()->keymaster0_calls());
-}
-
-TEST_P(SigningOperationsTest, HmacAnyDigestSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE)));
-    string message = "12345678901234567890123456789012";
-    string signature;
-
-    size_t len;
-    keymaster_digest_t* digests;
-    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
-                                                           KM_PURPOSE_SIGN, &digests, &len));
-    for (size_t i = 0; i < len; ++i)
-        MacMessage(message, &signature, digests[i], 128 /* small MAC to work with all digests */);
-    free(digests);
-
-    // Ensure that we can't actually try to do an HMAC with no digest
-    AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
-    begin_params.push_back(TAG_MAC_LENGTH, 128);
-    EXPECT_EQ(KM_ERROR_UNSUPPORTED_DIGEST, BeginOperation(KM_PURPOSE_SIGN, begin_params));
-
-    EXPECT_EQ(0, GetParam()->keymaster0_calls());
-}
-
-TEST_P(SigningOperationsTest, HmacLengthInKey) {
-    // TODO(swillden): unified API should generate an error on key generation.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
-                                           .Digest(KM_DIGEST_SHA_2_256)
-                                           .Authorization(TAG_MAC_LENGTH, 20)));
+                                           .Digest(KM_DIGEST_SHA_2_512)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 512)));
     string message = "12345678901234567890123456789012";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 240);
-    // Size in key was ignored.
-    ASSERT_EQ(30U, signature.size());
+    MacMessage(message, &signature, 512);
+    ASSERT_EQ(64U, signature.size());
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1098,18 +1124,29 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase7) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha256TooLargeMacLength) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 256)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_MAC_LENGTH, 264);
     begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
-    ASSERT_EQ(KM_ERROR_OK,
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH,
               BeginOperation(KM_PURPOSE_SIGN, begin_params, nullptr /* output_params */));
-    string message = "1234567890123456789012345678901";
-    string result;
-    size_t input_consumed;
-    ASSERT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    ASSERT_EQ(KM_ERROR_UNSUPPORTED_MAC_LENGTH, FinishOperation(&result));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, HmacSha256TooSmallMacLength) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_MAC_LENGTH, 120);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    ASSERT_EQ(KM_ERROR_INVALID_MAC_LENGTH,
+              BeginOperation(KM_PURPOSE_SIGN, begin_params, nullptr /* output_params */));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1448,81 +1485,92 @@ TEST_P(VerificationOperationsTest, EcdsaSha256Success) {
 }
 
 TEST_P(VerificationOperationsTest, HmacSha1Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA1));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA1)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA1, 160);
-    VerifyMessage(message, signature, KM_DIGEST_SHA1);
+    MacMessage(message, &signature, 160);
+    VerifyMac(message, signature);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(VerificationOperationsTest, HmacSha224Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_224));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_224)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_224, 224);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_224);
+    MacMessage(message, &signature, 224);
+    VerifyMac(message, signature);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(VerificationOperationsTest, HmacSha256Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_256));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 256);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+    MacMessage(message, &signature, 256);
+    VerifyMac(message, signature);
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(VerificationOperationsTest, HmacSha256TooShortMac) {
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_256)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
+    string message = "123456789012345678901234567890123456789012345678";
+    string signature;
+    MacMessage(message, &signature, 256);
+
+    // Shorten to 128 bits, should still work.
+    signature.resize(128 / 8);
+    VerifyMac(message, signature);
+
+    // Drop one more byte.
+    signature.resize(signature.length() - 1);
+
+    AuthorizationSet begin_params(client_params());
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_MAC_LENGTH, FinishOperation(signature, &result));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(VerificationOperationsTest, HmacSha384Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_384));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_384)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_384, 384);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_384);
+    MacMessage(message, &signature, 384);
+    VerifyMac(message, signature);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
 TEST_P(VerificationOperationsTest, HmacSha512Success) {
-    GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_SHA_2_512));
+    GenerateKey(AuthorizationSetBuilder()
+                    .HmacKey(128)
+                    .Digest(KM_DIGEST_SHA_2_512)
+                    .Authorization(TAG_MIN_MAC_LENGTH, 128));
     string message = "123456789012345678901234567890123456789012345678";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_512, 512);
-    VerifyMessage(message, signature, KM_DIGEST_SHA_2_512);
-
-    EXPECT_EQ(0, GetParam()->keymaster0_calls());
-}
-
-TEST_P(VerificationOperationsTest, HmacAnyDigestSuccess) {
-    ASSERT_EQ(KM_ERROR_OK,
-              GenerateKey(AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE)));
-    string message = "12345678901234567890123456789012";
-    string signature;
-
-    size_t len;
-    keymaster_digest_t* digests;
-    ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
-                                                           KM_PURPOSE_SIGN, &digests, &len));
-    for (size_t i = 0; i < len; ++i) {
-        MacMessage(message, &signature, digests[i], 128 /* small MAC to work with all digests */);
-        VerifyMessage(message, signature, digests[i]);
-        if (len > 1) {
-            size_t wrong_digest_index = (i == 0) ? 1 : 0;
-            AuthorizationSet begin_params(client_params());
-            begin_params.push_back(TAG_DIGEST, digests[wrong_digest_index]);
-            begin_params.push_back(TAG_MAC_LENGTH, 128);
-            EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
-            string output;
-            size_t input_consumed;
-            EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &output, &input_consumed));
-            EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &output));
-        }
-    }
-    free(digests);
+    MacMessage(message, &signature, 512);
+    VerifyMac(message, signature);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1787,7 +1835,7 @@ TEST_P(ImportKeyTest, HmacSha256KeySuccess) {
     ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
                                          .HmacKey(sizeof(key_data) * 8)
                                          .Digest(KM_DIGEST_SHA_2_256)
-                                         .Authorization(TAG_MAC_LENGTH, 32),
+                                         .Authorization(TAG_MIN_MAC_LENGTH, 256),
                                      KM_KEY_FORMAT_RAW, key));
 
     EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
@@ -1795,7 +1843,7 @@ TEST_P(ImportKeyTest, HmacSha256KeySuccess) {
 
     string message = "Hello World!";
     string signature;
-    MacMessage(message, &signature, KM_DIGEST_SHA_2_256, 32);
+    MacMessage(message, &signature, 256);
     VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
@@ -2115,10 +2163,11 @@ TEST_P(EncryptionOperationsTest, EcdsaEncrypt) {
 }
 
 TEST_P(EncryptionOperationsTest, HmacEncrypt) {
-    ASSERT_EQ(
-        KM_ERROR_OK,
-        GenerateKey(
-            AuthorizationSetBuilder().HmacKey(128).Digest(KM_DIGEST_NONE).Padding(KM_PAD_NONE)));
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Padding(KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_ENCRYPT));
     ASSERT_EQ(KM_ERROR_UNSUPPORTED_PURPOSE, BeginOperation(KM_PURPOSE_DECRYPT));
 
@@ -2552,7 +2601,8 @@ TEST_P(EncryptionOperationsTest, AesGcmRoundTripSuccess) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string aad = "foobar";
     string message = "123456789012345678901234567890123456";
     AuthorizationSet begin_params(client_params());
@@ -2590,6 +2640,70 @@ TEST_P(EncryptionOperationsTest, AesGcmRoundTripSuccess) {
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
 
+TEST_P(EncryptionOperationsTest, AesGcmTooShortTag) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
+    string aad = "foobar";
+    string message = "123456789012345678901234567890123456";
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 96);
+
+    AuthorizationSet update_params;
+    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
+
+    AuthorizationSet begin_out_params;
+    EXPECT_EQ(KM_ERROR_INVALID_MAC_LENGTH,
+              BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, AesGcmTooShortTagOnDecrypt) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
+    string aad = "foobar";
+    string message = "123456789012345678901234567890123456";
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 128);
+
+    AuthorizationSet update_params;
+    update_params.push_back(TAG_ASSOCIATED_DATA, aad.data(), aad.size());
+
+    // Encrypt
+    AuthorizationSet begin_out_params;
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params, &begin_out_params));
+    string ciphertext;
+    size_t input_consumed;
+    AuthorizationSet update_out_params;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(update_params, message, &update_out_params, &ciphertext,
+                                           &input_consumed));
+    EXPECT_EQ(message.size(), input_consumed);
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&ciphertext));
+
+    // Grab nonce
+    EXPECT_NE(-1, begin_out_params.find(TAG_NONCE));
+    begin_params.Reinitialize(client_params());
+    begin_params.push_back(begin_out_params);
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    begin_params.push_back(TAG_MAC_LENGTH, 96);
+
+    // Decrypt.
+    EXPECT_EQ(KM_ERROR_INVALID_MAC_LENGTH, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
 TEST_P(EncryptionOperationsTest, AesGcmCorruptKey) {
     uint8_t nonce[] = {
         0xb7, 0x94, 0x37, 0xae, 0x08, 0xff, 0x35, 0x5d, 0x7d, 0x8a, 0x4d, 0x0f,
@@ -2622,7 +2736,8 @@ TEST_P(EncryptionOperationsTest, AesGcmCorruptKey) {
                                          .AesEncryptionKey(128)
                                          .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
                                          .Authorization(TAG_PADDING, KM_PAD_NONE)
-                                         .Authorization(TAG_CALLER_NONCE),
+                                         .Authorization(TAG_CALLER_NONCE)
+                                         .Authorization(TAG_MIN_MAC_LENGTH, 128),
                                      KM_KEY_FORMAT_RAW, good_key_str));
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext_str, &plaintext, &input_consumed));
@@ -2637,7 +2752,8 @@ TEST_P(EncryptionOperationsTest, AesGcmCorruptKey) {
     ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
                                          .AesEncryptionKey(128)
                                          .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                         .Authorization(TAG_PADDING, KM_PAD_NONE),
+                                         .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                         .Authorization(TAG_MIN_MAC_LENGTH, 128),
                                      KM_KEY_FORMAT_RAW, bad_key_str));
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext_str, &plaintext, &input_consumed));
@@ -2650,7 +2766,8 @@ TEST_P(EncryptionOperationsTest, AesGcmAadNoData) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string aad = "123456789012345678";
     string empty_message;
     AuthorizationSet begin_params(client_params());
@@ -2692,7 +2809,8 @@ TEST_P(EncryptionOperationsTest, AesGcmIncremental) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
     begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
@@ -2761,7 +2879,8 @@ TEST_P(EncryptionOperationsTest, AesGcmMultiPartAad) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string message = "123456789012345678901234567890123456";
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
@@ -2811,7 +2930,8 @@ TEST_P(EncryptionOperationsTest, AesGcmBadAad) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string message = "12345678901234567890123456789012";
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
@@ -2857,7 +2977,8 @@ TEST_P(EncryptionOperationsTest, AesGcmWrongNonce) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string message = "12345678901234567890123456789012";
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_GCM);
@@ -2897,7 +3018,8 @@ TEST_P(EncryptionOperationsTest, AesGcmCorruptTag) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .AesEncryptionKey(128)
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_GCM)
-                                           .Authorization(TAG_PADDING, KM_PAD_NONE)));
+                                           .Authorization(TAG_PADDING, KM_PAD_NONE)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 128)));
     string aad = "foobar";
     string message = "123456789012345678901234567890123456";
     AuthorizationSet begin_params(client_params());

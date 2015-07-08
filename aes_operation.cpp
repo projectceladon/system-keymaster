@@ -50,6 +50,33 @@ inline bool allows_padding(keymaster_block_mode_t block_mode) {
     return false;
 }
 
+static keymaster_error_t GetAndValidateGcmTagLength(const AuthorizationSet& begin_params,
+                                                    const AuthorizationSet& key_params,
+                                                    size_t* tag_length) {
+    uint32_t tag_length_bits;
+    if (!begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length_bits)) {
+        return KM_ERROR_MISSING_MAC_LENGTH;
+    }
+
+    uint32_t min_tag_length_bits;
+    if (!key_params.GetTagValue(TAG_MIN_MAC_LENGTH, &min_tag_length_bits)) {
+        LOG_E("AES GCM key must have KM_TAG_MIN_MAC_LENGTH", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    if (tag_length_bits % 8 != 0 || tag_length_bits > kMaxGcmTagLength ||
+        tag_length_bits < kMinGcmTagLength) {
+        return KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+    }
+
+    if (tag_length_bits < min_tag_length_bits) {
+        return KM_ERROR_INVALID_MAC_LENGTH;
+    }
+
+    *tag_length = tag_length_bits / 8;
+    return KM_ERROR_OK;
+}
+
 Operation* AesOperationFactory::CreateOperation(const Key& key,
                                                 const AuthorizationSet& begin_params,
                                                 keymaster_error_t* error) {
@@ -83,22 +110,16 @@ Operation* AesOperationFactory::CreateOperation(const Key& key,
 
     size_t tag_length = 0;
     if (block_mode == KM_MODE_GCM) {
-        uint32_t tag_length_bits;
-        if (!begin_params.GetTagValue(TAG_MAC_LENGTH, &tag_length_bits)) {
-            *error = KM_ERROR_MISSING_MAC_LENGTH;
-            return nullptr;
-        }
-        tag_length = tag_length_bits / 8;
-        if (tag_length_bits % 8 != 0 || tag_length > GCM_MAX_TAG_LENGTH ||
-            tag_length < GCM_MIN_TAG_LENGTH) {
-            *error = KM_ERROR_UNSUPPORTED_MAC_LENGTH;
+        *error = GetAndValidateGcmTagLength(begin_params, key.authorizations(), &tag_length);
+        if (*error != KM_ERROR_OK) {
             return nullptr;
         }
     }
 
     keymaster_padding_t padding;
-    if (!GetAndValidatePadding(begin_params, key, &padding, error))
+    if (!GetAndValidatePadding(begin_params, key, &padding, error)) {
         return nullptr;
+    }
     if (!allows_padding(block_mode) && padding != KM_PAD_NONE) {
         LOG_E("Mode does not support padding", 0);
         *error = KM_ERROR_INCOMPATIBLE_PADDING_MODE;

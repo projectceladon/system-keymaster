@@ -45,6 +45,8 @@ class SymmetricKeyFactory : public KeyFactory {
 
   private:
     virtual bool key_size_supported(size_t key_size_bits) const = 0;
+    virtual keymaster_error_t
+    validate_algorithm_specific_new_key_params(const AuthorizationSet& key_description) const = 0;
 
     const keymaster_key_format_t* NoFormats(size_t* format_count) const {
         *format_count = 0;
