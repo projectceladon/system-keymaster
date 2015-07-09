@@ -25,6 +25,7 @@
 
 #include "keymaster/android_keymaster_utils.h"
 
+#include <openssl/bn.h>
 #include <openssl/ec_key.h>
 #include <openssl/ecdsa.h>
 
@@ -166,7 +167,7 @@ static keymaster_key_blob_t* duplicate_blob(const uint8_t* key_data, size_t key_
     if (!key_material_copy)
         return nullptr;
 
-    unique_ptr<keymaster_key_blob_t> blob_copy(new  (std::nothrow) keymaster_key_blob_t);
+    unique_ptr<keymaster_key_blob_t> blob_copy(new (std::nothrow) keymaster_key_blob_t);
     if (!blob_copy.get())
         return nullptr;
     blob_copy->key_material_size = key_data_size;
@@ -345,6 +346,17 @@ int Keymaster0Engine::RsaPrivateTransform(RSA* rsa, uint8_t* out, const uint8_t*
     return 1;
 }
 
+static size_t ec_group_size_bits(EC_KEY* ec_key) {
+    const EC_GROUP* group = EC_KEY_get0_group(ec_key);
+    unique_ptr<BN_CTX, BN_CTX_Delete> bn_ctx(BN_CTX_new());
+    unique_ptr<BIGNUM, BIGNUM_Delete> order(BN_new());
+    if (!EC_GROUP_get_order(group, order.get(), bn_ctx.get())) {
+        ALOGE("Failed to get EC group order");
+        return 0;
+    }
+    return BN_num_bits(order.get());
+}
+
 int Keymaster0Engine::EcdsaSign(const uint8_t* digest, size_t digest_len, uint8_t* sig,
                                 unsigned int* sig_len, EC_KEY* ec_key) const {
     const keymaster_key_blob_t* key_blob = EcKeyToBlob(ec_key);
@@ -352,6 +364,11 @@ int Keymaster0Engine::EcdsaSign(const uint8_t* digest, size_t digest_len, uint8_
         ALOGE("key had no key_blob!");
         return 0;
     }
+
+    // Truncate digest if it's too long
+    size_t max_input_len = (ec_group_size_bits(ec_key) + 7) / 8;
+    if (digest_len > max_input_len)
+        digest_len = max_input_len;
 
     keymaster_ec_sign_params_t sign_params = {DIGEST_NONE};
     unique_ptr<uint8_t[], Malloc_Delete> signature;
