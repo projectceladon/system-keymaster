@@ -1861,17 +1861,18 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLong) {
 }
 
 TEST_P(EncryptionOperationsTest, RsaOaepSuccess) {
+    size_t key_size = 768;
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaEncryptionKey(512, 3)
+                                           .RsaEncryptionKey(key_size, 3)
                                            .Padding(KM_PAD_RSA_OAEP)
                                            .Digest(KM_DIGEST_SHA_2_256)));
 
-    string message = "Hello World!";
+    string message = "Hello";
     string ciphertext1 = EncryptMessage(string(message), KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
-    EXPECT_EQ(512U / 8, ciphertext1.size());
+    EXPECT_EQ(key_size / 8, ciphertext1.size());
 
     string ciphertext2 = EncryptMessage(string(message), KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
-    EXPECT_EQ(512U / 8, ciphertext2.size());
+    EXPECT_EQ(key_size / 8, ciphertext2.size());
 
     // OAEP randomizes padding so every result should be different.
     EXPECT_NE(ciphertext1, ciphertext2);
@@ -1881,13 +1882,14 @@ TEST_P(EncryptionOperationsTest, RsaOaepSuccess) {
 }
 
 TEST_P(EncryptionOperationsTest, RsaOaepRoundTrip) {
+    size_t key_size = 768;
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaEncryptionKey(512, 3)
+                                           .RsaEncryptionKey(key_size, 3)
                                            .Padding(KM_PAD_RSA_OAEP)
                                            .Digest(KM_DIGEST_SHA_2_256)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message), KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
-    EXPECT_EQ(512U / 8, ciphertext.size());
+    EXPECT_EQ(key_size / 8, ciphertext.size());
 
     string plaintext = DecryptMessage(ciphertext, KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
     EXPECT_EQ(message, plaintext);
@@ -1912,18 +1914,59 @@ TEST_P(EncryptionOperationsTest, RsaOaepInvalidDigest) {
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
+TEST_P(EncryptionOperationsTest, RsaOaepUnauthorizedDigest) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                       .RsaEncryptionKey(512, 3)
+                                           .Padding(KM_PAD_RSA_OAEP)
+                                           .Digest(KM_DIGEST_SHA_2_256)));
+    string message = "Hello World!";
+    // Works because encryption is a public key operation.
+    EncryptMessage(string(message), KM_DIGEST_SHA1, KM_PAD_RSA_OAEP);
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA1);
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_DIGEST, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, RsaOaepDecryptWithWrongDigest) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .RsaEncryptionKey(768, 3)
+                                           .Padding(KM_PAD_RSA_OAEP)
+                                           .Digest(KM_DIGEST_SHA_2_256)
+                                           .Digest(KM_DIGEST_SHA_2_384)));
+    string message = "Hello World!";
+    string ciphertext = EncryptMessage(string(message), KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
+
+    string result;
+    size_t input_consumed;
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_384);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_DECRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(ciphertext, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_UNKNOWN_ERROR, FinishOperation(&result));
+    EXPECT_EQ(0U, result.size());
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(4, GetParam()->keymaster0_calls());
+}
+
 TEST_P(EncryptionOperationsTest, RsaOaepTooLarge) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaEncryptionKey(512, 3)
                                            .Padding(KM_PAD_RSA_OAEP)
-                                           .Digest(KM_DIGEST_SHA_2_256)));
+                                           .Digest(KM_DIGEST_SHA1)));
     string message = "12345678901234567890123";
     string result;
     size_t input_consumed;
 
     AuthorizationSet begin_params(client_params());
     begin_params.push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
-    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA1);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
@@ -1934,16 +1977,17 @@ TEST_P(EncryptionOperationsTest, RsaOaepTooLarge) {
 }
 
 TEST_P(EncryptionOperationsTest, RsaOaepCorruptedDecrypt) {
+    size_t key_size = 768;
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaEncryptionKey(512, 3)
+                                           .RsaEncryptionKey(768, 3)
                                            .Padding(KM_PAD_RSA_OAEP)
                                            .Digest(KM_DIGEST_SHA_2_256)));
     string message = "Hello World!";
     string ciphertext = EncryptMessage(string(message), KM_DIGEST_SHA_2_256, KM_PAD_RSA_OAEP);
-    EXPECT_EQ(512U / 8, ciphertext.size());
+    EXPECT_EQ(key_size / 8, ciphertext.size());
 
     // Corrupt the ciphertext
-    ciphertext[512 / 8 / 2]++;
+    ciphertext[key_size / 8 / 2]++;
 
     string result;
     size_t input_consumed;

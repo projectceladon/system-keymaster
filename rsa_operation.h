@@ -39,10 +39,8 @@ class RsaOperation : public Operation {
           digest_algorithm_(nullptr) {}
     ~RsaOperation();
 
-    keymaster_error_t Begin(const AuthorizationSet& /* input_params */,
-                            AuthorizationSet* /* output_params */) override {
-        return KM_ERROR_OK;
-    }
+    keymaster_error_t Begin(const AuthorizationSet& input_params,
+                            AuthorizationSet* output_params) override;
     keymaster_error_t Update(const AuthorizationSet& additional_params, const Buffer& input,
                              AuthorizationSet* output_params, Buffer* output,
                              size_t* input_consumed) override;
@@ -134,6 +132,9 @@ class RsaCryptOperation : public RsaOperation {
     RsaCryptOperation(keymaster_purpose_t, keymaster_digest_t digest, keymaster_padding_t padding,
                       EVP_PKEY* key)
         : RsaOperation(KM_PURPOSE_ENCRYPT, digest, padding, key) {}
+
+  protected:
+    keymaster_error_t SetOaepDigestIfRequired(EVP_PKEY_CTX* pkey_ctx);
 
   private:
     int GetOpensslPadding(keymaster_error_t* error) override;
