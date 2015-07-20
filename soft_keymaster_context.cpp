@@ -352,12 +352,27 @@ keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
     hw_enforced->Clear();
     sw_enforced->Clear();
 
-    // It does; build auth sets
     switch (EVP_PKEY_type(pubkey->type)) {
     case EVP_PKEY_RSA: {
         hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
         hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_MD5);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA1);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_224);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_384);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_512);
         hw_enforced->push_back(TAG_PADDING, KM_PAD_NONE);
+        hw_enforced->push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
+        hw_enforced->push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
+        hw_enforced->push_back(TAG_PADDING, KM_PAD_RSA_PSS);
+        hw_enforced->push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_ENCRYPT);
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_DECRYPT);
+
         unique_ptr<RSA, RSA_Delete> rsa(EVP_PKEY_get1_RSA(pubkey));
         if (!rsa)
             return TranslateLastOpenSslError();
@@ -372,6 +387,16 @@ keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
     case EVP_PKEY_EC: {
         hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
         hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_NONE);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_MD5);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA1);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_224);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_384);
+        hw_enforced->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_512);
+
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
+        sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
+
         UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
         if (!ec_key.get())
             return TranslateLastOpenSslError();
@@ -388,13 +413,8 @@ keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
 
-    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
-    sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
     sw_enforced->push_back(TAG_ALL_USERS);
     sw_enforced->push_back(TAG_NO_AUTH_REQUIRED);
-    uint64_t now = java_time(time(NULL));
-    sw_enforced->push_back(TAG_CREATION_DATETIME, now);
-    sw_enforced->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
 
     return KM_ERROR_OK;
 }
