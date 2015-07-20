@@ -544,17 +544,18 @@ TEST_P(SigningOperationsTest, RsaPssSha256Success) {
         EXPECT_EQ(3, GetParam()->keymaster0_calls());
 }
 
-TEST_P(SigningOperationsTest, RsaPaddingNoneAllowsOther) {
+TEST_P(SigningOperationsTest, RsaPaddingNoneDoesNotAllowOther) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(512, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
     string message = "12345678901234567890123456789012";
     string signature;
-    SignMessage(message, &signature, KM_DIGEST_SHA_2_256, KM_PAD_RSA_PSS);
 
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(3, GetParam()->keymaster0_calls());
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
+    begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
+    EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PADDING_MODE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
 }
 
 TEST_P(SigningOperationsTest, RsaPkcs1Sha256Success) {
@@ -865,6 +866,20 @@ TEST_P(SigningOperationsTest, HmacSha384Success) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha512Success) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .HmacKey(128)
+                                           .Digest(KM_DIGEST_SHA_2_512)
+                                           .Authorization(TAG_MIN_MAC_LENGTH, 384)));
+    string message = "12345678901234567890123456789012";
+    string signature;
+    MacMessage(message, &signature, 512);
+    ASSERT_EQ(64U, signature.size());
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(SigningOperationsTest, HmacLengthInKey) {
+    // TODO(swillden): unified API should generate an error on key generation.
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
                                            .Digest(KM_DIGEST_SHA_2_512)
@@ -2256,13 +2271,13 @@ TEST_P(EncryptionOperationsTest, AesEcbNoPaddingKeyWithPkcs7Padding) {
                                            .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
                                            .Authorization(TAG_PADDING, KM_PAD_NONE)));
 
-    // Try various message lengths; all should work.
+    // Try various message lengths; all should fail.
     for (size_t i = 0; i < 32; ++i) {
-        string message(i, 'a');
-        string ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_PKCS7);
-        EXPECT_EQ(i + 16 - (i % 16), ciphertext.size());
-        string plaintext = DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_PKCS7);
-        EXPECT_EQ(message, plaintext);
+        AuthorizationSet begin_params(client_params());
+        begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+        begin_params.push_back(TAG_PADDING, KM_PAD_PKCS7);
+        EXPECT_EQ(KM_ERROR_INCOMPATIBLE_PADDING_MODE,
+                  BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     }
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
@@ -3259,8 +3274,18 @@ TEST_P(Keymaster0AdapterTest, OldHwKeymaster0RsaBlobGetCharacteristics) {
     EXPECT_TRUE(contains(hw_enforced(), TAG_KEY_SIZE, 512));
     EXPECT_TRUE(contains(hw_enforced(), TAG_RSA_PUBLIC_EXPONENT, 3));
     EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_NONE));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_MD5));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_SHA1));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_SHA_2_224));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_SHA_2_256));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_SHA_2_384));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_DIGEST, KM_DIGEST_SHA_2_512));
     EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_NONE));
-    EXPECT_EQ(5U, hw_enforced().size());
+    EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_ENCRYPT));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_RSA_OAEP));
+    EXPECT_TRUE(contains(hw_enforced(), TAG_PADDING, KM_PAD_RSA_PSS));
+    EXPECT_EQ(15U, hw_enforced().size());
 
     EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_SIGN));
     EXPECT_TRUE(contains(sw_enforced(), TAG_PURPOSE, KM_PURPOSE_VERIFY));
