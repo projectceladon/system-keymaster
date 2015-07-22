@@ -43,12 +43,16 @@ keymaster_error_t SymmetricKeyFactory::GenerateKey(const AuthorizationSet& key_d
         !key_size_supported(key_size_bits))
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
 
+    keymaster_error_t error = validate_algorithm_specific_new_key_params(key_description);
+    if (error != KM_ERROR_OK)
+        return error;
+
     size_t key_data_size = key_size_bits / 8;
     KeymasterKeyBlob key_material(key_data_size);
     if (!key_material.key_material)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    keymaster_error_t error = context_->GenerateRandom(key_material.writable_data(), key_data_size);
+    error = context_->GenerateRandom(key_material.writable_data(), key_data_size);
     if (error != KM_ERROR_OK) {
         LOG_E("Error generating %d bit symmetric key", key_size_bits);
         return error;
@@ -75,6 +79,10 @@ keymaster_error_t SymmetricKeyFactory::ImportKey(const AuthorizationSet& key_des
         key_size_bits = input_key_material.key_material_size * 8;
         authorizations.push_back(TAG_KEY_SIZE, key_size_bits);
     }
+
+    keymaster_error_t error = validate_algorithm_specific_new_key_params(key_description);
+    if (error != KM_ERROR_OK)
+        return error;
 
     if (!key_size_supported(key_size_bits))
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;

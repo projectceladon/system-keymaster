@@ -383,12 +383,10 @@ void Keymaster1Test::SignMessage(const string& message, string* signature,
     EXPECT_GT(signature->size(), 0U);
 }
 
-void Keymaster1Test::MacMessage(const string& message, string* signature, keymaster_digest_t digest,
-                                size_t mac_length) {
+void Keymaster1Test::MacMessage(const string& message, string* signature, size_t mac_length) {
     SCOPED_TRACE("SignMessage");
     AuthorizationSet input_params(AuthorizationSet(client_params_, array_length(client_params_)));
     input_params.push_back(TAG_MAC_LENGTH, mac_length);
-    input_params.push_back(TAG_DIGEST, digest);
     AuthorizationSet update_params;
     AuthorizationSet output_params;
     *signature =
@@ -417,6 +415,11 @@ void Keymaster1Test::VerifyMessage(const string& message, const string& signatur
     AuthorizationSet output_params;
     ProcessMessage(KM_PURPOSE_VERIFY, message, signature, input_params, update_params,
                    &output_params);
+}
+
+void Keymaster1Test::VerifyMac(const string& message, const string& signature) {
+    SCOPED_TRACE("VerifyMac");
+    ProcessMessage(KM_PURPOSE_VERIFY, message, signature);
 }
 
 string Keymaster1Test::EncryptMessage(const string& message, keymaster_padding_t padding,
@@ -577,11 +580,13 @@ keymaster_error_t Keymaster1Test::ExportKey(keymaster_key_format_t format, strin
 
 void Keymaster1Test::CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
                                          string expected_mac) {
-    ASSERT_EQ(KM_ERROR_OK,
-              ImportKey(AuthorizationSetBuilder().HmacKey(key.size() * 8).Digest(digest),
-                        KM_KEY_FORMAT_RAW, key));
+    ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
+                                         .HmacKey(key.size() * 8)
+                                         .Authorization(TAG_MIN_MAC_LENGTH, expected_mac.size() * 8)
+                                         .Digest(digest),
+                                     KM_KEY_FORMAT_RAW, key));
     string signature;
-    MacMessage(message, &signature, digest, expected_mac.size() * 8);
+    MacMessage(message, &signature, expected_mac.size() * 8);
     EXPECT_EQ(expected_mac, signature) << "Test vector didn't match for digest " << (int)digest;
 }
 

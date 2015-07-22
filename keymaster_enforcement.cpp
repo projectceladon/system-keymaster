@@ -286,7 +286,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_APPLICATION_DATA:
             return KM_ERROR_INVALID_KEY_BLOB;
 
-        /* Tags used for cryptographic parameters. */
+        /* Tags used for cryptographic parameters in keygen.  Nothing to enforce. */
         case KM_TAG_PURPOSE:
         case KM_TAG_ALGORITHM:
         case KM_TAG_KEY_SIZE:
@@ -295,6 +295,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_MAC_LENGTH:
         case KM_TAG_PADDING:
         case KM_TAG_NONCE:
+        case KM_TAG_MIN_MAC_LENGTH:
 
         /* Tags not used for operations. */
         case KM_TAG_BLOB_USAGE_REQUIREMENTS:

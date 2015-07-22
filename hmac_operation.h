@@ -26,7 +26,7 @@ namespace keymaster {
 class HmacOperation : public Operation {
   public:
     HmacOperation(keymaster_purpose_t purpose, const uint8_t* key_data, size_t key_data_size,
-                  keymaster_digest_t digest, size_t tag_length);
+                  keymaster_digest_t digest, size_t mac_length, size_t min_mac_length);
     ~HmacOperation();
 
     virtual keymaster_error_t Begin(const AuthorizationSet& input_params,
@@ -44,7 +44,8 @@ class HmacOperation : public Operation {
   private:
     HMAC_CTX ctx_;
     keymaster_error_t error_;
-    size_t tag_length_;
+    const size_t mac_length_;
+    const size_t min_mac_length_;
 };
 
 /**
