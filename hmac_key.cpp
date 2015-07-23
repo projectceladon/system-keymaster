@@ -46,11 +46,68 @@ keymaster_error_t HmacKeyFactory::LoadKey(const KeymasterKeyBlob& key_material,
     if (!key)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
+    uint32_t min_mac_length;
+    if (!hw_enforced.GetTagValue(TAG_MIN_MAC_LENGTH, &min_mac_length) &&
+        !sw_enforced.GetTagValue(TAG_MIN_MAC_LENGTH, &min_mac_length)) {
+        LOG_E("HMAC key must have KM_TAG_MIN_MAC_LENGTH", 0);
+        return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
     keymaster_error_t error;
     key->reset(new (std::nothrow) HmacKey(key_material, hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
     return error;
+}
+
+keymaster_error_t HmacKeyFactory::validate_algorithm_specific_new_key_params(
+    const AuthorizationSet& key_description) const {
+    uint32_t min_mac_length_bits;
+    if (!key_description.GetTagValue(TAG_MIN_MAC_LENGTH, &min_mac_length_bits))
+        return KM_ERROR_MISSING_MIN_MAC_LENGTH;
+
+    keymaster_digest_t digest;
+    if (!key_description.GetTagValue(TAG_DIGEST, &digest)) {
+        LOG_E("%d digests specified for HMAC key", key_description.GetTagCount(TAG_DIGEST));
+        return KM_ERROR_UNSUPPORTED_DIGEST;
+    }
+
+    size_t hash_size_bits = 0;
+    switch (digest) {
+    case KM_DIGEST_NONE:
+        return KM_ERROR_UNSUPPORTED_DIGEST;
+    case KM_DIGEST_MD5:
+        hash_size_bits = 128;
+        break;
+    case KM_DIGEST_SHA1:
+        hash_size_bits = 160;
+        break;
+    case KM_DIGEST_SHA_2_224:
+        hash_size_bits = 224;
+        break;
+    case KM_DIGEST_SHA_2_256:
+        hash_size_bits = 256;
+        break;
+    case KM_DIGEST_SHA_2_384:
+        hash_size_bits = 384;
+        break;
+    case KM_DIGEST_SHA_2_512:
+        hash_size_bits = 512;
+        break;
+    };
+
+    if (hash_size_bits == 0) {
+        // digest was not matched
+        return KM_ERROR_UNSUPPORTED_DIGEST;
+    }
+
+    if (min_mac_length_bits % 8 != 0 || min_mac_length_bits > hash_size_bits)
+        return KM_ERROR_UNSUPPORTED_MIN_MAC_LENGTH;
+
+    if (min_mac_length_bits < kMinHmacLengthBits)
+        return KM_ERROR_UNSUPPORTED_MIN_MAC_LENGTH;
+
+    return KM_ERROR_OK;
 }
 
 }  // namespace keymaster

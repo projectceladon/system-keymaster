@@ -23,6 +23,9 @@
 
 namespace keymaster {
 
+const size_t kMinGcmTagLength = 12 * 8;
+const size_t kMaxGcmTagLength = 16 * 8;
+
 class AesKeyFactory : public SymmetricKeyFactory {
   public:
     AesKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
@@ -40,6 +43,8 @@ class AesKeyFactory : public SymmetricKeyFactory {
     bool key_size_supported(size_t key_size_bits) const override {
         return key_size_bits == 128 || key_size_bits == 192 || key_size_bits == 256;
     }
+    keymaster_error_t validate_algorithm_specific_new_key_params(
+        const AuthorizationSet& key_description) const override;
 };
 
 class AesKey : public SymmetricKey {
