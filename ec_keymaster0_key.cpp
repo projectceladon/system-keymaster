@@ -58,9 +58,8 @@ keymaster_error_t EcdsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet&
     // context_->CreateKeyBlob doesn't put them in sw_enforced.
     hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
-    hw_enforced->push_back(TAG_ORIGIN, KM_ORIGIN_UNKNOWN);
 
-    return context_->CreateKeyBlob(key_description, KM_ORIGIN_UNKNOWN, key_material, key_blob,
+    return context_->CreateKeyBlob(key_description, KM_ORIGIN_GENERATED, key_material, key_blob,
                                    hw_enforced, sw_enforced);
 }
 
@@ -90,9 +89,8 @@ keymaster_error_t EcdsaKeymaster0KeyFactory::ImportKey(
     // context_->CreateKeyBlob doesn't put them in sw_enforced.
     hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
-    hw_enforced->push_back(TAG_ORIGIN, KM_ORIGIN_UNKNOWN);
 
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_UNKNOWN, imported_hw_key,
+    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, imported_hw_key,
                                    output_key_blob, hw_enforced, sw_enforced);
 }
 

@@ -67,9 +67,8 @@ keymaster_error_t RsaKeymaster0KeyFactory::GenerateKey(const AuthorizationSet& k
     hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
     hw_enforced->push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
-    hw_enforced->push_back(TAG_ORIGIN, KM_ORIGIN_UNKNOWN);
 
-    return context_->CreateKeyBlob(key_description, KM_ORIGIN_UNKNOWN, key_material, key_blob,
+    return context_->CreateKeyBlob(key_description, KM_ORIGIN_GENERATED, key_material, key_blob,
                                    hw_enforced, sw_enforced);
 }
 
@@ -102,9 +101,8 @@ keymaster_error_t RsaKeymaster0KeyFactory::ImportKey(
     hw_enforced->push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
     hw_enforced->push_back(TAG_RSA_PUBLIC_EXPONENT, public_exponent);
     hw_enforced->push_back(TAG_KEY_SIZE, key_size);
-    hw_enforced->push_back(TAG_ORIGIN, KM_ORIGIN_UNKNOWN);
 
-    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_UNKNOWN, imported_hw_key,
+    return context_->CreateKeyBlob(authorizations, KM_ORIGIN_IMPORTED, imported_hw_key,
                                    output_key_blob, hw_enforced, sw_enforced);
 }
 

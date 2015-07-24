@@ -325,6 +325,7 @@ class NewKeyGeneration : public Keymaster1Test {
         EXPECT_FALSE(contains(auths, TAG_AUTH_TIMEOUT, 301));
 
         // Now check that unspecified, defaulted tags are correct.
+        EXPECT_TRUE(contains(auths, TAG_ORIGIN, KM_ORIGIN_GENERATED));
         EXPECT_TRUE(contains(auths, KM_TAG_CREATION_DATETIME));
     }
 };
@@ -1673,10 +1674,7 @@ TEST_P(ImportKeyTest, RsaSuccess) {
                          TAG_RSA_PUBLIC_EXPONENT, 65537U));
 
     // And values provided by AndroidKeymaster
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_TRUE(contains(hw_enforced(), TAG_ORIGIN, KM_ORIGIN_UNKNOWN));
-    else
-        EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message(1024 / 8, 'a');
@@ -1759,10 +1757,7 @@ TEST_P(ImportKeyTest, EcdsaSuccess) {
                  TAG_KEY_SIZE, 256));
 
     // And values provided by AndroidKeymaster
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
-        EXPECT_TRUE(contains(hw_enforced(), TAG_ORIGIN, KM_ORIGIN_UNKNOWN));
-    else
-        EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message(32, 'a');
@@ -1791,10 +1786,7 @@ TEST_P(ImportKeyTest, EcdsaSizeSpecified) {
                  TAG_KEY_SIZE, 256));
 
     // And values provided by AndroidKeymaster
-    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_EC))
-        EXPECT_TRUE(contains(hw_enforced(), TAG_ORIGIN, KM_ORIGIN_UNKNOWN));
-    else
-        EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
+    EXPECT_TRUE(contains(sw_enforced(), TAG_ORIGIN, KM_ORIGIN_IMPORTED));
     EXPECT_TRUE(contains(sw_enforced(), KM_TAG_CREATION_DATETIME));
 
     string message(32, 'a');
@@ -1972,7 +1964,7 @@ TEST_P(EncryptionOperationsTest, RsaOaepInvalidDigest) {
 
 TEST_P(EncryptionOperationsTest, RsaOaepUnauthorizedDigest) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaEncryptionKey(512, 3)
+                                       .RsaEncryptionKey(512, 3)
                                            .Padding(KM_PAD_RSA_OAEP)
                                            .Digest(KM_DIGEST_SHA_2_256)));
     string message = "Hello World!";
