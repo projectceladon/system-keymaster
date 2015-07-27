@@ -99,8 +99,13 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := libsoftkeymasterdevice
 LOCAL_SRC_FILES := \
 	ec_keymaster0_key.cpp \
+	ec_keymaster1_key.cpp \
+	ecdsa_keymaster1_operation.cpp \
 	keymaster0_engine.cpp \
+	keymaster1_engine.cpp \
 	rsa_keymaster0_key.cpp \
+	rsa_keymaster1_key.cpp \
+	rsa_keymaster1_operation.cpp \
 	soft_keymaster_context.cpp \
 	soft_keymaster_device.cpp \
 	soft_keymaster_logger.cpp
