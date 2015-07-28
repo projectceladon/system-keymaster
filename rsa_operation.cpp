@@ -31,7 +31,7 @@
 namespace keymaster {
 
 const size_t kPssOverhead = 2;
-const size_t kMinPssSaltSize = 8;
+const size_t kMinPssSaltSize = 20;
 
 // Overhead for PKCS#1 v1.5 signature padding of undigested messages.  Digested messages have
 // additional overhead, for the digest algorithmIdentifier required by PKCS#1.
