@@ -1374,7 +1374,7 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                     key_bits = digest_bits + 8 * (11 + 19);
                     break;
                 case KM_PAD_RSA_PSS:
-                    key_bits = digest_bits + 8 * 10;
+                    key_bits = digest_bits + 22 * 8;
                     break;
                 default:
                     FAIL() << "Missing padding";
