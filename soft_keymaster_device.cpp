@@ -187,11 +187,11 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     GenerateKeyRequest req;
-    StoreDefaultNewKeyParams(&req.key_description);
 
     switch (key_type) {
     case TYPE_RSA: {
         req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_RSA);
+        StoreDefaultNewKeyParams(KM_ALGORITHM_RSA, &req.key_description);
         const keymaster_rsa_keygen_params_t* rsa_params =
             static_cast<const keymaster_rsa_keygen_params_t*>(key_params);
         LOG_D("Generating RSA pair, modulus size: %u, public exponent: %lu",
@@ -203,6 +203,7 @@ int SoftKeymasterDevice::generate_keypair(const keymaster1_device_t* dev,
 
     case TYPE_EC: {
         req.key_description.push_back(TAG_ALGORITHM, KM_ALGORITHM_EC);
+        StoreDefaultNewKeyParams(KM_ALGORITHM_EC, &req.key_description);
         const keymaster_ec_keygen_params_t* ec_params =
             static_cast<const keymaster_ec_keygen_params_t*>(key_params);
         LOG_D("Generating ECDSA pair, key size: %u", ec_params->field_size);
@@ -247,12 +248,12 @@ int SoftKeymasterDevice::import_keypair(const keymaster1_device_t* dev, const ui
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     ImportKeyRequest request;
-    StoreDefaultNewKeyParams(&request.key_description);
     keymaster_algorithm_t algorithm;
     keymaster_error_t err = GetPkcs8KeyAlgorithm(key, key_length, &algorithm);
     if (err != KM_ERROR_OK)
         return err;
     request.key_description.push_back(TAG_ALGORITHM, algorithm);
+    StoreDefaultNewKeyParams(algorithm, &request.key_description);
     request.SetKeyMaterial(key, key_length);
     request.key_format = KM_KEY_FORMAT_PKCS8;
 
@@ -943,16 +944,31 @@ keymaster_error_t SoftKeymasterDevice::abort(const keymaster1_device_t* dev,
 }
 
 /* static */
-void SoftKeymasterDevice::StoreDefaultNewKeyParams(AuthorizationSet* auth_set) {
+void SoftKeymasterDevice::StoreDefaultNewKeyParams(keymaster_algorithm_t algorithm,
+                                                   AuthorizationSet* auth_set) {
     auth_set->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
     auth_set->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
     auth_set->push_back(TAG_ALL_USERS);
     auth_set->push_back(TAG_NO_AUTH_REQUIRED);
-    uint64_t now = java_time(time(NULL));
-    auth_set->push_back(TAG_CREATION_DATETIME, now);
-    auth_set->push_back(TAG_ORIGINATION_EXPIRE_DATETIME, now + HUNDRED_YEARS);
+
+    // All digests.
     auth_set->push_back(TAG_DIGEST, KM_DIGEST_NONE);
-    auth_set->push_back(TAG_PADDING, KM_PAD_NONE);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_MD5);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_SHA1);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_224);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_384);
+    auth_set->push_back(TAG_DIGEST, KM_DIGEST_SHA_2_512);
+
+    if (algorithm == KM_ALGORITHM_RSA) {
+        auth_set->push_back(TAG_PURPOSE, KM_PURPOSE_ENCRYPT);
+        auth_set->push_back(TAG_PURPOSE, KM_PURPOSE_DECRYPT);
+        auth_set->push_back(TAG_PADDING, KM_PAD_NONE);
+        auth_set->push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
+        auth_set->push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_ENCRYPT);
+        auth_set->push_back(TAG_PADDING, KM_PAD_RSA_PSS);
+        auth_set->push_back(TAG_PADDING, KM_PAD_RSA_OAEP);
+    }
 }
 
 }  // namespace keymaster

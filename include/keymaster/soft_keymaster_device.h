@@ -70,7 +70,8 @@ class SoftKeymasterDevice {
   private:
     void initialize(keymaster0_device_t* keymaster0_device);
 
-    static void StoreDefaultNewKeyParams(AuthorizationSet* auth_set);
+    static void StoreDefaultNewKeyParams(keymaster_algorithm_t algorithm,
+                                         AuthorizationSet* auth_set);
     static keymaster_error_t GetPkcs8KeyAlgorithm(const uint8_t* key, size_t key_length,
                                                   keymaster_algorithm_t* algorithm);
 
@@ -159,12 +160,10 @@ class SoftKeymasterDevice {
                                    const keymaster_key_param_set_t* in_params,
                                    keymaster_key_param_set_t* out_params,
                                    keymaster_operation_handle_t* operation_handle);
-    static keymaster_error_t update(const keymaster1_device_t* dev,
-                                    keymaster_operation_handle_t operation_handle,
-                                    const keymaster_key_param_set_t* in_params,
-                                    const keymaster_blob_t* input, size_t* input_consumed,
-                                    keymaster_key_param_set_t* out_params,
-                                    keymaster_blob_t* output);
+    static keymaster_error_t
+    update(const keymaster1_device_t* dev, keymaster_operation_handle_t operation_handle,
+           const keymaster_key_param_set_t* in_params, const keymaster_blob_t* input,
+           size_t* input_consumed, keymaster_key_param_set_t* out_params, keymaster_blob_t* output);
     static keymaster_error_t
     finish(const keymaster1_device_t* dev, keymaster_operation_handle_t operation_handle,
            const keymaster_key_param_set_t* in_params, const keymaster_blob_t* signature,
