@@ -97,9 +97,6 @@ bool OperationFactory::GetAndValidatePadding(const AuthorizationSet& begin_param
     } else if (
         // If it's a public key operation, all padding modes are authorized.
         !is_public_key_operation() &&
-        // If key contains KM_PAD_NONE, all padding modes are authorized.
-        !key.authorizations().Contains(TAG_PADDING, KM_PAD_NONE) &&
-        !key.authorizations().Contains(TAG_PADDING_OLD, KM_PAD_NONE) &&
         // Otherwise the key needs to authorize the specific mode.
         !key.authorizations().Contains(TAG_PADDING, *padding) &&
         !key.authorizations().Contains(TAG_PADDING_OLD, *padding)) {
@@ -125,9 +122,6 @@ bool OperationFactory::GetAndValidateDigest(const AuthorizationSet& begin_params
     } else if (
         // If it's a public key operation, all digests are authorized.
         !is_public_key_operation() &&
-        // If key contains KM_DIGEST_NONE, all digests are authorized.
-        !key.authorizations().Contains(TAG_DIGEST, KM_DIGEST_NONE) &&
-        !key.authorizations().Contains(TAG_DIGEST_OLD, KM_DIGEST_NONE) &&
         // Otherwise the key needs to authorize the specific digest.
         !key.authorizations().Contains(TAG_DIGEST, *digest) &&
         !key.authorizations().Contains(TAG_DIGEST_OLD, *digest)) {
