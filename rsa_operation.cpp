@@ -297,6 +297,21 @@ keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional
         return SignDigested(output);
 }
 
+static keymaster_error_t zero_pad_left(UniquePtr<uint8_t[]>* dest, size_t padded_len, Buffer& src) {
+    assert(padded_len > src.available_read());
+
+    dest->reset(new uint8_t[padded_len]);
+    if (!dest->get())
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    size_t padding_len = padded_len - src.available_read();
+    memset(dest->get(), 0, padding_len);
+    if (!src.read(dest->get() + padding_len, src.available_read()))
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    return KM_ERROR_OK;
+}
+
 keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
     UniquePtr<RSA, RSA_Delete> rsa(EVP_PKEY_get1_RSA(const_cast<EVP_PKEY*>(rsa_key_)));
     if (!rsa.get())
@@ -305,16 +320,27 @@ keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
     if (!output->Reinitialize(RSA_size(rsa.get())))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
+    size_t key_len = EVP_PKEY_size(rsa_key_);
     int bytes_encrypted;
     switch (padding_) {
-    case KM_PAD_NONE:
-        bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
-                                              output->peek_write(), rsa.get(), RSA_NO_PADDING);
+    case KM_PAD_NONE: {
+        const uint8_t* to_encrypt = data_.peek_read();
+        UniquePtr<uint8_t[]> zero_padded;
+        if (data_.available_read() > key_len) {
+            return KM_ERROR_INVALID_INPUT_LENGTH;
+        } else if (data_.available_read() < key_len) {
+            keymaster_error_t error = zero_pad_left(&zero_padded, key_len, data_);
+            if (error != KM_ERROR_OK)
+                return error;
+            to_encrypt = zero_padded.get();
+        }
+        bytes_encrypted = RSA_private_encrypt(key_len, to_encrypt, output->peek_write(), rsa.get(),
+                                              RSA_NO_PADDING);
         break;
+    }
     case KM_PAD_RSA_PKCS1_1_5_SIGN:
         // Does PKCS1 padding without digesting even make sense?  Dunno.  We'll support it.
-        if (data_.available_read() + kPkcs1UndigestedSignaturePaddingOverhead >
-            static_cast<size_t>(EVP_PKEY_size(rsa_key_))) {
+        if (data_.available_read() + kPkcs1UndigestedSignaturePaddingOverhead > key_len) {
             LOG_E("Input too long: cannot sign %u-byte message with PKCS1 padding with %u-bit key",
                   data_.available_read(), EVP_PKEY_size(rsa_key_) * 8);
             return KM_ERROR_INVALID_INPUT_LENGTH;
@@ -322,6 +348,7 @@ keymaster_error_t RsaSignOperation::SignUndigested(Buffer* output) {
         bytes_encrypted = RSA_private_encrypt(data_.available_read(), data_.peek_read(),
                                               output->peek_write(), rsa.get(), RSA_PKCS1_PADDING);
         break;
+
     default:
         return KM_ERROR_UNSUPPORTED_PADDING_MODE;
     }
@@ -397,9 +424,9 @@ keymaster_error_t RsaVerifyOperation::VerifyUndigested(const Buffer& signature) 
     int openssl_padding;
     switch (padding_) {
     case KM_PAD_NONE:
-        if (data_.available_read() != key_len)
+        if (data_.available_read() > key_len)
             return KM_ERROR_INVALID_INPUT_LENGTH;
-        if (data_.available_read() != signature.available_read())
+        if (key_len != signature.available_read())
             return KM_ERROR_VERIFICATION_FAILED;
         openssl_padding = RSA_NO_PADDING;
         break;
@@ -423,7 +450,19 @@ keymaster_error_t RsaVerifyOperation::VerifyUndigested(const Buffer& signature) 
     if (bytes_decrypted < 0)
         return KM_ERROR_VERIFICATION_FAILED;
 
-    if (memcmp_s(decrypted_data.get(), data_.peek_read(), data_.available_read()) != 0)
+    const uint8_t* compare_pos = decrypted_data.get();
+    size_t bytes_to_compare = bytes_decrypted;
+    uint8_t zero_check_result = 0;
+    if (padding_ == KM_PAD_NONE && data_.available_read() < bytes_to_compare) {
+        // If the data is short, for "unpadded" signing we zero-pad to the left.  So during
+        // verification we should have zeros on the left of the decrypted data.  Do a constant-time
+        // check.
+        const uint8_t* zero_end = compare_pos + bytes_to_compare - data_.available_read();
+        while (compare_pos < zero_end)
+            zero_check_result |= *compare_pos++;
+        bytes_to_compare = data_.available_read();
+    }
+    if (memcmp_s(compare_pos, data_.peek_read(), bytes_to_compare) != 0 || zero_check_result != 0)
         return KM_ERROR_VERIFICATION_FAILED;
     return KM_ERROR_OK;
 }
@@ -496,8 +535,18 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     if (!output->Reinitialize(outlen))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    if (EVP_PKEY_encrypt(ctx.get(), output->peek_write(), &outlen, data_.peek_read(),
-                         data_.available_read()) <= 0)
+    const uint8_t* to_encrypt = data_.peek_read();
+    size_t to_encrypt_len = data_.available_read();
+    UniquePtr<uint8_t[]> zero_padded;
+    if (padding_ == KM_PAD_NONE && to_encrypt_len < outlen) {
+        keymaster_error_t error = zero_pad_left(&zero_padded, outlen, data_);
+        if (error != KM_ERROR_OK)
+            return error;
+        to_encrypt = zero_padded.get();
+        to_encrypt_len = outlen;
+    }
+
+    if (EVP_PKEY_encrypt(ctx.get(), output->peek_write(), &outlen, to_encrypt, to_encrypt_len) <= 0)
         return TranslateLastOpenSslError();
     if (!output->advance_write(outlen))
         return KM_ERROR_UNKNOWN_ERROR;
@@ -534,8 +583,18 @@ keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additio
     if (!output->Reinitialize(outlen))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    if (EVP_PKEY_decrypt(ctx.get(), output->peek_write(), &outlen, data_.peek_read(),
-                         data_.available_read()) <= 0)
+    const uint8_t* to_decrypt = data_.peek_read();
+    size_t to_decrypt_len = data_.available_read();
+    UniquePtr<uint8_t[]> zero_padded;
+    if (padding_ == KM_PAD_NONE && to_decrypt_len < outlen) {
+        keymaster_error_t error = zero_pad_left(&zero_padded, outlen, data_);
+        if (error != KM_ERROR_OK)
+            return error;
+        to_decrypt = zero_padded.get();
+        to_decrypt_len = outlen;
+    }
+
+    if (EVP_PKEY_decrypt(ctx.get(), output->peek_write(), &outlen, to_decrypt, to_decrypt_len) <= 0)
         return TranslateLastOpenSslError();
     if (!output->advance_write(outlen))
         return KM_ERROR_UNKNOWN_ERROR;

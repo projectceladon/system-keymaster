@@ -26,6 +26,7 @@
 
 #include "android_keymaster_test_utils.h"
 #include "keymaster0_engine.h"
+#include "openssl_utils.h"
 
 using std::ifstream;
 using std::istreambuf_iterator;
@@ -701,24 +702,12 @@ TEST_P(SigningOperationsTest, RsaTooShortMessage) {
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
                                            .Padding(KM_PAD_NONE)));
-    AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_DIGEST, KM_DIGEST_NONE);
-    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
-    ASSERT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
-
     string message = "1234567890123456789012345678901";
-    string result;
-    size_t input_consumed;
-    ASSERT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(0U, result.size());
-    EXPECT_EQ(31U, input_consumed);
-
     string signature;
-    ASSERT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&signature));
-    EXPECT_EQ(0U, signature.length());
+    SignMessage(message, &signature, KM_DIGEST_NONE, KM_PAD_NONE);
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+        EXPECT_EQ(3, GetParam()->keymaster0_calls());
 }
 
 TEST_P(SigningOperationsTest, RsaSignWithEncryptionKey) {
@@ -1897,20 +1886,18 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooShort) {
     ASSERT_EQ(KM_ERROR_OK,
               GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(256, 3).Padding(KM_PAD_NONE)));
 
-    string message = "1234567890123456789012345678901";
+    string message = "1";
 
-    AuthorizationSet begin_params(client_params());
-    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
-    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+    string ciphertext = EncryptMessage(message, KM_PAD_NONE);
+    EXPECT_EQ(256U / 8, ciphertext.size());
 
-    string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&result));
-    EXPECT_EQ(0U, result.size());
+    string expected_plaintext = string(256 / 8 - 1, 0) + message;
+    string plaintext = DecryptMessage(ciphertext, KM_PAD_NONE);
+
+    EXPECT_EQ(expected_plaintext, plaintext);
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(2, GetParam()->keymaster0_calls());
+        EXPECT_EQ(4, GetParam()->keymaster0_calls());
 }
 
 TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLong) {
@@ -1929,6 +1916,49 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLong) {
 
     if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
+}
+
+TEST_P(EncryptionOperationsTest, RsaNoPaddingLargerThanModulus) {
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(256, 3).Padding(KM_PAD_NONE)));
+
+    string exported;
+    ASSERT_EQ(KM_ERROR_OK, ExportKey(KM_KEY_FORMAT_X509, &exported));
+
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(exported.data());
+    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(
+        d2i_PUBKEY(nullptr /* alloc new */, &p, exported.size()));
+    unique_ptr<RSA, RSA_Delete> rsa(EVP_PKEY_get1_RSA(pkey.get()));
+
+    size_t modulus_len = BN_num_bytes(rsa->n);
+    ASSERT_EQ(256U / 8, modulus_len);
+    unique_ptr<uint8_t> modulus_buf(new uint8_t[modulus_len]);
+    BN_bn2bin(rsa->n, modulus_buf.get());
+
+    // The modulus is too big to encrypt.
+    string message(reinterpret_cast<const char*>(modulus_buf.get()), modulus_len);
+
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    string result;
+    size_t input_consumed;
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, FinishOperation(&result));
+
+    // One smaller than the modulus is okay.
+    BN_sub(rsa->n, rsa->n, BN_value_one());
+    modulus_len = BN_num_bytes(rsa->n);
+    ASSERT_EQ(256U / 8, modulus_len);
+    BN_bn2bin(rsa->n, modulus_buf.get());
+    message = string(reinterpret_cast<const char*>(modulus_buf.get()), modulus_len);
+    EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&result));
+
+    if (GetParam()->algorithm_in_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(4, GetParam()->keymaster0_calls());
 }
 
 TEST_P(EncryptionOperationsTest, RsaOaepSuccess) {
