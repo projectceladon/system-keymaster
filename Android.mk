@@ -30,6 +30,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_MODULE_TAGS := optional
+LOCAL_CLANG := true
+LOCAL_SANITIZE := unsigned-integer-overflow
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_SHARED_LIBRARY)
@@ -78,6 +80,8 @@ LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
+LOCAL_CLANG := true
+LOCAL_SANITIZE := unsigned-integer-overflow
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
@@ -105,6 +109,8 @@ LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
+LOCAL_CLANG := true
+LOCAL_SANITIZE := unsigned-integer-overflow
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 include $(BUILD_SHARED_LIBRARY)
