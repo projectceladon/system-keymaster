@@ -302,7 +302,7 @@ TEST_P(CheckSupported, SupportedDigests) {
     ASSERT_EQ(KM_ERROR_OK, device()->get_supported_digests(device(), KM_ALGORITHM_HMAC,
                                                            KM_PURPOSE_SIGN, &digests, &len));
     if (GetParam()->minimal_digest_set()) {
-        EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_256}, digests, len));
+        EXPECT_TRUE(ResponseContains(KM_DIGEST_SHA_2_256, digests, len));
     } else {
         EXPECT_TRUE(ResponseContains({KM_DIGEST_SHA_2_224, KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384,
                                       KM_DIGEST_SHA_2_512, KM_DIGEST_SHA1},
