@@ -443,7 +443,9 @@ void AuthorizationSet::FreeData() {
     delete[] indirect_data_;
 
     elems_ = NULL;
+    elems_size_ = 0;
     indirect_data_ = NULL;
+    indirect_data_size_ = 0;
     elems_capacity_ = 0;
     indirect_data_capacity_ = 0;
     error_ = OK;

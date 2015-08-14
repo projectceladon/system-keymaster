@@ -55,17 +55,23 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      */
     AuthorizationSet(const keymaster_key_param_t* elems, size_t count) : indirect_data_(nullptr) {
         elems_ = nullptr;
+        elems_size_ = 0;
+        indirect_data_size_ = 0;
         Reinitialize(elems, count);
     }
 
     explicit AuthorizationSet(const keymaster_key_param_set_t& set) : indirect_data_(nullptr) {
         elems_ = nullptr;
+        elems_size_ = 0;
+        indirect_data_size_ = 0;
         Reinitialize(set.params, set.length);
     }
 
     explicit AuthorizationSet(const uint8_t* serialized_set, size_t serialized_size)
         : indirect_data_(nullptr) {
         elems_ = nullptr;
+        elems_size_ = 0;
+        indirect_data_size_ = 0;
         Deserialize(&serialized_set, serialized_set + serialized_size);
     }
 
@@ -78,6 +84,8 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     // Copy constructor.
     AuthorizationSet(const AuthorizationSet& set) : Serializable(), indirect_data_(nullptr) {
         elems_ = nullptr;
+        elems_size_ = 0;
+        indirect_data_size_ = 0;
         Reinitialize(set.elems_, set.elems_size_);
     }
 
