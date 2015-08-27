@@ -73,14 +73,6 @@ static keymaster_error_t add_digests(keymaster1_device_t* dev, keymaster_algorit
 
     keymaster_digest_t* digests;
     size_t digests_length;
-    if (algorithm == KM_ALGORITHM_RSA &&
-        (purpose == KM_PURPOSE_ENCRYPT || purpose == KM_PURPOSE_DECRYPT)) {
-        // Temporary hack: On bullhead there's a problem with the keymaster app.  It rejects
-        // requests for digests for RSA and purpose ENCRYPT or DECRYPT.  Since the result is the
-        // same as for SIGN or VERIFY, we just ask for SIGN in this case.
-        // TODO(swillden): Remove this hack when bullhead's keymaster is fixed.
-        purpose = KM_PURPOSE_SIGN;
-    }
     keymaster_error_t error =
         dev->get_supported_digests(dev, algorithm, purpose, &digests, &digests_length);
     if (error != KM_ERROR_OK) {
