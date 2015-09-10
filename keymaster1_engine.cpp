@@ -374,24 +374,13 @@ EVP_PKEY* Keymaster1Engine::GetKeymaster1PublicKey(const KeymasterKeyBlob& blob,
 RSA_METHOD Keymaster1Engine::BuildRsaMethod() {
     RSA_METHOD method;
 
+    memset(&method, 0, sizeof(method));
     method.common.references = 0;
     method.common.is_static = 1;
-    method.app_data = nullptr;
-    method.init = nullptr;
-    method.finish = nullptr;
-    method.size = nullptr;
-    method.sign = nullptr;
-    method.verify = nullptr;
-    method.encrypt = nullptr;
     method.sign_raw = Keymaster1Engine::rsa_sign_raw;
     method.decrypt = Keymaster1Engine::rsa_decrypt;
-    method.verify_raw = nullptr;
-    method.private_transform = nullptr;
-    method.mod_exp = nullptr;
     method.bn_mod_exp = BN_mod_exp_mont;
     method.flags = RSA_FLAG_OPAQUE;
-    method.keygen = nullptr;
-    method.supports_digest = nullptr;
 
     return method;
 }
@@ -399,14 +388,10 @@ RSA_METHOD Keymaster1Engine::BuildRsaMethod() {
 ECDSA_METHOD Keymaster1Engine::BuildEcdsaMethod() {
     ECDSA_METHOD method;
 
+    memset(&method, 0, sizeof(method));
     method.common.references = 0;
     method.common.is_static = 1;
-    method.app_data = nullptr;
-    method.init = nullptr;
-    method.finish = nullptr;
-    method.group_order_size = nullptr;
     method.sign = Keymaster1Engine::ecdsa_sign;
-    method.verify = nullptr;
     method.flags = ECDSA_FLAG_OPAQUE;
 
     return method;
