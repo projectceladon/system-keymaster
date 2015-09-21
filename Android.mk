@@ -29,6 +29,9 @@ LOCAL_SRC_FILES:= \
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror -Wunused
+# TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
+# Currently, if enabled, these flags will cause an internal error in Clang.
+LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
 LOCAL_MODULE_TAGS := optional
 LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow
@@ -78,6 +81,9 @@ LOCAL_C_INCLUDES := \
 LOCAL_SHARED_LIBRARIES := libcrypto libkeymaster_messages
 LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
+# TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
+# Currently, if enabled, these flags will cause an internal error in Clang.
+LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
 # Ignore benigh warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
 LOCAL_CLANG := true
@@ -112,6 +118,9 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
+# TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
+# Currently, if enabled, these flags will cause an internal error in Clang.
+LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
 LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
 LOCAL_MODULE_TAGS := optional
 LOCAL_CLANG := true
@@ -136,6 +145,9 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
 LOCAL_CFLAGS = -Wall -Werror -Wunused
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
+# TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
+# Currently, if enabled, these flags will cause an internal error in Clang.
+LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
 LOCAL_MODULE_TAGS := tests
 LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymasterdevice \
