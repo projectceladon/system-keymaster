@@ -123,6 +123,18 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 include $(BUILD_SHARED_LIBRARY)
 
+###
+# libkeymasterfiles is an empty library that exports all of the files in keymaster as includes.
+###
+include $(CLEAR_VARS)
+LOCAL_MODULE := libkeymasterfiles
+LOCAL_EXPORT_C_INCLUDE_DIRS := \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/include
+LOCAL_MODULE_TAGS := optional
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_STATIC_LIBRARY)
+
 # Unit tests for libkeymaster
 include $(CLEAR_VARS)
 LOCAL_MODULE := keymaster_tests
@@ -151,4 +163,3 @@ LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymaster
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_NATIVE_TEST)
-
