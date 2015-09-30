@@ -65,9 +65,7 @@ const RSA_METHOD Keymaster0Engine::rsa_method_ = {
     .flags = RSA_FLAG_OPAQUE,
 
     .keygen = nullptr,
-#if defined(BORINGSSL_201509)
     .multi_prime_keygen = nullptr,
-#endif
     .supports_digest = nullptr,
 };
 
