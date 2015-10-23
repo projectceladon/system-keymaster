@@ -115,7 +115,7 @@ keymaster_error_t RsaKeymaster1KeyFactory::LoadKey(const KeymasterKeyBlob& key_m
         return error;
 
     key->reset(new (std::nothrow)
-                   RsaKeymaster1Key(rsa.release(), hw_enforced, sw_enforced, engine_, &error));
+                   RsaKeymaster1Key(rsa.release(), hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
@@ -138,10 +138,5 @@ OperationFactory* RsaKeymaster1KeyFactory::GetOperationFactory(keymaster_purpose
     }
     return nullptr;
 }
-
-RsaKeymaster1Key::RsaKeymaster1Key(RSA* rsa_key, const AuthorizationSet& hw_enforced,
-                                   const AuthorizationSet& sw_enforced,
-                                   const Keymaster1Engine* engine, keymaster_error_t* error)
-    : RsaKey(rsa_key, hw_enforced, sw_enforced, error), engine_(engine) {}
 
 }  // namespace keymaster
