@@ -66,6 +66,8 @@ class SoftKeymasterContext : public KeymasterContext {
                                    const AuthorizationSet& additional_params,
                                    KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
                                    AuthorizationSet* sw_enforced) const override;
+    keymaster_error_t DeleteKey(const KeymasterKeyBlob& blob) const override;
+    keymaster_error_t DeleteAllKeys() const override;
     keymaster_error_t AddRngEntropy(const uint8_t* buf, size_t length) const override;
     keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const override;
 
