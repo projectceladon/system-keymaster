@@ -44,8 +44,6 @@ namespace keymaster {
 
 namespace {
 static uint8_t master_key_bytes[AES_BLOCK_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-const int NONCE_LENGTH = 12;
-const int TAG_LENGTH = 16;
 const KeymasterKeyBlob MASTER_KEY(master_key_bytes, array_length(master_key_bytes));
 }  // anonymous namespace
 
@@ -215,7 +213,6 @@ static keymaster_error_t ParseOcbAuthEncryptedBlob(const KeymasterKeyBlob& blob,
 // unwrap_key function, modified for the preferred function signature and formatting.  It does some
 // odd things, but they have been left unchanged to avoid breaking compatibility.
 static const uint8_t SOFT_KEY_MAGIC[] = {'P', 'K', '#', '8'};
-const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
 keymaster_error_t SoftKeymasterContext::ParseOldSoftkeymasterBlob(
     const KeymasterKeyBlob& blob, KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
     AuthorizationSet* sw_enforced) const {

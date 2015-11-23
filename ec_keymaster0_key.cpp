@@ -112,16 +112,11 @@ keymaster_error_t EcdsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key
 
     keymaster_error_t error;
     key->reset(new (std::nothrow)
-                   EcKeymaster0Key(ec_key.release(), hw_enforced, sw_enforced, engine_, &error));
+                   EcKeymaster0Key(ec_key.release(), hw_enforced, sw_enforced, &error));
     if (error != KM_ERROR_OK)
         return error;
 
     return KM_ERROR_OK;
 }
-
-EcKeymaster0Key::EcKeymaster0Key(EC_KEY* ec_key, const AuthorizationSet& hw_enforced,
-                                 const AuthorizationSet& sw_enforced,
-                                 const Keymaster0Engine* engine, keymaster_error_t* error)
-    : EcKey(ec_key, hw_enforced, sw_enforced, error), engine_(engine) {}
 
 }  // namespace keymaster

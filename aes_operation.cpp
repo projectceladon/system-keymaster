@@ -34,8 +34,6 @@
 namespace keymaster {
 
 static const size_t GCM_NONCE_SIZE = 12;
-static const size_t GCM_MAX_TAG_LENGTH = 16;
-static const size_t GCM_MIN_TAG_LENGTH = 12;
 
 inline bool allows_padding(keymaster_block_mode_t block_mode) {
     switch (block_mode) {
