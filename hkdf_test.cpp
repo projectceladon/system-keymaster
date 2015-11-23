@@ -65,19 +65,20 @@ static const HkdfTest kHkdfTests[] = {
 };
 
 TEST(HkdfTest, Hkdf) {
-    for (auto& test : kHkdfTests) {
+    for (size_t i = 0; i < 3; i++) {
+        const HkdfTest& test(kHkdfTests[i]);
         const string key = hex2str(test.key_hex);
         const string salt = hex2str(test.salt_hex);
         const string info = hex2str(test.info_hex);
         const string expected = hex2str(test.output_hex);
+        keymaster_error_t error;
         // We set the key_length to the length of the expected output and then take
         // the result.
-        Rfc5869Sha256Kdf hkdf;
-        ASSERT_TRUE(hkdf.Init(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
-                              reinterpret_cast<const uint8_t*>(salt.data()), salt.size(),
-                              reinterpret_cast<const uint8_t*>(info.data()), info.size(),
-                              expected.size()));
-
+        Rfc5869HmacSha256Kdf hkdf(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+                                  reinterpret_cast<const uint8_t*>(salt.data()), salt.size(),
+                                  reinterpret_cast<const uint8_t*>(info.data()), info.size(),
+                                  expected.size(), &error);
+        ASSERT_EQ(error, KM_ERROR_OK);
         Buffer secret_key;
         bool result = hkdf.secret_key(&secret_key);
         ASSERT_TRUE(result);

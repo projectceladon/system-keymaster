@@ -144,7 +144,7 @@ keymaster_error_t EcdsaSignOperation::Finish(const AuthorizationSet& /* addition
 
     size_t siglen;
     if (digest_ == KM_DIGEST_NONE) {
-        UniquePtr<EC_KEY, EC_KEY_Delete> ecdsa(EVP_PKEY_get1_EC_KEY(ecdsa_key_));
+        UniquePtr<EC_KEY, EC_Delete> ecdsa(EVP_PKEY_get1_EC_KEY(ecdsa_key_));
         if (!ecdsa.get())
             return TranslateLastOpenSslError();
 
@@ -201,7 +201,7 @@ keymaster_error_t EcdsaVerifyOperation::Finish(const AuthorizationSet& /* additi
                                                AuthorizationSet* /* output_params */,
                                                Buffer* /* output */) {
     if (digest_ == KM_DIGEST_NONE) {
-        UniquePtr<EC_KEY, EC_KEY_Delete> ecdsa(EVP_PKEY_get1_EC_KEY(ecdsa_key_));
+        UniquePtr<EC_KEY, EC_Delete> ecdsa(EVP_PKEY_get1_EC_KEY(ecdsa_key_));
         if (!ecdsa.get())
             return TranslateLastOpenSslError();
 

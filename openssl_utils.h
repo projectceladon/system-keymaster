@@ -32,14 +32,6 @@ namespace keymaster {
 
 struct KeymasterKeyBlob;
 
-struct EC_KEY_Delete {
-    void operator()(EC_KEY* p) { EC_KEY_free(p); }
-};
-
-struct EC_POINT_Delete {
-    void operator()(EC_POINT* p) { EC_POINT_free(p); }
-};
-
 struct EVP_PKEY_Delete {
     void operator()(EVP_PKEY* p) const { EVP_PKEY_free(p); }
 };
@@ -64,12 +56,13 @@ struct EC_GROUP_Delete {
     void operator()(EC_GROUP* p) { EC_GROUP_free(p); }
 };
 
+struct EC_Delete {
+    void operator()(EC_KEY* p) { EC_KEY_free(p); }
+};
+
 struct ENGINE_Delete {
     void operator()(ENGINE* p) { ENGINE_free(p); }
 };
-
-keymaster_error_t ec_get_group_size(const EC_GROUP* group, size_t* key_size_bits);
-EC_GROUP* ec_get_group(keymaster_ec_curve_t curve);
 
 /**
  * Many OpenSSL APIs take ownership of an argument on success but don't free the argument on
