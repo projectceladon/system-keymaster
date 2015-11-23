@@ -191,7 +191,7 @@ RSA* Keymaster0Engine::BlobToRsaKey(const KeymasterKeyBlob& blob) const {
 
 EC_KEY* Keymaster0Engine::BlobToEcKey(const KeymasterKeyBlob& blob) const {
     // Create new EC key (with engine methods) and insert blob
-    unique_ptr<EC_KEY, EC_KEY_Delete> ec_key(EC_KEY_new_method(engine_));
+    unique_ptr<EC_KEY, EC_Delete> ec_key(EC_KEY_new_method(engine_));
     if (!ec_key)
         return nullptr;
 
@@ -204,7 +204,7 @@ EC_KEY* Keymaster0Engine::BlobToEcKey(const KeymasterKeyBlob& blob) const {
     if (!pkey)
         return nullptr;
 
-    unique_ptr<EC_KEY, EC_KEY_Delete> public_ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
+    unique_ptr<EC_KEY, EC_Delete> public_ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
     if (!public_ec_key)
         return nullptr;
 
