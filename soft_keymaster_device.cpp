@@ -262,8 +262,6 @@ void SoftKeymasterDevice::initialize_device_struct() {
     device_.context = NULL;
 }
 
-const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
-
 hw_device_t* SoftKeymasterDevice::hw_device() {
     return &device_.common;
 }

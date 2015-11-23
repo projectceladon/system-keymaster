@@ -95,7 +95,7 @@ keymaster_error_t EcdsaKeymaster1KeyFactory::LoadKey(const KeymasterKeyBlob& key
         return error;
 
     key->reset(new (std::nothrow)
-                   EcdsaKeymaster1Key(ecdsa.release(), hw_enforced, sw_enforced, engine_, &error));
+                   EcdsaKeymaster1Key(ecdsa.release(), hw_enforced, sw_enforced, &error));
     if (!key->get())
         error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
@@ -116,10 +116,5 @@ EcdsaKeymaster1KeyFactory::GetOperationFactory(keymaster_purpose_t purpose) cons
         return nullptr;
     }
 }
-
-EcdsaKeymaster1Key::EcdsaKeymaster1Key(EC_KEY* ecdsa_key, const AuthorizationSet& hw_enforced,
-                                       const AuthorizationSet& sw_enforced,
-                                       const Keymaster1Engine* engine, keymaster_error_t* error)
-    : EcKey(ecdsa_key, hw_enforced, sw_enforced, error), engine_(engine) {}
 
 }  // namespace keymaster
