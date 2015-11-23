@@ -55,7 +55,7 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
-    UniquePtr<EC_KEY, EC_KEY_Delete> ec_key(EC_KEY_new());
+    UniquePtr<EC_KEY, EC_Delete> ec_key(EC_KEY_new());
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
     if (ec_key.get() == NULL || pkey.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -122,14 +122,14 @@ keymaster_error_t EcKeyFactory::UpdateImportKeyDescription(const AuthorizationSe
     if (error != KM_ERROR_OK)
         return error;
 
-    UniquePtr<EC_KEY, EC_KEY_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
+    UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
     if (!ec_key.get())
         return TranslateLastOpenSslError();
 
     updated_description->Reinitialize(key_description);
 
     size_t extracted_key_size_bits;
-    error = ec_get_group_size(EC_KEY_get0_group(ec_key.get()), &extracted_key_size_bits);
+    error = get_group_size(*EC_KEY_get0_group(ec_key.get()), &extracted_key_size_bits);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -167,6 +167,26 @@ EC_GROUP* EcKeyFactory::choose_group(size_t key_size_bits) {
         return NULL;
         break;
     }
+}
+/* static */
+keymaster_error_t EcKeyFactory::get_group_size(const EC_GROUP& group, size_t* key_size_bits) {
+    switch (EC_GROUP_get_curve_name(&group)) {
+    case NID_secp224r1:
+        *key_size_bits = 224;
+        break;
+    case NID_X9_62_prime256v1:
+        *key_size_bits = 256;
+        break;
+    case NID_secp384r1:
+        *key_size_bits = 384;
+        break;
+    case NID_secp521r1:
+        *key_size_bits = 521;
+        break;
+    default:
+        return KM_ERROR_UNSUPPORTED_EC_FIELD;
+    }
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t EcKeyFactory::CreateEmptyKey(const AuthorizationSet& hw_enforced,
