@@ -59,7 +59,6 @@ LOCAL_SRC_FILES:= \
 		ec_key.cpp \
 		ec_key_factory.cpp \
 		ecdsa_operation.cpp \
-		ecies_kem.cpp \
 		hkdf.cpp \
 		hmac.cpp \
 		hmac_key.cpp \
@@ -67,7 +66,6 @@ LOCAL_SRC_FILES:= \
 		integrity_assured_key_blob.cpp \
 		key.cpp \
 		keymaster_enforcement.cpp \
-		nist_curve_key_exchange.cpp \
 		ocb.c \
 		ocb_utils.cpp \
 		openssl_err.cpp \
