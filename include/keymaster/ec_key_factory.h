@@ -53,7 +53,6 @@ class EcKeyFactory : public AsymmetricKeyFactory {
     OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const override;
 
     static EC_GROUP* choose_group(size_t key_size_bits);
-    static keymaster_error_t get_group_size(const EC_GROUP& group, size_t* key_size_bits);
 };
 
 }  // namespace keymaster

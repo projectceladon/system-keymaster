@@ -80,6 +80,8 @@ CPPSRCS=\
 	ec_keymaster1_key.cpp \
 	ecdsa_keymaster1_operation.cpp \
 	ecdsa_operation.cpp \
+	ecies_kem.cpp \
+	ecies_kem_test.cpp \
 	gtest_main.cpp \
 	hkdf.cpp \
 	hkdf_test.cpp \
@@ -95,6 +97,8 @@ CPPSRCS=\
 	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp \
 	logger.cpp \
+	nist_curve_key_exchange.cpp \
+	nist_curve_key_exchange_test.cpp \
 	ocb_utils.cpp \
 	openssl_err.cpp \
 	openssl_utils.cpp \
@@ -121,10 +125,12 @@ BINARIES = \
 	android_keymaster_messages_test \
 	android_keymaster_test \
 	authorization_set_test \
+	ecies_kem_test \
 	hkdf_test \
 	hmac_test \
 	key_blob_test \
 	keymaster_enforcement_test \
+	nist_curve_key_exchange_test
 
 .PHONY: coverage memcheck massif clean run
 
@@ -189,6 +195,30 @@ hkdf_test: hkdf_test.o \
 	hkdf.o \
 	hmac.o \
 	logger.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+nist_curve_key_exchange_test: nist_curve_key_exchange_test.o \
+	android_keymaster_test_utils.o \
+	authorization_set.o \
+	logger.o \
+	nist_curve_key_exchange.o \
+	openssl_err.o \
+	openssl_utils.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+ecies_kem_test: ecies_kem_test.o \
+	android_keymaster_utils.o \
+	android_keymaster_test_utils.o \
+	authorization_set.o \
+	ecies_kem.o \
+	hkdf.o \
+	hmac.o \
+	logger.o \
+	nist_curve_key_exchange.o \
+	openssl_err.o \
+	openssl_utils.o \
 	serializable.o \
 	$(GTEST_OBJS)
 

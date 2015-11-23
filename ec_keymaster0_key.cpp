@@ -106,7 +106,7 @@ keymaster_error_t EcdsaKeymaster0KeyFactory::LoadKey(const KeymasterKeyBlob& key
     if (sw_enforced.GetTagCount(TAG_ALGORITHM) == 1)
         return super::LoadKey(key_material, additional_params, hw_enforced, sw_enforced, key);
 
-    unique_ptr<EC_KEY, EC_Delete> ec_key(engine_->BlobToEcKey(key_material));
+    unique_ptr<EC_KEY, EC_KEY_Delete> ec_key(engine_->BlobToEcKey(key_material));
     if (!ec_key)
         return KM_ERROR_UNKNOWN_ERROR;
 
