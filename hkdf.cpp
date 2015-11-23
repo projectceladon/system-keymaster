@@ -16,8 +16,6 @@
 
 #include "hkdf.h"
 
-#include <assert.h>
-
 #include <new>
 
 #include <keymaster/android_keymaster_utils.h>
@@ -28,17 +26,16 @@ namespace keymaster {
 
 const size_t kSHA256HashLength = 32;
 
-Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(Buffer& secret, Buffer& salt, Buffer& info,
-                                           size_t key_bytes_to_generate, keymaster_error_t* error) {
-    Rfc5869HmacSha256Kdf(secret.peek_read(), secret.available_read(), salt.peek_read(),
-                         salt.available_read(), info.peek_read(), info.available_read(),
-                         key_bytes_to_generate, error);
+bool Rfc5869Sha256Kdf::Init(Buffer& secret, Buffer& salt, Buffer& info,
+                            size_t key_bytes_to_generate) {
+    return Init(secret.peek_read(), secret.available_read(), salt.peek_read(),
+                salt.available_read(), info.peek_read(), info.available_read(),
+                key_bytes_to_generate);
 }
 
-Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_len,
-                                           const uint8_t* salt, size_t salt_len,
-                                           const uint8_t* info, size_t info_len,
-                                           size_t key_bytes_to_generate, keymaster_error_t* error) {
+bool Rfc5869Sha256Kdf::Init(const uint8_t* secret, size_t secret_len, const uint8_t* salt,
+                            size_t salt_len, const uint8_t* info, size_t info_len,
+                            size_t key_bytes_to_generate) {
     // Step 1. Extract: PRK = HMAC-SHA256(actual_salt, secret)
     // https://tools.ietf.org/html/rfc5869#section-2.2
     HmacSha256 prk_hmac;
@@ -51,31 +48,37 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
         memset(zeros, 0, sizeof(zeros));
         result = prk_hmac.Init(zeros, sizeof(zeros));
     }
-    assert(result);
-    // avoid the unused variable warning if asserts are disabled.
-    (void)result;
+    if (!result) {
+        return false;
+    }
 
     // |prk| is a pseudorandom key (of kSHA256HashLength octets).
     uint8_t prk[kSHA256HashLength];
-    assert(sizeof(prk) == prk_hmac.DigestLength());
+    if (sizeof(prk) != prk_hmac.DigestLength())
+        return false;
     result = prk_hmac.Sign(secret, secret_len, prk, sizeof(prk));
-    assert(result);
+    if (!result) {
+        return false;
+    }
 
     // Step 2. Expand: OUTPUT = HKDF-Expand(PRK, info)
     // https://tools.ietf.org/html/rfc5869#section-2.3
     const size_t n = (key_bytes_to_generate + kSHA256HashLength - 1) / kSHA256HashLength;
-    assert(n < 256u);
-    output_.reset(new (std::nothrow) uint8_t[n * kSHA256HashLength]);
+    if (n >= 256u) {
+        return false;
+    }
+    output_.reset(new uint8_t[n * kSHA256HashLength]);
     if (!output_.get()) {
-        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-        return;
+        return false;
     }
 
     uint8_t buf[kSHA256HashLength + info_len + 1];
     uint8_t digest[kSHA256HashLength];
     HmacSha256 hmac;
     result = hmac.Init(prk, sizeof(prk));
-    assert(result);
+    if (!result) {
+        return false;
+    }
 
     for (size_t i = 1; i <= n; i++) {
         size_t j = 0;
@@ -87,7 +90,8 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
         j += info_len;
         buf[j++] = static_cast<uint8_t>(i);
         result = hmac.Sign(buf, j, digest, sizeof(digest));
-        assert(result);
+        if (!result)
+            return false;
         memcpy(output_.get() + (i - 1) * sizeof(digest), digest, sizeof(digest));
     }
 
@@ -95,11 +99,12 @@ Rfc5869HmacSha256Kdf::Rfc5869HmacSha256Kdf(const uint8_t* secret, size_t secret_
         secret_key_len_ = key_bytes_to_generate;
         secret_key_.reset(dup_buffer(output_.get(), key_bytes_to_generate));
         if (!secret_key_.get()) {
-            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
-            return;
+            return false;
         }
     }
-    *error = KM_ERROR_OK;
+    initalized_ = true;
+
+    return true;
 }
 
 }  // namespace keymaster

@@ -470,12 +470,12 @@ keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
         sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
         sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
 
-        UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
+        UniquePtr<EC_KEY, EC_KEY_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
         if (!ec_key.get())
             return TranslateLastOpenSslError();
         size_t key_size_bits;
         keymaster_error_t error =
-            EcKeyFactory::get_group_size(*EC_KEY_get0_group(ec_key.get()), &key_size_bits);
+            ec_get_group_size(EC_KEY_get0_group(ec_key.get()), &key_size_bits);
         if (error != KM_ERROR_OK)
             return error;
         hw_enforced->push_back(TAG_KEY_SIZE, key_size_bits);
