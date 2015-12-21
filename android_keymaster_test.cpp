@@ -427,8 +427,10 @@ TEST_P(NewKeyGeneration, Rsa) {
     EXPECT_TRUE(contains(crypto_params, TAG_RSA_PUBLIC_EXPONENT, 3));
     EXPECT_FALSE(contains(non_crypto_params, TAG_RSA_PUBLIC_EXPONENT, 3));
 
+    EXPECT_EQ(KM_ERROR_OK, DeleteKey());
+
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
-        EXPECT_EQ(1, GetParam()->keymaster0_calls());
+        EXPECT_EQ(2, GetParam()->keymaster0_calls());
 }
 
 TEST_P(NewKeyGeneration, RsaDefaultSize) {
@@ -812,7 +814,6 @@ TEST_P(SigningOperationsTest, RsaSignTooLargeMessage) {
     ASSERT_EQ(message.size(), input_consumed);
     string output;
     ASSERT_EQ(KM_ERROR_INVALID_ARGUMENT, FinishOperation(&output));
-
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(3, GetParam()->keymaster0_calls());

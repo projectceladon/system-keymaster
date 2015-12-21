@@ -121,6 +121,18 @@ keymaster_error_t Keymaster1Engine::ImportKey(const AuthorizationSet& key_descri
     return error;
 }
 
+keymaster_error_t Keymaster1Engine::DeleteKey(const KeymasterKeyBlob& blob) const {
+    if (!keymaster1_device_->delete_key)
+        return KM_ERROR_OK;
+    return keymaster1_device_->delete_key(keymaster1_device_, &blob);
+}
+
+keymaster_error_t Keymaster1Engine::DeleteAllKeys() const {
+    if (!keymaster1_device_->delete_all_keys)
+        return KM_ERROR_OK;
+    return keymaster1_device_->delete_all_keys(keymaster1_device_);
+}
+
 RSA* Keymaster1Engine::BuildRsaKey(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
                                    keymaster_error_t* error) const {
