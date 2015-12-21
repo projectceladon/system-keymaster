@@ -17,11 +17,11 @@
 #include <keymaster/soft_keymaster_device.h>
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stddef.h>
 
 #include <algorithm>
 
@@ -763,16 +763,8 @@ keymaster_error_t SoftKeymasterDevice::delete_key(const struct keymaster1_device
     if (!dev || !key || !key->key_material)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    const keymaster1_device_t* km1_dev = convert_device(dev)->wrapped_km1_device_;
-    if (km1_dev && km1_dev->delete_key)
-        return km1_dev->delete_key(km1_dev, key);
-
-    const keymaster0_device_t* km0_dev = convert_device(dev)->wrapped_km0_device_;
-    if (km0_dev && km0_dev->delete_keypair)
-        if (km0_dev->delete_keypair(km0_dev, key->key_material, key->key_material_size) < 0)
-            return KM_ERROR_UNKNOWN_ERROR;
-
-    return KM_ERROR_OK;
+    KeymasterKeyBlob blob(*key);
+    return convert_device(dev)->context_->DeleteKey(blob);
 }
 
 /* static */
@@ -780,16 +772,7 @@ keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_d
     if (!dev)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    const keymaster1_device_t* km1_dev = convert_device(dev)->wrapped_km1_device_;
-    if (km1_dev && km1_dev->delete_all_keys)
-        return km1_dev->delete_all_keys(km1_dev);
-
-    const keymaster0_device_t* km0_dev = convert_device(dev)->wrapped_km0_device_;
-    if (km0_dev && km0_dev->delete_all)
-        if (km0_dev->delete_all(km0_dev) < 0)
-            return KM_ERROR_UNKNOWN_ERROR;
-
-    return KM_ERROR_OK;
+    return convert_device(dev)->context_->DeleteAllKeys();
 }
 
 static bool FindAlgorithm(const keymaster_key_param_set_t& params,

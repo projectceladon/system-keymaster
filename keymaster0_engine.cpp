@@ -147,6 +147,19 @@ bool Keymaster0Engine::ImportKey(keymaster_key_format_t key_format,
     return true;
 }
 
+bool Keymaster0Engine::DeleteKey(const KeymasterKeyBlob& blob) const {
+    if (!keymaster0_device_->delete_keypair)
+        return true;
+    return (keymaster0_device_->delete_keypair(keymaster0_device_, blob.key_material,
+                                               blob.key_material_size) == 0);
+}
+
+bool Keymaster0Engine::DeleteAllKeys() const {
+    if (!keymaster0_device_->delete_all)
+        return true;
+    return (keymaster0_device_->delete_all(keymaster0_device_) == 0);
+}
+
 static keymaster_key_blob_t* duplicate_blob(const uint8_t* key_data, size_t key_data_size) {
     unique_ptr<uint8_t[]> key_material_copy(dup_buffer(key_data, key_data_size));
     if (!key_material_copy)

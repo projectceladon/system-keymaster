@@ -180,6 +180,10 @@ keymaster_error_t Keymaster1Test::GenerateKey(const AuthorizationSetBuilder& bui
     return device()->generate_key(device(), &params, &blob_, &characteristics_);
 }
 
+keymaster_error_t Keymaster1Test::DeleteKey() {
+    return device()->delete_key(device(), &blob_);
+}
+
 keymaster_error_t Keymaster1Test::ImportKey(const AuthorizationSetBuilder& builder,
                                             keymaster_key_format_t format,
                                             const string& key_material) {
