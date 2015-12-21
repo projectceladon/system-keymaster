@@ -122,7 +122,8 @@ SoftKeymasterDevice::SoftKeymasterDevice()
     LOG_I("Creating device", 0);
     LOG_D("Device address: %p", this);
 
-    initialize_device_struct();
+    initialize_device_struct(KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE |
+                             KEYMASTER_SUPPORTS_EC);
 }
 
 SoftKeymasterDevice::SoftKeymasterDevice(SoftKeymasterContext* context)
@@ -137,7 +138,8 @@ SoftKeymasterDevice::SoftKeymasterDevice(SoftKeymasterContext* context)
     LOG_I("Creating test device", 0);
     LOG_D("Device address: %p", this);
 
-    initialize_device_struct();
+    initialize_device_struct(KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE |
+                             KEYMASTER_SUPPORTS_EC);
 }
 
 keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster0_device_t* keymaster0_device) {
@@ -151,7 +153,7 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster0_device_t* ke
     if (error != KM_ERROR_OK)
         return error;
 
-    initialize_device_struct();
+    initialize_device_struct(keymaster0_device->flags);
 
     module_name_ = device_.common.module->name;
     module_name_.append("(Wrapping ");
@@ -183,7 +185,7 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster1_device_t* ke
     if (error != KM_ERROR_OK)
         return error;
 
-    initialize_device_struct();
+    initialize_device_struct(keymaster1_device->flags);
 
     module_name_ = device_.common.module->name;
     module_name_.append(" (Wrapping ");
@@ -221,7 +223,7 @@ bool SoftKeymasterDevice::Keymaster1DeviceIsGood() {
     return true;
 }
 
-void SoftKeymasterDevice::initialize_device_struct() {
+void SoftKeymasterDevice::initialize_device_struct(uint32_t flags) {
     memset(&device_, 0, sizeof(device_));
 
     device_.common.tag = HARDWARE_DEVICE_TAG;
@@ -229,7 +231,7 @@ void SoftKeymasterDevice::initialize_device_struct() {
     device_.common.module = reinterpret_cast<hw_module_t*>(&soft_keymaster_device_module);
     device_.common.close = &close_device;
 
-    device_.flags = KEYMASTER_BLOBS_ARE_STANDALONE | KEYMASTER_SUPPORTS_EC;
+    device_.flags = flags;
 
     // keymaster0 APIs
     device_.generate_keypair = nullptr;
