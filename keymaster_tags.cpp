@@ -1,0 +1,87 @@
+/*
+ * Copyright 2014 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <keymaster/keymaster_tags.h>
+
+namespace keymaster {
+
+#ifdef KEYMASTER_NAME_TAGS
+std::map<keymaster_tag_t, const char*> tag_name_map;
+#endif  // KEYMASTER_NAME_TAGS
+
+// DEFINE_KEYMASTER_TAG is used to create TypedTag instances for each non-enum keymaster tag.
+#ifdef KEYMASTER_NAME_TAGS
+#define DEFINE_KEYMASTER_TAG(type, name) TypedTag<type, KM_##name> name(#name)
+#else
+#define DEFINE_KEYMASTER_TAG(type, name) TypedTag<type, KM_##name> name
+#endif
+
+DEFINE_KEYMASTER_TAG(KM_INVALID, TAG_INVALID);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_KEY_SIZE);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MAC_LENGTH);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_CALLER_NONCE);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MIN_MAC_LENGTH);
+DEFINE_KEYMASTER_TAG(KM_ULONG, TAG_RSA_PUBLIC_EXPONENT);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ECIES_SINGLE_HASH_MODE);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_INCLUDE_UNIQUE_ID);
+DEFINE_KEYMASTER_TAG(KM_DATE, TAG_ACTIVE_DATETIME);
+DEFINE_KEYMASTER_TAG(KM_DATE, TAG_ORIGINATION_EXPIRE_DATETIME);
+DEFINE_KEYMASTER_TAG(KM_DATE, TAG_USAGE_EXPIRE_DATETIME);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MIN_SECONDS_BETWEEN_OPS);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_MAX_USES_PER_BOOT);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_USERS);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_USER_ID);
+DEFINE_KEYMASTER_TAG(KM_ULONG_REP, TAG_USER_SECURE_ID);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_NO_AUTH_REQUIRED);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_AUTH_TIMEOUT);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ALL_APPLICATIONS);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_APPLICATION_ID);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_APPLICATION_DATA);
+DEFINE_KEYMASTER_TAG(KM_DATE, TAG_CREATION_DATETIME);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_ROLLBACK_RESISTANT);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_ROOT_OF_TRUST);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_ASSOCIATED_DATA);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_NONCE);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_AUTH_TOKEN);
+DEFINE_KEYMASTER_TAG(KM_BOOL, TAG_BOOTLOADER_ONLY);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_OS_VERSION);
+DEFINE_KEYMASTER_TAG(KM_UINT, TAG_OS_PATCHLEVEL);
+DEFINE_KEYMASTER_TAG(KM_BYTES, TAG_UNIQUE_ID);
+
+// DEFINE_KEYMASTER_ENUM_TAG is used to create TypedEnumTag instances for each enum keymaster tag.
+
+#ifdef KEYMASTER_NAME_TAGS
+#define DEFINE_KEYMASTER_ENUM_TAG(type, name, enumtype)                                            \
+    TypedEnumTag<type, KM_##name, enumtype> name(#name)
+#else
+#define DEFINE_KEYMASTER_ENUM_TAG(type, name, enumtype) TypedEnumTag<type, KM_##name, enumtype> name
+#endif
+
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_PURPOSE, keymaster_purpose_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_ALGORITHM, keymaster_algorithm_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_BLOCK_MODE, keymaster_block_mode_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_DIGEST, keymaster_digest_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_DIGEST_OLD, keymaster_digest_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_PADDING, keymaster_padding_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_PADDING_OLD, keymaster_padding_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_BLOB_USAGE_REQUIREMENTS,
+                          keymaster_key_blob_usage_requirements_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_ORIGIN, keymaster_key_origin_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_USER_AUTH_TYPE, hw_authenticator_type_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM_REP, TAG_KDF, keymaster_kdf_t);
+DEFINE_KEYMASTER_ENUM_TAG(KM_ENUM, TAG_EC_CURVE, keymaster_ec_curve_t);
+
+}  // namespace keymaster
