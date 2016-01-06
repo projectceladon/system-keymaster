@@ -414,4 +414,88 @@ bool GetVersionResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint
     return true;
 }
 
+AttestKeyRequest::~AttestKeyRequest() {
+    delete[] key_blob.key_material;
+}
+
+void AttestKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
+    set_key_blob(&key_blob, key_material, length);
+}
+
+size_t AttestKeyRequest::SerializedSize() const {
+    return key_blob_size(key_blob) + attest_params.SerializedSize();
+}
+
+uint8_t* AttestKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
+    buf = serialize_key_blob(key_blob, buf, end);
+    return attest_params.Serialize(buf, end);
+}
+
+bool AttestKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    return deserialize_key_blob(&key_blob, buf_ptr, end) && attest_params.Deserialize(buf_ptr, end);
+}
+
+AttestKeyResponse::~AttestKeyResponse() {
+    for (size_t i = 0; i < certificate_chain.entry_count; ++i)
+        delete[] certificate_chain.entries[i].data;
+    delete[] certificate_chain.entries;
+}
+
+const size_t kMaxChainEntryCount = 10;
+bool AttestKeyResponse::AllocateChain(size_t entry_count) {
+    if (entry_count > kMaxChainEntryCount)
+        return false;
+
+    if (certificate_chain.entries) {
+        for (size_t i = 0; i < certificate_chain.entry_count; ++i)
+            delete[] certificate_chain.entries[i].data;
+        delete[] certificate_chain.entries;
+    }
+
+    certificate_chain.entry_count = entry_count;
+    certificate_chain.entries = new keymaster_blob_t[entry_count];
+    if (!certificate_chain.entries) {
+        certificate_chain.entry_count = 0;
+        return false;
+    }
+
+    memset(certificate_chain.entries, 0, sizeof(certificate_chain.entries[0]) * entry_count);
+    return true;
+}
+
+size_t AttestKeyResponse::NonErrorSerializedSize() const {
+    size_t result = sizeof(uint32_t); /* certificate_chain.entry_count */
+    for (size_t i = 0; i < certificate_chain.entry_count; ++i) {
+        result += sizeof(uint32_t); /* certificate_chain.entries[i].data_length */
+        result += certificate_chain.entries[i].data_length;
+    }
+    return result;
+}
+
+uint8_t* AttestKeyResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
+    buf = append_uint32_to_buf(buf, end, certificate_chain.entry_count);
+    for (size_t i = 0; i < certificate_chain.entry_count; ++i) {
+        buf = append_size_and_data_to_buf(buf, end, certificate_chain.entries[i].data,
+                                          certificate_chain.entries[i].data_length);
+    }
+    return buf;
+}
+
+bool AttestKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    size_t entry_count;
+    if (!copy_uint32_from_buf(buf_ptr, end, &entry_count) || !AllocateChain(entry_count))
+        return false;
+
+    for (size_t i = 0; i < certificate_chain.entry_count; ++i) {
+        UniquePtr<uint8_t[]> data;
+        size_t data_length;
+        if (!copy_size_and_data_from_buf(buf_ptr, end, &data_length, &data))
+            return false;
+        certificate_chain.entries[i].data = data.release();
+        certificate_chain.entries[i].data_length = data_length;
+    }
+
+    return true;
+}
+
 }  // namespace keymaster
