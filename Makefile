@@ -101,6 +101,7 @@ CPPSRCS=\
 	keymaster1_engine.cpp \
 	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp \
+	keymaster_tags.cpp \
 	logger.cpp \
 	nist_curve_key_exchange.cpp \
 	nist_curve_key_exchange_test.cpp \
@@ -192,6 +193,7 @@ hmac_test: hmac_test.o \
 	android_keymaster_utils.o \
 	authorization_set.o \
 	hmac.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -203,6 +205,7 @@ hkdf_test: hkdf_test.o \
 	hkdf.o \
 	hmac.o \
 	kdf.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -220,6 +223,7 @@ kdf1_test: kdf1_test.o \
 	authorization_set.o \
 	iso18033kdf.o \
 	kdf.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -230,6 +234,7 @@ kdf2_test: kdf2_test.o \
 	authorization_set.o \
 	iso18033kdf.o \
 	kdf.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -237,6 +242,7 @@ kdf2_test: kdf2_test.o \
 nist_curve_key_exchange_test: nist_curve_key_exchange_test.o \
 	android_keymaster_test_utils.o \
 	authorization_set.o \
+	keymaster_tags.o \
 	logger.o \
 	nist_curve_key_exchange.o \
 	openssl_err.o \
@@ -252,6 +258,7 @@ ecies_kem_test: ecies_kem_test.o \
 	hkdf.o \
 	hmac.o \
 	kdf.o \
+	keymaster_tags.o \
 	logger.o \
 	nist_curve_key_exchange.o \
 	openssl_err.o \
@@ -262,6 +269,7 @@ ecies_kem_test: ecies_kem_test.o \
 authorization_set_test: authorization_set_test.o \
 	android_keymaster_test_utils.o \
 	authorization_set.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -272,6 +280,7 @@ key_blob_test: key_blob_test.o \
 	auth_encrypted_key_blob.o \
 	authorization_set.o \
 	integrity_assured_key_blob.o \
+	keymaster_tags.o \
 	logger.o \
 	ocb.o \
 	ocb_utils.o \
@@ -284,6 +293,7 @@ android_keymaster_messages_test: android_keymaster_messages_test.o \
 	android_keymaster_test_utils.o \
 	android_keymaster_utils.o \
 	authorization_set.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -312,6 +322,7 @@ android_keymaster_test: android_keymaster_test.o \
 	keymaster0_engine.o \
 	keymaster1_engine.o \
 	keymaster_enforcement.o \
+	keymaster_tags.o \
 	logger.o \
 	ocb.o \
 	ocb_utils.o \
@@ -339,6 +350,7 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 	android_keymaster_utils.o \
 	authorization_set.o \
 	keymaster_enforcement.o \
+	keymaster_tags.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)

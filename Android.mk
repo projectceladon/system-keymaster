@@ -24,11 +24,12 @@ LOCAL_SRC_FILES:= \
 		android_keymaster_messages.cpp \
 		android_keymaster_utils.cpp \
 		authorization_set.cpp \
+		keymaster_tags.cpp \
 		logger.cpp \
 		serializable.cpp
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
-LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CFLAGS = -Wall -Werror -Wunused -DKEYMASTER_NAME_TAGS
 # TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
 # Currently, if enabled, these flags will cause an internal error in Clang.
 LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
@@ -154,9 +155,10 @@ LOCAL_SRC_FILES := \
 	kdf2_test.cpp \
 	key_blob_test.cpp \
 	keymaster_enforcement_test.cpp
+
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include
-LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CFLAGS = -Wall -Werror -Wunused -DKEYMASTER_NAME_TAGS
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
 # TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
 # Currently, if enabled, these flags will cause an internal error in Clang.
