@@ -17,22 +17,35 @@
 #ifndef SYSTEM_KEYMASTER_KDF_H_
 #define SYSTEM_KEYMASTER_KDF_H_
 
+#include <hardware/keymaster_defs.h>
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/serializable.h>
+
+#include <UniquePtr.h>
 
 namespace keymaster {
 
-// Kdf is an abstract class that provides an interface to a
-// key derivation function.
+/**
+ * A base class for wrapping different key derivation functions.
+ */
 class Kdf {
   public:
-    virtual ~Kdf() {}
+    virtual ~Kdf() { memset_s(secret_key_.get(), 0, secret_key_len_); };
+    Kdf();
+    bool Init(keymaster_digest_t digest_type, const uint8_t* secret, size_t secret_len,
+              const uint8_t* salt, size_t salt_len);
+    virtual bool GenerateKey(const uint8_t* info, size_t info_len, uint8_t* output,
+                             size_t output_len) = 0;
 
-    virtual bool Init(Buffer& secret, Buffer& salt, Buffer& info, size_t key_bytes_to_generate) = 0;
-    virtual bool Init(const uint8_t* secret, size_t secret_len, const uint8_t* salt,
-                      size_t salt_len, const uint8_t* info, size_t info_len,
-                      size_t key_bytes_to_generate) = 0;
-
-    virtual bool secret_key(Buffer* buf) const = 0;
+  protected:
+    bool Uint32ToBigEndianByteArray(uint32_t number, uint8_t* output);
+    UniquePtr<uint8_t[]> secret_key_;
+    size_t secret_key_len_;
+    UniquePtr<uint8_t[]> salt_;
+    size_t salt_len_;
+    bool is_initialized_;
+    keymaster_digest_t digest_type_;
+    size_t digest_size_;
 };
 
 }  // namespace keymaster

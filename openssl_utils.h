@@ -18,9 +18,9 @@
 #define SYSTEM_KEYMASTER_OPENSSL_UTILS_H_
 
 #include <openssl/bn.h>
-#include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/engine.h>
+#include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 
@@ -31,6 +31,15 @@
 namespace keymaster {
 
 struct KeymasterKeyBlob;
+
+class EvpMdCtxCleaner {
+  public:
+    EvpMdCtxCleaner(EVP_MD_CTX* ctx) : ctx_(ctx) {}
+    ~EvpMdCtxCleaner() { EVP_MD_CTX_cleanup(ctx_); }
+
+  private:
+    EVP_MD_CTX* ctx_;
+};
 
 struct EC_KEY_Delete {
     void operator()(EC_KEY* p) { EC_KEY_free(p); }

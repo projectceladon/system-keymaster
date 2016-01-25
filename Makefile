@@ -90,6 +90,11 @@ CPPSRCS=\
 	hmac_operation.cpp \
 	hmac_test.cpp \
 	integrity_assured_key_blob.cpp \
+	iso18033kdf.cpp \
+	kdf.cpp \
+	kdf_test.cpp \
+	kdf1_test.cpp \
+	kdf2_test.cpp \
 	key.cpp \
 	key_blob_test.cpp \
 	keymaster0_engine.cpp \
@@ -128,6 +133,9 @@ BINARIES = \
 	ecies_kem_test \
 	hkdf_test \
 	hmac_test \
+	kdf_test \
+	kdf1_test \
+	kdf2_test \
 	key_blob_test \
 	keymaster_enforcement_test \
 	nist_curve_key_exchange_test
@@ -194,6 +202,34 @@ hkdf_test: hkdf_test.o \
 	authorization_set.o \
 	hkdf.o \
 	hmac.o \
+	kdf.o \
+	logger.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+kdf_test: kdf_test.o \
+	android_keymaster_utils.o \
+	kdf.o \
+	logger.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+kdf1_test: kdf1_test.o \
+	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
+	authorization_set.o \
+	iso18033kdf.o \
+	kdf.o \
+	logger.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+kdf2_test: kdf2_test.o \
+	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
+	authorization_set.o \
+	iso18033kdf.o \
+	kdf.o \
 	logger.o \
 	serializable.o \
 	$(GTEST_OBJS)
@@ -215,6 +251,7 @@ ecies_kem_test: ecies_kem_test.o \
 	ecies_kem.o \
 	hkdf.o \
 	hmac.o \
+	kdf.o \
 	logger.o \
 	nist_curve_key_exchange.o \
 	openssl_err.o \
@@ -316,4 +353,3 @@ clean:
 
 -include $(CPPSRCS:.cpp=.d)
 -include $(CCSRCS:.cc=.d)
-
