@@ -63,6 +63,8 @@ LOCAL_SRC_FILES:= \
 		hmac_key.cpp \
 		hmac_operation.cpp \
 		integrity_assured_key_blob.cpp \
+		iso18033kdf.cpp \
+		kdf.cpp \
 		key.cpp \
 		keymaster_enforcement.cpp \
 		nist_curve_key_exchange.cpp \
@@ -147,6 +149,9 @@ LOCAL_SRC_FILES := \
 	authorization_set_test.cpp \
 	hkdf_test.cpp \
 	hmac_test.cpp \
+	kdf_test.cpp \
+	kdf1_test.cpp \
+	kdf2_test.cpp \
 	key_blob_test.cpp \
 	keymaster_enforcement_test.cpp
 LOCAL_C_INCLUDES := \
