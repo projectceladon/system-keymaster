@@ -30,8 +30,12 @@ using std::ostream;
 using std::string;
 using std::vector;
 
+#ifndef KEYMASTER_NAME_TAGS
+#error Keymaster test code requires that KEYMASTER_NAME_TAGS is defined
+#endif
+
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param) {
-    os << "Tag: " << keymaster_tag_mask_type(param.tag);
+    os << "Tag: " << keymaster::StringifyTag(param.tag);
     switch (keymaster_tag_get_type(param.tag)) {
     case KM_INVALID:
         os << " Invalid";
@@ -157,11 +161,8 @@ std::ostream& operator<<(std::ostream& os, const AuthorizationSet& set) {
         os << "(Empty)" << std::endl;
     else {
         os << "\n";
-        for (size_t i = 0; i < set.size(); ++i) {
-            os << set[i];
-            if (i < set.size() - 1)
-                os << std::endl;
-        }
+        for (size_t i = 0; i < set.size(); ++i)
+            os << set[i] << std::endl;
     }
     return os;
 }
