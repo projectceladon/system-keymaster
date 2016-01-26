@@ -602,7 +602,7 @@ TEST_P(SigningOperationsTest, RsaSuccess) {
 
 TEST_P(SigningOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(512, 3)
+                                           .RsaSigningKey(768, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
                                            .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
@@ -1318,7 +1318,7 @@ TEST_P(VerificationOperationsTest, RsaSuccess) {
 
 TEST_P(VerificationOperationsTest, RsaPssSha256Success) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(512, 3)
+                                           .RsaSigningKey(768, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
                                            .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
@@ -1369,7 +1369,7 @@ TEST_P(VerificationOperationsTest, RsaPssSha224Success) {
 
 TEST_P(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
     GenerateKey(AuthorizationSetBuilder()
-                    .RsaSigningKey(512, 3)
+                    .RsaSigningKey(768, 3)
                     .Digest(KM_DIGEST_SHA_2_256)
                     .Padding(KM_PAD_RSA_PSS));
     string message(1024, 'a');
@@ -1394,7 +1394,7 @@ TEST_P(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
 
 TEST_P(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(512, 3)
+                                           .RsaSigningKey(768, 3)
                                            .Digest(KM_DIGEST_SHA_2_256)
                                            .Padding(KM_PAD_RSA_PSS)));
     // Use large message, which won't work without digesting.
@@ -1586,7 +1586,7 @@ TEST_P(VerificationOperationsTest, RsaAllDigestAndPadCombinations) {
                     key_bits = digest_bits + 8 * (11 + 19);
                     break;
                 case KM_PAD_RSA_PSS:
-                    key_bits = digest_bits + 22 * 8;
+                    key_bits = digest_bits * 2 + 2 * 8;
                     break;
                 default:
                     FAIL() << "Missing padding";
