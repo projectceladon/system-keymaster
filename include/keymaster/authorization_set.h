@@ -128,6 +128,11 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     const keymaster_key_param_t* data() const { return elems_; }
 
     /**
+     * Sorts the set
+     */
+    void Sort();
+
+    /**
      * Sorts the set and removes duplicates (inadvertently duplicating tags is easy to do with the
      * AuthorizationSetBuilder).
      */

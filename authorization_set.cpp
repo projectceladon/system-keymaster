@@ -17,9 +17,9 @@
 #include <keymaster/authorization_set.h>
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
 
 #include <new>
 
@@ -129,9 +129,13 @@ void AuthorizationSet::set_invalid(Error error) {
     error_ = error;
 }
 
-void AuthorizationSet::Deduplicate() {
+void AuthorizationSet::Sort() {
     qsort(elems_, elems_size_, sizeof(*elems_),
           reinterpret_cast<int (*)(const void*, const void*)>(keymaster_param_compare));
+}
+
+void AuthorizationSet::Deduplicate() {
+    Sort();
 
     size_t invalid_count = 0;
     for (size_t i = 1; i < size(); ++i) {
@@ -150,6 +154,8 @@ void AuthorizationSet::Deduplicate() {
 
     if (invalid_count == 0)
         return;
+
+    Sort();
 
     // Since KM_TAG_INVALID == 0, all of the invalid entries are first.
     elems_size_ -= invalid_count;
@@ -198,7 +204,6 @@ keymaster_key_param_t& AuthorizationSet::operator[](int at) {
     memset(&empty, 0, sizeof(empty));
     return empty;
 }
-
 
 keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     if (is_valid() == OK && at < (int)elems_size_) {
