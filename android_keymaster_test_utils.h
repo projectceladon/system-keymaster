@@ -33,6 +33,7 @@
 
 #include <hardware/keymaster0.h>
 #include <hardware/keymaster1.h>
+#include <hardware/keymaster2.h>
 #include <hardware/keymaster_defs.h>
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/authorization_set.h>
@@ -148,15 +149,15 @@ template <size_t N> std::string make_string(const uint8_t(&a)[N]) {
 }
 
 /**
- * Keymaster1TestInstance is used to parameterize Keymaster1Tests.  Its main function is to create a
- * keymaster1_device_t to which test calls can be directed.  It also provides a place to specify
+ * Keymaster2TestInstance is used to parameterize Keymaster2Tests.  Its main function is to create a
+ * keymaster2_device_t to which test calls can be directed.  It also provides a place to specify
  * various bits of alternative behavior, in cases where different devices are expected to behave
  * differently (any such cases are a potential bug, but sometimes they may make sense).
  */
-class Keymaster1TestInstanceCreator {
+class Keymaster2TestInstanceCreator {
   public:
-    virtual ~Keymaster1TestInstanceCreator(){};
-    virtual keymaster1_device_t* CreateDevice() const = 0;
+    virtual ~Keymaster2TestInstanceCreator(){};
+    virtual keymaster2_device_t* CreateDevice() const = 0;
 
     virtual bool algorithm_in_km0_hardware(keymaster_algorithm_t algorithm) const = 0;
     virtual int keymaster0_calls() const = 0;
@@ -164,15 +165,15 @@ class Keymaster1TestInstanceCreator {
 };
 
 // Use a shared_ptr because it's copyable.
-typedef std::shared_ptr<Keymaster1TestInstanceCreator> InstanceCreatorPtr;
+typedef std::shared_ptr<Keymaster2TestInstanceCreator> InstanceCreatorPtr;
 
 const uint64_t OP_HANDLE_SENTINEL = 0xFFFFFFFFFFFFFFFF;
-class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
+class Keymaster2Test : public testing::TestWithParam<InstanceCreatorPtr> {
   protected:
-    Keymaster1Test();
-    ~Keymaster1Test();
+    Keymaster2Test();
+    ~Keymaster2Test();
 
-    keymaster1_device_t* device();
+    keymaster2_device_t* device();
 
     keymaster_error_t GenerateKey(const AuthorizationSetBuilder& builder);
 
@@ -304,7 +305,7 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
     }
 
   private:
-    keymaster1_device_t* device_;
+    keymaster2_device_t* device_;
     keymaster_blob_t client_id_ = {.data = reinterpret_cast<const uint8_t*>("app_id"),
                                    .data_length = 6};
     keymaster_key_param_t client_params_[1] = {
@@ -313,7 +314,7 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
     uint64_t op_handle_;
 
     keymaster_key_blob_t blob_;
-    keymaster_key_characteristics_t* characteristics_;
+    keymaster_key_characteristics_t characteristics_;
 };
 
 struct Keymaster0CountingWrapper : public keymaster0_device_t {
