@@ -335,6 +335,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_UNIQUE_ID:
         case KM_TAG_RESET_SINCE_ID_ROTATION:
+        case KM_TAG_ALLOW_WHILE_ON_BODY:
             break;
 
         case KM_TAG_BOOTLOADER_ONLY:
