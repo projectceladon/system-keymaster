@@ -17,11 +17,11 @@
 #include <keymaster/soft_keymaster_device.h>
 
 #include <assert.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stddef.h>
 
 #include <algorithm>
 
@@ -122,8 +122,7 @@ SoftKeymasterDevice::SoftKeymasterDevice()
     LOG_I("Creating device", 0);
     LOG_D("Device address: %p", this);
 
-    initialize_device_struct(KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE |
-                             KEYMASTER_SUPPORTS_EC);
+    initialize_device_struct();
 }
 
 SoftKeymasterDevice::SoftKeymasterDevice(SoftKeymasterContext* context)
@@ -138,8 +137,7 @@ SoftKeymasterDevice::SoftKeymasterDevice(SoftKeymasterContext* context)
     LOG_I("Creating test device", 0);
     LOG_D("Device address: %p", this);
 
-    initialize_device_struct(KEYMASTER_SOFTWARE_ONLY | KEYMASTER_BLOBS_ARE_STANDALONE |
-                             KEYMASTER_SUPPORTS_EC);
+    initialize_device_struct();
 }
 
 keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster0_device_t* keymaster0_device) {
@@ -153,7 +151,7 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster0_device_t* ke
     if (error != KM_ERROR_OK)
         return error;
 
-    initialize_device_struct(keymaster0_device->flags);
+    initialize_device_struct();
 
     module_name_ = device_.common.module->name;
     module_name_.append("(Wrapping ");
@@ -185,7 +183,7 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster1_device_t* ke
     if (error != KM_ERROR_OK)
         return error;
 
-    initialize_device_struct(keymaster1_device->flags);
+    initialize_device_struct();
 
     module_name_ = device_.common.module->name;
     module_name_.append(" (Wrapping ");
@@ -223,7 +221,7 @@ bool SoftKeymasterDevice::Keymaster1DeviceIsGood() {
     return true;
 }
 
-void SoftKeymasterDevice::initialize_device_struct(uint32_t flags) {
+void SoftKeymasterDevice::initialize_device_struct() {
     memset(&device_, 0, sizeof(device_));
 
     device_.common.tag = HARDWARE_DEVICE_TAG;
@@ -231,7 +229,7 @@ void SoftKeymasterDevice::initialize_device_struct(uint32_t flags) {
     device_.common.module = reinterpret_cast<hw_module_t*>(&soft_keymaster_device_module);
     device_.common.close = &close_device;
 
-    device_.flags = flags;
+    device_.flags = KEYMASTER_BLOBS_ARE_STANDALONE | KEYMASTER_SUPPORTS_EC;
 
     // keymaster0 APIs
     device_.generate_keypair = nullptr;
@@ -263,6 +261,8 @@ void SoftKeymasterDevice::initialize_device_struct(uint32_t flags) {
 
     device_.context = NULL;
 }
+
+const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
 
 hw_device_t* SoftKeymasterDevice::hw_device() {
     return &device_.common;
@@ -765,8 +765,16 @@ keymaster_error_t SoftKeymasterDevice::delete_key(const struct keymaster1_device
     if (!dev || !key || !key->key_material)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    KeymasterKeyBlob blob(*key);
-    return convert_device(dev)->context_->DeleteKey(blob);
+    const keymaster1_device_t* km1_dev = convert_device(dev)->wrapped_km1_device_;
+    if (km1_dev && km1_dev->delete_key)
+        return km1_dev->delete_key(km1_dev, key);
+
+    const keymaster0_device_t* km0_dev = convert_device(dev)->wrapped_km0_device_;
+    if (km0_dev && km0_dev->delete_keypair)
+        if (km0_dev->delete_keypair(km0_dev, key->key_material, key->key_material_size) < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+
+    return KM_ERROR_OK;
 }
 
 /* static */
@@ -774,7 +782,16 @@ keymaster_error_t SoftKeymasterDevice::delete_all_keys(const struct keymaster1_d
     if (!dev)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    return convert_device(dev)->context_->DeleteAllKeys();
+    const keymaster1_device_t* km1_dev = convert_device(dev)->wrapped_km1_device_;
+    if (km1_dev && km1_dev->delete_all_keys)
+        return km1_dev->delete_all_keys(km1_dev);
+
+    const keymaster0_device_t* km0_dev = convert_device(dev)->wrapped_km0_device_;
+    if (km0_dev && km0_dev->delete_all)
+        if (km0_dev->delete_all(km0_dev) < 0)
+            return KM_ERROR_UNKNOWN_ERROR;
+
+    return KM_ERROR_OK;
 }
 
 static bool FindAlgorithm(const keymaster_key_param_set_t& params,

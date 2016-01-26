@@ -78,7 +78,7 @@ class SoftKeymasterDevice {
     }
 
   private:
-    void initialize_device_struct(uint32_t flags);
+    void initialize_device_struct();
     bool FindUnsupportedDigest(keymaster_algorithm_t algorithm, keymaster_purpose_t purpose,
                                const AuthorizationSet& params,
                                keymaster_digest_t* unsupported) const;

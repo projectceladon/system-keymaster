@@ -44,6 +44,8 @@ namespace keymaster {
 
 namespace {
 static uint8_t master_key_bytes[AES_BLOCK_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const int NONCE_LENGTH = 12;
+const int TAG_LENGTH = 16;
 const KeymasterKeyBlob MASTER_KEY(master_key_bytes, array_length(master_key_bytes));
 }  // anonymous namespace
 
@@ -213,6 +215,7 @@ static keymaster_error_t ParseOcbAuthEncryptedBlob(const KeymasterKeyBlob& blob,
 // unwrap_key function, modified for the preferred function signature and formatting.  It does some
 // odd things, but they have been left unchanged to avoid breaking compatibility.
 static const uint8_t SOFT_KEY_MAGIC[] = {'P', 'K', '#', '8'};
+const uint64_t HUNDRED_YEARS = 1000LL * 60 * 60 * 24 * 365 * 100;
 keymaster_error_t SoftKeymasterContext::ParseOldSoftkeymasterBlob(
     const KeymasterKeyBlob& blob, KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
     AuthorizationSet* sw_enforced) const {
@@ -357,59 +360,6 @@ keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blo
     return KM_ERROR_INVALID_KEY_BLOB;
 }
 
-keymaster_error_t SoftKeymasterContext::DeleteKey(const KeymasterKeyBlob& blob) const {
-    if (km1_engine_) {
-        keymaster_error_t error = km1_engine_->DeleteKey(blob);
-        if (error == KM_ERROR_INVALID_KEY_BLOB) {
-            // Note that we succeed on invalid blob, because it probably just indicates that the
-            // blob is a software blob, not a hardware blob.
-            error = KM_ERROR_OK;
-        }
-        return error;
-    }
-
-    if (km0_engine_) {
-        // This could be a keymaster0 hardware key, and it could be either raw or encapsulated in an
-        // integrity-assured blob.  If it's integrity-assured, we can't validate it strongly,
-        // because we don't have the necessary additional_params data.  However, the probability
-        // that anything other than an integrity-assured blob would have all of the structure
-        // required to decode as a valid blob is low -- unless it's maliciously-constructed, but the
-        // deserializer should be proof against bad data, as should the keymaster0 hardware.
-        //
-        // Thus, we first try to parse it as integrity-assured.  If that works, we pass the result
-        // to the underlying hardware.  If not, we pass blob unmodified to the underlying hardware.
-        KeymasterKeyBlob key_material;
-        AuthorizationSet hw_enforced, sw_enforced;
-        keymaster_error_t error = DeserializeIntegrityAssuredBlob_NoHmacCheck(
-            blob, &key_material, &hw_enforced, &sw_enforced);
-        if (error == KM_ERROR_OK && km0_engine_->DeleteKey(key_material))
-            return KM_ERROR_OK;
-
-        km0_engine_->DeleteKey(blob);
-
-        // We succeed unconditionally at this point, even if delete failed.  Failure indicates that
-        // either the blob is a software blob (which we can't distinguish with certainty without
-        // additional_params) or because it is a hardware blob and the hardware failed.  In the
-        // first case, there is no error.  In the second case, the client can't do anything to fix
-        // it anyway, so it's not too harmful to simply swallow the error.  This is not ideal, but
-        // it's the least-bad alternative.
-        return KM_ERROR_OK;
-    }
-
-    // Nothing to do for software-only contexts.
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t SoftKeymasterContext::DeleteAllKeys() const {
-    if (km1_engine_)
-        return km1_engine_->DeleteAllKeys();
-
-    if (km0_engine_ && !km0_engine_->DeleteAllKeys())
-        return KM_ERROR_UNKNOWN_ERROR;
-
-    return KM_ERROR_OK;
-}
-
 keymaster_error_t SoftKeymasterContext::AddRngEntropy(const uint8_t* buf, size_t length) const {
     RAND_add(buf, length, 0 /* Don't assume any entropy is added to the pool. */);
     return KM_ERROR_OK;
@@ -523,12 +473,12 @@ keymaster_error_t SoftKeymasterContext::FakeKeyAuthorizations(EVP_PKEY* pubkey,
         sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_SIGN);
         sw_enforced->push_back(TAG_PURPOSE, KM_PURPOSE_VERIFY);
 
-        UniquePtr<EC_KEY, EC_KEY_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
+        UniquePtr<EC_KEY, EC_Delete> ec_key(EVP_PKEY_get1_EC_KEY(pubkey));
         if (!ec_key.get())
             return TranslateLastOpenSslError();
         size_t key_size_bits;
         keymaster_error_t error =
-            ec_get_group_size(EC_KEY_get0_group(ec_key.get()), &key_size_bits);
+            EcKeyFactory::get_group_size(*EC_KEY_get0_group(ec_key.get()), &key_size_bits);
         if (error != KM_ERROR_OK)
             return error;
         hw_enforced->push_back(TAG_KEY_SIZE, key_size_bits);

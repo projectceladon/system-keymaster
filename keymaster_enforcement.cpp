@@ -130,7 +130,6 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
 
         case KM_PURPOSE_DECRYPT:
         case KM_PURPOSE_SIGN:
-        case KM_PURPOSE_DERIVE_KEY:
             break;
         };
     };
@@ -297,16 +296,12 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_PADDING:
         case KM_TAG_NONCE:
         case KM_TAG_MIN_MAC_LENGTH:
-        case KM_TAG_KDF:
-        case KM_TAG_EC_CURVE:
 
         /* Tags not used for operations. */
         case KM_TAG_BLOB_USAGE_REQUIREMENTS:
-        case KM_TAG_EXPORTABLE:
 
         /* Algorithm specific parameters not used for access control. */
         case KM_TAG_RSA_PUBLIC_EXPONENT:
-        case KM_TAG_ECIES_SINGLE_HASH_MODE:
 
         /* Informational tags. */
         case KM_TAG_CREATION_DATETIME:
@@ -321,20 +316,11 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         /* Tag to provide data to operations. */
         case KM_TAG_ASSOCIATED_DATA:
 
-        /* Tags that are implicitly verified by secure side */
+        /* Ignored pending removal */
         case KM_TAG_ALL_APPLICATIONS:
         case KM_TAG_APPLICATION_ID:
-        case KM_TAG_OS_VERSION:
-        case KM_TAG_OS_PATCHLEVEL:
-
-        /* Ignored pending removal */
         case KM_TAG_USER_ID:
         case KM_TAG_ALL_USERS:
-
-        /* TODO(swillden): Handle these */
-        case KM_TAG_INCLUDE_UNIQUE_ID:
-        case KM_TAG_UNIQUE_ID:
-        case KM_TAG_RESET_SINCE_ID_ROTATION:
             break;
 
         case KM_TAG_BOOTLOADER_ONLY:
