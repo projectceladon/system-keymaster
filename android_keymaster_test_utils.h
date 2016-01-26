@@ -176,8 +176,6 @@ class Keymaster1Test : public testing::TestWithParam<InstanceCreatorPtr> {
 
     keymaster_error_t GenerateKey(const AuthorizationSetBuilder& builder);
 
-    keymaster_error_t DeleteKey();
-
     keymaster_error_t ImportKey(const AuthorizationSetBuilder& builder,
                                 keymaster_key_format_t format, const std::string& key_material);
 
@@ -407,8 +405,6 @@ struct Keymaster0CountingWrapper : public keymaster0_device_t {
     static int counting_delete_keypair(const struct keymaster0_device* dev, const uint8_t* key_blob,
                                        const size_t key_blob_length) {
         increment(dev);
-        if (key_blob && key_blob_length > 0)
-            EXPECT_EQ('Q', *key_blob);
         if (device(dev)->delete_keypair) {
             std::unique_ptr<uint8_t[]> dup_blob(unmunge_blob(key_blob, key_blob_length));
             return device(dev)->delete_keypair(device(dev), dup_blob.get(), key_blob_length);

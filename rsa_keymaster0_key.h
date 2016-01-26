@@ -59,10 +59,15 @@ class RsaKeymaster0KeyFactory : public RsaKeyFactory {
 };
 
 class RsaKeymaster0Key : public RsaKey {
+    typedef RsaKey super;
+
   public:
     RsaKeymaster0Key(RSA* rsa_key, const AuthorizationSet& hw_enforced,
-                     const AuthorizationSet& sw_enforced, keymaster_error_t* error)
-        : RsaKey(rsa_key, hw_enforced, sw_enforced, error) {}
+                     const AuthorizationSet& sw_enforced, const Keymaster0Engine* engine,
+                     keymaster_error_t* error);
+
+  private:
+    const Keymaster0Engine* engine_;
 };
 
 }  // namespace keymaster
