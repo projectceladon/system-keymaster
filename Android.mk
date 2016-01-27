@@ -54,6 +54,7 @@ LOCAL_SRC_FILES:= \
 		android_keymaster_utils.cpp \
 		asymmetric_key.cpp \
 		asymmetric_key_factory.cpp \
+		attestation_record.cpp \
 		auth_encrypted_key_blob.cpp \
 		ec_key.cpp \
 		ec_key_factory.cpp \
@@ -147,12 +148,13 @@ LOCAL_SRC_FILES := \
 	android_keymaster_messages_test.cpp \
 	android_keymaster_test.cpp \
 	android_keymaster_test_utils.cpp \
+	attestation_record_test.cpp \
 	authorization_set_test.cpp \
 	hkdf_test.cpp \
 	hmac_test.cpp \
-	kdf_test.cpp \
 	kdf1_test.cpp \
 	kdf2_test.cpp \
+	kdf_test.cpp \
 	key_blob_test.cpp \
 	keymaster_enforcement_test.cpp
 

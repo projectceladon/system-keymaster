@@ -50,7 +50,7 @@ endif
 
 LDFLAGS += $(ARCH_FLAGS)
 CPPFLAGS = $(INCLUDES) -g -O0 -MD -MP
-CXXFLAGS += -Wall -Werror -Wno-unused -Winit-self -Wpointer-arith	-Wunused-parameter \
+CXXFLAGS += -Wall -Werror -Wno-unused -Winit-self -Wpointer-arith -Wunused-parameter \
 	-Werror=sign-compare -Werror=return-type -fno-permissive \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS $(ARCH_FLAGS)
 CFLAGS += $(ARCH_FLAGS)
@@ -71,6 +71,8 @@ CPPSRCS=\
 	android_keymaster_utils.cpp \
 	asymmetric_key.cpp \
 	asymmetric_key_factory.cpp \
+	attestation_record.cpp \
+	attestation_record_test.cpp \
 	auth_encrypted_key_blob.cpp \
 	authorization_set.cpp \
 	authorization_set_test.cpp \
@@ -130,6 +132,7 @@ DEPS=$(CPPSRCS:.cpp=.d) $(CCSRCS:.cc=.d) $(CSRCS:.c=.d)
 BINARIES = \
 	android_keymaster_messages_test \
 	android_keymaster_test \
+	attestation_record_test \
 	authorization_set_test \
 	ecies_kem_test \
 	hkdf_test \
@@ -307,6 +310,7 @@ android_keymaster_test: android_keymaster_test.o \
 	android_keymaster_utils.o \
 	asymmetric_key.o \
 	asymmetric_key_factory.o \
+	attestation_record.o \
 	auth_encrypted_key_blob.o \
 	authorization_set.o \
 	ec_key.o \
@@ -352,6 +356,16 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 	keymaster_enforcement.o \
 	keymaster_tags.o \
 	logger.o \
+	serializable.o \
+	$(GTEST_OBJS)
+
+attestation_record_test: attestation_record_test.o \
+	android_keymaster_test_utils.o \
+	attestation_record.o \
+	authorization_set.o \
+	keymaster_tags.o \
+	logger.o \
+	openssl_err.o \
 	serializable.o \
 	$(GTEST_OBJS)
 
