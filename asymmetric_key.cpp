@@ -161,7 +161,9 @@ static bool copy_attestation_chain(const KeymasterContext& context,
     if (!allocate_cert_chain(attest_key_chain->entry_count + 1, chain, error))
         return false;
 
-    chain->entries[0] = {};  // Leave empty for the leaf certificate.
+    chain->entries[0].data = nullptr;  // Leave empty for the leaf certificate.
+    chain->entries[0].data_length = 0;
+
     for (size_t i = 0; i < attest_key_chain->entry_count; ++i) {
         chain->entries[i + 1] = attest_key_chain->entries[i];
         attest_key_chain->entries[i].data = nullptr;
