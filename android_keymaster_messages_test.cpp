@@ -532,6 +532,42 @@ TEST(RoundTrip, AbortOperationResponse) {
     }
 }
 
+TEST(RoundTrip, AttestKeyRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AttestKeyRequest msg(ver);
+        msg.SetKeyMaterial("foo", 3);
+        msg.attest_params.Reinitialize(params, array_length(params));
+
+        UniquePtr<AttestKeyRequest> deserialized(round_trip(ver, msg, 85));
+        EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+        EXPECT_EQ(0, memcmp("foo", deserialized->key_blob.key_material, 3));
+        EXPECT_EQ(msg.attest_params, deserialized->attest_params);
+    }
+}
+
+TEST(RoundTrip, AttestKeyResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        AttestKeyResponse msg(ver);
+        msg.error = KM_ERROR_OK;
+        EXPECT_TRUE(msg.AllocateChain(3));
+        msg.certificate_chain.entries[0] = {dup_buffer("foo", 3), 3};
+        msg.certificate_chain.entries[1] = {dup_buffer("bar", 3), 3};
+        msg.certificate_chain.entries[2] = {dup_buffer("baz", 3), 3};
+
+        UniquePtr<AttestKeyResponse> deserialized(round_trip(ver, msg, 29));
+        keymaster_cert_chain_t* chain = &deserialized->certificate_chain;
+
+        EXPECT_NE(nullptr, chain->entries);
+        EXPECT_EQ(3U, chain->entry_count);
+        EXPECT_EQ(3U, chain->entries[0].data_length);
+        EXPECT_EQ(0, memcmp("foo", chain->entries[0].data, 3));
+        EXPECT_EQ(3U, chain->entries[1].data_length);
+        EXPECT_EQ(0, memcmp("bar", chain->entries[1].data, 3));
+        EXPECT_EQ(3U, chain->entries[2].data_length);
+        EXPECT_EQ(0, memcmp("baz", chain->entries[2].data, 3));
+    }
+}
+
 uint8_t msgbuf[] = {
     220, 88,  183, 255, 71,  1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   173, 0,   0,   0,   228, 174, 98,  187, 191, 135, 253, 200, 51,  230, 114, 247, 151, 109,
@@ -624,6 +660,8 @@ GARBAGE_TEST(SupportedByAlgorithmAndPurposeRequest)
 GARBAGE_TEST(SupportedByAlgorithmRequest)
 GARBAGE_TEST(UpdateOperationRequest);
 GARBAGE_TEST(UpdateOperationResponse);
+GARBAGE_TEST(AttestKeyRequest);
+GARBAGE_TEST(AttestKeyResponse);
 
 // The macro doesn't work on this one.
 TEST(GarbageTest, SupportedResponse) {
