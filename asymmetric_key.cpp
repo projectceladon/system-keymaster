@@ -224,7 +224,7 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
         return TranslateLastOpenSslError();
 
     keymaster_error_t error = KM_ERROR_OK;
-    EVP_PKEY_Ptr sign_key(context.AttestationKey(KM_ALGORITHM_RSA, &error));
+    EVP_PKEY_Ptr sign_key(context.AttestationKey(sign_algorithm, &error));
 
     if (!sign_key.get() ||  //
         !add_public_key(pkey.get(), certificate.get(), &error) ||
