@@ -76,6 +76,7 @@ typedef struct km_auth_list {
     ASN1_NULL* no_auth_required;
     ASN1_INTEGER* user_auth_type;
     ASN1_INTEGER* auth_timeout;
+    ASN1_NULL* allow_while_on_body;
     ASN1_NULL* all_applications;
     ASN1_OCTET_STRING* application_id;
     ASN1_OCTET_STRING* application_data;
@@ -118,6 +119,8 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
     ASN1_IMP_OPT(KM_AUTH_LIST, no_auth_required, ASN1_NULL, TAG_NO_AUTH_REQUIRED.masked_tag()),
     ASN1_IMP_OPT(KM_AUTH_LIST, user_auth_type, ASN1_INTEGER, TAG_USER_AUTH_TYPE.masked_tag()),
     ASN1_IMP_OPT(KM_AUTH_LIST, auth_timeout, ASN1_INTEGER, TAG_AUTH_TIMEOUT.masked_tag()),
+    ASN1_IMP_OPT(KM_AUTH_LIST, allow_while_on_body, ASN1_NULL,
+                 TAG_ALLOW_WHILE_ON_BODY.masked_tag()),
     ASN1_IMP_OPT(KM_AUTH_LIST, all_applications, ASN1_NULL, TAG_ALL_APPLICATIONS.masked_tag()),
     ASN1_IMP_OPT(KM_AUTH_LIST, application_id, ASN1_OCTET_STRING, TAG_APPLICATION_ID.masked_tag()),
     ASN1_IMP_OPT(KM_AUTH_LIST, application_data, ASN1_OCTET_STRING,
@@ -311,6 +314,10 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
             break;
         case KM_TAG_INCLUDE_UNIQUE_ID:
             bool_ptr = &record->include_unique_id;
+            break;
+        case KM_TAG_ALLOW_WHILE_ON_BODY:
+            bool_ptr = &record->allow_while_on_body;
+            break;
 
         /* Byte arrays*/
         case KM_TAG_APPLICATION_ID:
