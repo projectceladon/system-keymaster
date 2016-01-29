@@ -65,7 +65,7 @@ enum AndroidKeymasterCommand {
  * Note that this approach implies that GetVersionRequest and GetVersionResponse cannot be
  * versioned.
  */
-const int32_t MAX_MESSAGE_VERSION = 2;
+const int32_t MAX_MESSAGE_VERSION = 3;
 inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t /* subminor_ver */) {
     int32_t message_version = -1;
     switch (major_ver) {
@@ -83,6 +83,9 @@ inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t /* s
             message_version = 2;
             break;
         }
+    case 2:
+        message_version = 3;
+        break;
     };
     return message_version;
 }
@@ -337,6 +340,7 @@ struct FinishOperationRequest : public KeymasterMessage {
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override;
 
     keymaster_operation_handle_t op_handle;
+    Buffer input;
     Buffer signature;
     AuthorizationSet additional_params;
 };

@@ -222,6 +222,7 @@ TEST(RoundTrip, BeginOperationResponse) {
             break;
         case 1:
         case 2:
+        case 3:
             deserialized.reset(round_trip(ver, msg, 39));
             break;
         default:
@@ -237,6 +238,7 @@ TEST(RoundTrip, BeginOperationResponse) {
             break;
         case 1:
         case 2:
+        case 3:
             EXPECT_EQ(msg.output_params, deserialized->output_params);
             break;
         default:
@@ -269,6 +271,7 @@ TEST(RoundTrip, UpdateOperationRequest) {
             break;
         case 1:
         case 2:
+        case 3:
             deserialized.reset(round_trip(ver, msg, 27));
             break;
         default:
@@ -296,6 +299,7 @@ TEST(RoundTrip, UpdateOperationResponse) {
             deserialized.reset(round_trip(ver, msg, 15));
             break;
         case 2:
+        case 3:
             deserialized.reset(round_trip(ver, msg, 42));
             break;
         default:
@@ -313,6 +317,7 @@ TEST(RoundTrip, UpdateOperationResponse) {
             EXPECT_EQ(99U, deserialized->input_consumed);
             break;
         case 2:
+        case 3:
             EXPECT_EQ(99U, deserialized->input_consumed);
             EXPECT_EQ(1U, deserialized->output_params.size());
             break;
@@ -327,6 +332,7 @@ TEST(RoundTrip, FinishOperationRequest) {
         FinishOperationRequest msg(ver);
         msg.op_handle = 0xDEADBEEF;
         msg.signature.Reinitialize("bar", 3);
+        msg.input.Reinitialize("baz", 3);
 
         UniquePtr<FinishOperationRequest> deserialized;
         switch (ver) {
@@ -336,6 +342,9 @@ TEST(RoundTrip, FinishOperationRequest) {
         case 1:
         case 2:
             deserialized.reset(round_trip(ver, msg, 27));
+            break;
+        case 3:
+            deserialized.reset(round_trip(ver, msg, 34));
             break;
         default:
             FAIL();
@@ -359,6 +368,7 @@ TEST(Round_Trip, FinishOperationResponse) {
             deserialized.reset(round_trip(ver, msg, 11));
             break;
         case 2:
+        case 3:
             deserialized.reset(round_trip(ver, msg, 23));
             break;
         default:
