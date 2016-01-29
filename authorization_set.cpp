@@ -196,21 +196,31 @@ int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
         return i;
 }
 
-keymaster_key_param_t empty;
+bool AuthorizationSet::erase(size_t index) {
+    if (index >= size())
+        return false;
+
+    --elems_size_;
+    for (size_t i = index; i < elems_size_; ++i)
+        elems_[i] = elems_[i + 1];
+    return true;
+}
+
+keymaster_key_param_t empty_set = {};
 keymaster_key_param_t& AuthorizationSet::operator[](int at) {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    memset(&empty, 0, sizeof(empty));
-    return empty;
+    empty_set = {};
+    return empty_set;
 }
 
 keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    memset(&empty, 0, sizeof(empty));
-    return empty;
+    empty_set = {};
+    return empty_set;
 }
 
 bool AuthorizationSet::push_back(const keymaster_key_param_set_t& set) {

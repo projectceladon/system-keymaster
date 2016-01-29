@@ -310,7 +310,7 @@ void AndroidKeymaster::FinishOperation(const FinishOperationRequest& request,
         }
     }
 
-    response->error = operation->Finish(request.additional_params, request.signature,
+    response->error = operation->Finish(request.additional_params, request.input, request.signature,
                                         &response->output_params, &response->output);
     operation_table_->Delete(request.op_handle);
 }
