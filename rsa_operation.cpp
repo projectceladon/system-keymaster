@@ -289,10 +289,14 @@ keymaster_error_t RsaSignOperation::Update(const AuthorizationSet& additional_pa
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                           const Buffer& /* signature */,
+keymaster_error_t RsaSignOperation::Finish(const AuthorizationSet& additional_params,
+                                           const Buffer& input, const Buffer& /* signature */,
                                            AuthorizationSet* /* output_params */, Buffer* output) {
     assert(output);
+
+    keymaster_error_t error = UpdateForFinish(additional_params, input);
+    if (error != KM_ERROR_OK)
+        return error;
 
     if (digest_ == KM_DIGEST_NONE)
         return SignUndigested(output);
@@ -408,10 +412,14 @@ keymaster_error_t RsaVerifyOperation::Update(const AuthorizationSet& additional_
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                             const Buffer& signature,
+keymaster_error_t RsaVerifyOperation::Finish(const AuthorizationSet& additional_params,
+                                             const Buffer& input, const Buffer& signature,
                                              AuthorizationSet* /* output_params */,
                                              Buffer* /* output */) {
+    keymaster_error_t error = UpdateForFinish(additional_params, input);
+    if (error != KM_ERROR_OK)
+        return error;
+
     if (digest_ == KM_DIGEST_NONE)
         return VerifyUndigested(signature);
     else
@@ -509,11 +517,16 @@ struct EVP_PKEY_CTX_Delete {
     void operator()(EVP_PKEY_CTX* p) { EVP_PKEY_CTX_free(p); }
 };
 
-keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                              const Buffer& /* signature */,
+keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& additional_params,
+                                              const Buffer& input, const Buffer& /* signature */,
                                               AuthorizationSet* /* output_params */,
                                               Buffer* output) {
-    assert(output);
+    if (!output)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    keymaster_error_t error = UpdateForFinish(additional_params, input);
+    if (error != KM_ERROR_OK)
+        return error;
 
     UniquePtr<EVP_PKEY_CTX, EVP_PKEY_CTX_Delete> ctx(
         EVP_PKEY_CTX_new(rsa_key_, nullptr /* engine */));
@@ -523,7 +536,7 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     if (EVP_PKEY_encrypt_init(ctx.get()) <= 0)
         return TranslateLastOpenSslError();
 
-    keymaster_error_t error = SetRsaPaddingInEvpContext(ctx.get(), false /* signing */);
+    error = SetRsaPaddingInEvpContext(ctx.get(), false /* signing */);
     if (error != KM_ERROR_OK)
         return error;
     error = SetOaepDigestIfRequired(ctx.get());
@@ -557,11 +570,16 @@ keymaster_error_t RsaEncryptOperation::Finish(const AuthorizationSet& /* additio
     return KM_ERROR_OK;
 }
 
-keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additional_params */,
-                                              const Buffer& /* signature */,
+keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& additional_params,
+                                              const Buffer& input, const Buffer& /* signature */,
                                               AuthorizationSet* /* output_params */,
                                               Buffer* output) {
-    assert(output);
+    if (!output)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
+
+    keymaster_error_t error = UpdateForFinish(additional_params, input);
+    if (error != KM_ERROR_OK)
+        return error;
 
     UniquePtr<EVP_PKEY_CTX, EVP_PKEY_CTX_Delete> ctx(
         EVP_PKEY_CTX_new(rsa_key_, nullptr /* engine */));
@@ -571,7 +589,7 @@ keymaster_error_t RsaDecryptOperation::Finish(const AuthorizationSet& /* additio
     if (EVP_PKEY_decrypt_init(ctx.get()) <= 0)
         return TranslateLastOpenSslError();
 
-    keymaster_error_t error = SetRsaPaddingInEvpContext(ctx.get(), false /* signing */);
+    error = SetRsaPaddingInEvpContext(ctx.get(), false /* signing */);
     if (error != KM_ERROR_OK)
         return error;
     error = SetOaepDigestIfRequired(ctx.get());

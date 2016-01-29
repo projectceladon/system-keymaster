@@ -118,6 +118,11 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     size_t size() const { return elems_size_; }
 
     /**
+     * Returns true if the set is empty.
+     */
+    bool empty() const { return size() == 0; }
+
+    /**
      * Returns the total size of all indirect data referenced by set elements.
      */
     size_t indirect_size() const { return indirect_data_size_; }
@@ -150,6 +155,12 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * begin.  If not found, returns -1.
      */
     int find(keymaster_tag_t tag, int begin = -1) const;
+
+    /**
+     * Removes the entry at the specified index. Returns true if successful, false if the index was
+     * out of bounds.
+     */
+    bool erase(size_t index);
 
     /**
      * Returns iterator (pointer) to beginning of elems array, to enable STL-style iteration
