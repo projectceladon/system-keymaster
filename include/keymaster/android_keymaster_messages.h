@@ -83,6 +83,7 @@ inline int32_t MessageVersion(uint8_t major_ver, uint8_t minor_ver, uint8_t /* s
             message_version = 2;
             break;
         }
+        break;
     case 2:
         message_version = 3;
         break;
@@ -142,8 +143,15 @@ struct SupportedByAlgorithmRequest : public KeymasterMessage {
     keymaster_algorithm_t algorithm;
 };
 
-class SupportedImportFormatsRequest : public SupportedByAlgorithmRequest {};
-class SupportedExportFormatsRequest : public SupportedByAlgorithmRequest {};
+struct SupportedImportFormatsRequest : public SupportedByAlgorithmRequest {
+    SupportedImportFormatsRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedByAlgorithmRequest(ver) {}
+};
+
+struct SupportedExportFormatsRequest : public SupportedByAlgorithmRequest {
+    SupportedExportFormatsRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedByAlgorithmRequest(ver) {}
+};
 
 struct SupportedByAlgorithmAndPurposeRequest : public KeymasterMessage {
     explicit SupportedByAlgorithmAndPurposeRequest(int32_t ver = MAX_MESSAGE_VERSION)
@@ -163,9 +171,20 @@ struct SupportedByAlgorithmAndPurposeRequest : public KeymasterMessage {
     keymaster_purpose_t purpose;
 };
 
-class SupportedBlockModesRequest : public SupportedByAlgorithmAndPurposeRequest {};
-class SupportedPaddingModesRequest : public SupportedByAlgorithmAndPurposeRequest {};
-class SupportedDigestsRequest : public SupportedByAlgorithmAndPurposeRequest {};
+struct SupportedBlockModesRequest : public SupportedByAlgorithmAndPurposeRequest {
+    SupportedBlockModesRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedByAlgorithmAndPurposeRequest(ver) {}
+};
+
+struct SupportedPaddingModesRequest : public SupportedByAlgorithmAndPurposeRequest {
+    SupportedPaddingModesRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedByAlgorithmAndPurposeRequest(ver) {}
+};
+
+struct SupportedDigestsRequest : public SupportedByAlgorithmAndPurposeRequest {
+    SupportedDigestsRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedByAlgorithmAndPurposeRequest(ver) {}
+};
 
 template <typename T> struct SupportedResponse : public KeymasterResponse {
     explicit SupportedResponse(int32_t ver = MAX_MESSAGE_VERSION)
@@ -206,12 +225,35 @@ template <typename T> struct SupportedResponse : public KeymasterResponse {
     size_t results_length;
 };
 
-class SupportedAlgorithmsResponse : public SupportedResponse<keymaster_algorithm_t> {};
-class SupportedBlockModesResponse : public SupportedResponse<keymaster_block_mode_t> {};
-class SupportedPaddingModesResponse : public SupportedResponse<keymaster_padding_t> {};
-class SupportedDigestsResponse : public SupportedResponse<keymaster_digest_t> {};
-class SupportedImportFormatsResponse : public SupportedResponse<keymaster_key_format_t> {};
-class SupportedExportFormatsResponse : public SupportedResponse<keymaster_key_format_t> {};
+struct SupportedAlgorithmsResponse : public SupportedResponse<keymaster_algorithm_t> {
+    SupportedAlgorithmsResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_algorithm_t>(ver) {}
+};
+
+struct SupportedBlockModesResponse : public SupportedResponse<keymaster_block_mode_t> {
+    SupportedBlockModesResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_block_mode_t>(ver) {}
+};
+
+struct SupportedPaddingModesResponse : public SupportedResponse<keymaster_padding_t> {
+    SupportedPaddingModesResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_padding_t>(ver) {}
+};
+
+struct SupportedDigestsResponse : public SupportedResponse<keymaster_digest_t> {
+    SupportedDigestsResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_digest_t>(ver) {}
+};
+
+struct SupportedImportFormatsResponse : public SupportedResponse<keymaster_key_format_t> {
+    SupportedImportFormatsResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_key_format_t>(ver) {}
+};
+
+struct SupportedExportFormatsResponse : public SupportedResponse<keymaster_key_format_t> {
+    SupportedExportFormatsResponse(int32_t ver = MAX_MESSAGE_VERSION)
+        : SupportedResponse<keymaster_key_format_t>(ver) {}
+};
 
 struct GenerateKeyRequest : public KeymasterMessage {
     explicit GenerateKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
