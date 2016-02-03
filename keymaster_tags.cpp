@@ -109,6 +109,8 @@ const char* StringifyTag(keymaster_tag_t tag) {
         return "KM_TAG_RESET_SINCE_ID_ROTATION";
     case KM_TAG_ALLOW_WHILE_ON_BODY:
         return "KM_TAG_ALLOW_WHILE_ON_BODY";
+    case KM_TAG_ATTESTATION_CHALLENGE:
+        return "KM_TAG_ATTESTATION_CHALLENGE";
     }
     return "<Unknown>";
 }

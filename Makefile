@@ -361,6 +361,7 @@ keymaster_enforcement_test: keymaster_enforcement_test.o \
 
 attestation_record_test: attestation_record_test.o \
 	android_keymaster_test_utils.o \
+	android_keymaster_utils.o \
 	attestation_record.o \
 	authorization_set.o \
 	keymaster_tags.o \

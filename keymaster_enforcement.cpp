@@ -285,6 +285,7 @@ keymaster_error_t KeymasterEnforcement::AuthorizeBegin(const keymaster_purpose_t
         case KM_TAG_AUTH_TOKEN:
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_APPLICATION_DATA:
+        case KM_TAG_ATTESTATION_CHALLENGE:
             return KM_ERROR_INVALID_KEY_BLOB;
 
         /* Tags used for cryptographic parameters in keygen.  Nothing to enforce. */
