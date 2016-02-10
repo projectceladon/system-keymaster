@@ -103,6 +103,23 @@ bool AuthorizationSet::reserve_indirect(size_t length) {
     return true;
 }
 
+void AuthorizationSet::MoveFrom(AuthorizationSet& set) {
+    elems_ = set.elems_;
+    elems_size_ = set.elems_size_;
+    elems_capacity_ = set.elems_capacity_;
+    indirect_data_ = set.indirect_data_;
+    indirect_data_size_ = set.indirect_data_size_;
+    indirect_data_capacity_ = set.indirect_data_capacity_;
+    error_ = set.error_;
+    set.elems_ = nullptr;
+    set.elems_size_ = 0;
+    set.elems_capacity_ = 0;
+    set.indirect_data_ = nullptr;
+    set.indirect_data_size_ = 0;
+    set.indirect_data_capacity_ = 0;
+    set.error_ = OK;
+}
+
 bool AuthorizationSet::Reinitialize(const keymaster_key_param_t* elems, const size_t count) {
     FreeData();
 

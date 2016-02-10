@@ -79,6 +79,26 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     AuthorizationSet(const AuthorizationSet& set) : Serializable(), indirect_data_(nullptr) {
         elems_ = nullptr;
         Reinitialize(set.elems_, set.elems_size_);
+        error_ = set.error_;
+    }
+
+    // Move constructor.
+    AuthorizationSet(AuthorizationSet&& set) : Serializable() {
+        MoveFrom(set);
+    }
+
+    // Copy assignment.
+    AuthorizationSet& operator=(const AuthorizationSet& set) {
+        Reinitialize(set.elems_, set.elems_size_);
+        error_ = set.error_;
+        return *this;
+    }
+
+    // Move assignment.
+    AuthorizationSet& operator=(AuthorizationSet&& set) {
+        FreeData();
+        MoveFrom(set);
+        return *this;
     }
 
     /**
@@ -392,10 +412,9 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     size_t SerializedSizeOfElements() const;
 
   private:
-    // Disallow assignment
-    void operator=(const AuthorizationSet&);
-
     void FreeData();
+    void MoveFrom(AuthorizationSet& set);
+
     void set_invalid(Error err);
 
     static size_t ComputeIndirectDataSize(const keymaster_key_param_t* elems, size_t count);
@@ -417,7 +436,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
 
     bool ContainsEnumValue(keymaster_tag_t tag, uint32_t val) const;
 
-    // Define elems_ and elems_size_ as aliases to params and length, respectivley.  This is to
+    // Define elems_ and elems_size_ as aliases to params and length, respectively.  This is to
     // avoid using the variables without the trailing underscore in the implementation.
     keymaster_key_param_t*& elems_ = keymaster_key_param_set_t::params;
     size_t& elems_size_ = keymaster_key_param_set_t::length;
