@@ -871,7 +871,8 @@ keymaster_error_t SoftKeymasterDevice::import_key(
         return km1_dev->import_key(km1_dev, params, key_format, key_data, key_blob,
                                    characteristics);
 
-    *characteristics = nullptr;
+    if (characteristics)
+        *characteristics = nullptr;
 
     request.key_format = key_format;
     request.SetKeyMaterial(key_data->data, key_data->data_length);
