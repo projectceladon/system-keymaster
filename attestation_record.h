@@ -39,14 +39,18 @@ namespace keymaster {
  */
 static const char kAttestionRecordOid[] = "1.3.6.1.4.1.11129.2.1.17";
 
-keymaster_error_t build_attestation_record(const AuthorizationSet& software_enforced,
+keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_params,
+                                           const AuthorizationSet& software_enforced,
                                            const AuthorizationSet& tee_enforced,
                                            UniquePtr<uint8_t[]>* asn1_key_desc,
                                            size_t* asn1_key_desc_len);
 
 keymaster_error_t parse_attestation_record(const uint8_t* asn1_key_desc, size_t asn1_key_desc_len,
+                                           uint32_t* keymaster_version,
+                                           keymaster_blob_t* attestation_challenge,
                                            AuthorizationSet* software_enforced,
-                                           AuthorizationSet* tee_enforced);
+                                           AuthorizationSet* tee_enforced,
+                                           keymaster_blob_t* unique_id);
 }
 
 #endif  // SYSTEM_KEYMASTER_ATTESTATION_RECORD_H_

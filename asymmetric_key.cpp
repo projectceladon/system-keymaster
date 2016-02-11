@@ -28,6 +28,12 @@
 
 namespace keymaster {
 
+namespace {
+template <typename T> T min(T a, T b) {
+    return (a < b) ? a : b;
+}
+} // anonymous namespace
+
 keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t format,
                                                         UniquePtr<uint8_t[]>* material,
                                                         size_t* size) const {
@@ -59,7 +65,8 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
     return KM_ERROR_OK;
 }
 
-static keymaster_error_t build_attestation_extension(const AuthorizationSet& tee_enforced,
+static keymaster_error_t build_attestation_extension(const AuthorizationSet& attest_params,
+                                                     const AuthorizationSet& tee_enforced,
                                                      const AuthorizationSet& sw_enforced,
                                                      X509_EXTENSION_Ptr* extension) {
     ASN1_OBJECT_Ptr oid(
@@ -69,8 +76,8 @@ static keymaster_error_t build_attestation_extension(const AuthorizationSet& tee
 
     UniquePtr<uint8_t[]> attest_bytes;
     size_t attest_bytes_len;
-    keymaster_error_t error =
-        build_attestation_record(sw_enforced, tee_enforced, &attest_bytes, &attest_bytes_len);
+    keymaster_error_t error = build_attestation_record(attest_params, sw_enforced, tee_enforced,
+                                                       &attest_bytes, &attest_bytes_len);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -95,11 +102,13 @@ static bool add_public_key(EVP_PKEY* key, X509* certificate, keymaster_error_t* 
     return true;
 }
 
-static bool add_attestation_extension(const AuthorizationSet& tee_enforced,
+static bool add_attestation_extension(const AuthorizationSet& attest_params,
+                                      const AuthorizationSet& tee_enforced,
                                       const AuthorizationSet& sw_enforced, X509* certificate,
                                       keymaster_error_t* error) {
     X509_EXTENSION_Ptr attest_extension;
-    *error = build_attestation_extension(tee_enforced, sw_enforced, &attest_extension);
+    *error =
+        build_attestation_extension(attest_params, tee_enforced, sw_enforced, &attest_extension);
     if (*error != KM_ERROR_OK)
         return false;
 
@@ -179,8 +188,11 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
                                                      keymaster_cert_chain_t* cert_chain) const {
 
     keymaster_algorithm_t sign_algorithm;
-    if (!attest_params.GetTagValue(TAG_ALGORITHM, &sign_algorithm) ||
-        (sign_algorithm != KM_ALGORITHM_RSA && sign_algorithm != KM_ALGORITHM_EC))
+    if ((!sw_enforced.GetTagValue(TAG_ALGORITHM, &sign_algorithm) &&
+         !tee_enforced.GetTagValue(TAG_ALGORITHM, &sign_algorithm)))
+        return KM_ERROR_UNKNOWN_ERROR;
+
+    if ((sign_algorithm != KM_ALGORITHM_RSA && sign_algorithm != KM_ALGORITHM_EC))
         return KM_ERROR_INCOMPATIBLE_ALGORITHM;
 
     EVP_PKEY_Ptr pkey(EVP_PKEY_new());
@@ -206,22 +218,36 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
     // TODO(swillden): Find useful values (if possible) for issuerName and subjectName.
     X509_NAME_Ptr issuerName(X509_NAME_new());
     if (!issuerName.get() ||
-        !X509_set_subject_name(certificate.get(), issuerName.get() /* Don't release; copied  */))
+        !X509_NAME_add_entry_by_txt(issuerName.get(), "CN", MBSTRING_ASC,
+                                    reinterpret_cast<const uint8_t*>("Android Keymaster"),
+                                    -1 /* len */, -1 /* loc */, 0 /* set */) ||
+        !X509_set_issuer_name(certificate.get(), issuerName.get() /* Don't release; copied  */))
         return TranslateLastOpenSslError();
 
     X509_NAME_Ptr subjectName(X509_NAME_new());
     if (!subjectName.get() ||
+        !X509_NAME_add_entry_by_txt(subjectName.get(), "CN", MBSTRING_ASC,
+                                    reinterpret_cast<const uint8_t*>("A Keymaster Key"),
+                                    -1 /* len */, -1 /* loc */, 0 /* set */) ||
         !X509_set_subject_name(certificate.get(), subjectName.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
     // TODO(swillden): Use key activity and expiration dates for notBefore and notAfter.
     ASN1_TIME_Ptr notBefore(ASN1_TIME_new());
-    if (!notBefore.get() || !ASN1_TIME_set(notBefore.get(), 0) ||
+    uint64_t activeDateTime = 0;
+    authorizations().GetTagValue(TAG_ACTIVE_DATETIME, &activeDateTime);
+    if (!notBefore.get() || !ASN1_TIME_set(notBefore.get(), activeDateTime / 1000) ||
         !X509_set_notBefore(certificate.get(), notBefore.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
     ASN1_TIME_Ptr notAfter(ASN1_TIME_new());
-    if (!notAfter.get() || !ASN1_TIME_set(notAfter.get(), 10000) ||
+    uint64_t usageExpireDateTime = UINT64_MAX;
+    authorizations().GetTagValue(TAG_USAGE_EXPIRE_DATETIME, &usageExpireDateTime);
+    // TODO(swillden): When trusty can use the C++ standard library change the calculation of
+    // notAfterTime to use std::numeric_limits<time_t>::max(), rather than assuming that time_t is
+    // 32 bits.
+    time_t notAfterTime = min(static_cast<uint64_t>(UINT32_MAX), usageExpireDateTime / 1000);
+    if (!notAfter.get() || !ASN1_TIME_set(notAfter.get(), notAfterTime) ||
         !X509_set_notAfter(certificate.get(), notAfter.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
@@ -230,7 +256,8 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
 
     if (!sign_key.get() ||  //
         !add_public_key(pkey.get(), certificate.get(), &error) ||
-        !add_attestation_extension(tee_enforced, sw_enforced, certificate.get(), &error))
+        !add_attestation_extension(attest_params, tee_enforced, sw_enforced, certificate.get(),
+                                   &error))
         return error;
 
     if (!X509_sign(certificate.get(), sign_key.get(), EVP_sha256()))

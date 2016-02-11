@@ -208,7 +208,7 @@ class Keymaster2Test : public testing::TestWithParam<InstanceCreatorPtr> {
 
     keymaster_error_t AbortOperation();
 
-    keymaster_error_t AttestKey(keymaster_algorithm_t algorithm, keymaster_cert_chain_t* chain);
+    keymaster_error_t AttestKey(const std::string& attest_challenge, keymaster_cert_chain_t* chain);
 
     keymaster_error_t GetVersion(uint8_t* major, uint8_t* minor, uint8_t* subminor);
 

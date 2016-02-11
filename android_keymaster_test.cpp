@@ -3500,7 +3500,8 @@ static ASN1_OCTET_STRING* get_attestation_record(X509* certificate) {
     return attest_rec;
 }
 
-static bool verify_attestation_record(AuthorizationSet expected_sw_enforced,
+static bool verify_attestation_record(const string& challenge, bool has_unique_id,
+                                      AuthorizationSet expected_sw_enforced,
                                       AuthorizationSet expected_tee_enforced,
                                       const keymaster_blob_t& attestation_cert) {
 
@@ -3516,8 +3517,22 @@ static bool verify_attestation_record(AuthorizationSet expected_sw_enforced,
 
     AuthorizationSet att_sw_enforced;
     AuthorizationSet att_tee_enforced;
-    EXPECT_EQ(KM_ERROR_OK, parse_attestation_record(attest_rec->data, attest_rec->length,
-                                                    &att_sw_enforced, &att_tee_enforced));
+    uint32_t att_keymaster_version;
+    keymaster_blob_t att_challenge = {};
+    keymaster_blob_t att_unique_id = {};
+    EXPECT_EQ(KM_ERROR_OK,
+              parse_attestation_record(attest_rec->data, attest_rec->length, &att_keymaster_version,
+                                       &att_challenge, &att_sw_enforced, &att_tee_enforced,
+                                       &att_unique_id));
+
+    EXPECT_EQ(challenge.length(), att_challenge.data_length);
+    EXPECT_EQ(0, memcmp(challenge.data(), att_challenge.data, challenge.length()));
+
+    if (has_unique_id) {
+        EXPECT_LT(0U, att_unique_id.data_length);
+    } else {
+        EXPECT_EQ(0U, att_unique_id.data_length);
+    }
 
     // Add TAG_USER_ID to the attestation sw-enforced list, because user IDs are not included in
     // attestations, since they're meaningless off-device.
@@ -3538,32 +3553,43 @@ static bool verify_attestation_record(AuthorizationSet expected_sw_enforced,
     return true;
 }
 
-TEST_P(AttestationTest, RsaSignedWithRsa) {
+TEST_P(AttestationTest, RsaAttestation) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .RsaSigningKey(256, 3)
                                            .Digest(KM_DIGEST_NONE)
-                                           .Padding(KM_PAD_NONE)));
+                                           .Padding(KM_PAD_NONE)
+                                           .Authorization(TAG_INCLUDE_UNIQUE_ID)));
 
     keymaster_cert_chain_t cert_chain;
-    EXPECT_EQ(KM_ERROR_OK, AttestKey(KM_ALGORITHM_RSA, &cert_chain));
+    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
     EXPECT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
-    EXPECT_TRUE(verify_attestation_record(sw_enforced(), hw_enforced(), cert_chain.entries[0]));
+    EXPECT_TRUE(verify_attestation_record("challenge", true /* has_unique_id */, sw_enforced(),
+                                          hw_enforced(), cert_chain.entries[0]));
+
+    // Uncomment to write certificate files.  This is a convenient way to generate certs to test
+    // parsing with other tools.
+
+    // for (size_t i = 0; i < cert_chain.entry_count; ++i) {
+    //     ofstream out(string("cert_") + (char)('0' + i) + ".der", ofstream::out |
+    //     ofstream::trunc);
+    //     out.write(reinterpret_cast<const char*>(cert_chain.entries[i].data),
+    //               cert_chain.entries[i].data_length);
+    // }
 
     keymaster_free_cert_chain(&cert_chain);
 }
 
-TEST_P(AttestationTest, RsaSignedWithEc) {
-    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
-                                           .RsaSigningKey(256, 3)
-                                           .Digest(KM_DIGEST_NONE)
-                                           .Padding(KM_PAD_NONE)));
+TEST_P(AttestationTest, EcAttestation) {
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(
+                               KM_DIGEST_SHA_2_256)));
 
     keymaster_cert_chain_t cert_chain;
-    EXPECT_EQ(KM_ERROR_OK, AttestKey(KM_ALGORITHM_EC, &cert_chain));
+    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
     EXPECT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
-    EXPECT_TRUE(verify_attestation_record(sw_enforced(), hw_enforced(), cert_chain.entries[0]));
+    EXPECT_TRUE(verify_attestation_record("challenge", false /* has_unique_id */, sw_enforced(),
+                                          hw_enforced(), cert_chain.entries[0]));
 
     keymaster_free_cert_chain(&cert_chain);
 }
