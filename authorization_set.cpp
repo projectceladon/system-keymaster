@@ -223,12 +223,12 @@ bool AuthorizationSet::erase(size_t index) {
     return true;
 }
 
-keymaster_key_param_t empty_set = {};
+keymaster_key_param_t empty_set = {KM_TAG_INVALID, {}};
 keymaster_key_param_t& AuthorizationSet::operator[](int at) {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    empty_set = {};
+    empty_set = {KM_TAG_INVALID, {}};
     return empty_set;
 }
 
@@ -236,7 +236,7 @@ keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    empty_set = {};
+    empty_set = {KM_TAG_INVALID, {}};
     return empty_set;
 }
 
