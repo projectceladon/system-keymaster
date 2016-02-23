@@ -496,13 +496,9 @@ keymaster_error_t SoftKeymasterContext::ParseOldSoftkeymasterBlob(
 
     // Just to be sure, make sure that the ASN.1 structure parses correctly.  We don't actually use
     // the EVP_PKEY here.
-    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(EVP_PKEY_new());
-    if (pkey.get() == nullptr)
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    EVP_PKEY* tmp = pkey.get();
     const uint8_t* key_start = p;
-    if (d2i_PrivateKey(type, &tmp, &p, privateLen) == NULL) {
+    unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(d2i_PrivateKey(type, nullptr, &p, privateLen));
+    if (pkey.get() == nullptr) {
         LOG_W("Failed to parse PKCS#8 key material (if old SW key)", 0);
         return KM_ERROR_INVALID_KEY_BLOB;
     }
