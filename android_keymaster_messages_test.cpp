@@ -578,6 +578,34 @@ TEST(RoundTrip, AttestKeyResponse) {
     }
 }
 
+TEST(RoundTrip, UpgradeKeyRequest) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        UpgradeKeyRequest msg(ver);
+        msg.SetKeyMaterial("foo", 3);
+        msg.upgrade_params.Reinitialize(params, array_length(params));
+
+        UniquePtr<UpgradeKeyRequest> deserialized(round_trip(ver, msg, 85));
+        EXPECT_EQ(3U, deserialized->key_blob.key_material_size);
+        EXPECT_EQ(0, memcmp("foo", deserialized->key_blob.key_material, 3));
+        EXPECT_EQ(msg.upgrade_params, deserialized->upgrade_params);
+    }
+}
+
+TEST(RoundTrip, UpgradeKeyResponse) {
+    for (int ver = 0; ver <= MAX_MESSAGE_VERSION; ++ver) {
+        UpgradeKeyResponse req(ver);
+        req.error = KM_ERROR_OK;
+        req.upgraded_key.key_material = dup_array(TEST_DATA);
+        req.upgraded_key.key_material_size = array_length(TEST_DATA);
+
+        UniquePtr<UpgradeKeyResponse> deserialized(round_trip(ver, req, 19));
+        EXPECT_EQ(KM_ERROR_OK, deserialized->error);
+        EXPECT_EQ(req.upgraded_key.key_material_size, deserialized->upgraded_key.key_material_size);
+        EXPECT_EQ(0, memcmp(req.upgraded_key.key_material, deserialized->upgraded_key.key_material,
+                            req.upgraded_key.key_material_size));
+    }
+}
+
 uint8_t msgbuf[] = {
     220, 88,  183, 255, 71,  1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   173, 0,   0,   0,   228, 174, 98,  187, 191, 135, 253, 200, 51,  230, 114, 247, 151, 109,
@@ -672,6 +700,8 @@ GARBAGE_TEST(UpdateOperationRequest);
 GARBAGE_TEST(UpdateOperationResponse);
 GARBAGE_TEST(AttestKeyRequest);
 GARBAGE_TEST(AttestKeyResponse);
+GARBAGE_TEST(UpgradeKeyRequest);
+GARBAGE_TEST(UpgradeKeyResponse);
 
 // The macro doesn't work on this one.
 TEST(GarbageTest, SupportedResponse) {

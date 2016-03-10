@@ -31,7 +31,14 @@ class TestContext : public KeymasterContext {
     keymaster_security_level_t GetSecurityLevel() const override {
         return KM_SECURITY_LEVEL_SOFTWARE;
     }
-
+    keymaster_error_t SetSystemVersion(uint32_t /* os_version */,
+                                       uint32_t /* os_patchlevel */) override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override {
+        *os_version = 0;
+        *os_patchlevel = 0;
+    }
     KeyFactory* GetKeyFactory(keymaster_algorithm_t /* algorithm */) const override {
         return nullptr;
     }
@@ -48,6 +55,11 @@ class TestContext : public KeymasterContext {
                                     KeymasterKeyBlob* /* blob */,
                                     AuthorizationSet* /* hw_enforced */,
                                     AuthorizationSet* /* sw_enforced */) const override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+    keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& /* key_to_upgrade */,
+                                     const AuthorizationSet& /* upgrade_params */,
+                                     KeymasterKeyBlob* /* upgraded_key */) const override {
         return KM_ERROR_UNIMPLEMENTED;
     }
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& /* blob */,

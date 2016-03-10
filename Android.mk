@@ -90,7 +90,7 @@ LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private
 # TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
 # Currently, if enabled, these flags will cause an internal error in Clang.
 LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
-# Ignore benigh warnings for now.
+# Ignore benign warnings for now.
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-private-field
 LOCAL_MODULE_TAGS := optional
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
@@ -111,6 +111,7 @@ LOCAL_SRC_FILES := \
 	ecdsa_keymaster1_operation.cpp \
 	keymaster0_engine.cpp \
 	keymaster1_engine.cpp \
+	keymaster_configuration.cpp \
 	rsa_keymaster0_key.cpp \
 	rsa_keymaster1_key.cpp \
 	rsa_keymaster1_operation.cpp \
@@ -126,7 +127,7 @@ LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private
 # TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
 # Currently, if enabled, these flags will cause an internal error in Clang.
 LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
-LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto
+LOCAL_SHARED_LIBRARIES := libkeymaster_messages libkeymaster1 liblog libcrypto libcutils
 LOCAL_MODULE_TAGS := optional
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include

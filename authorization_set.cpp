@@ -213,8 +213,8 @@ int AuthorizationSet::find(keymaster_tag_t tag, int begin) const {
         return i;
 }
 
-bool AuthorizationSet::erase(size_t index) {
-    if (index >= size())
+bool AuthorizationSet::erase(int index) {
+    if (index < 0 || index >= static_cast<int>(size()))
         return false;
 
     --elems_size_;
@@ -223,21 +223,21 @@ bool AuthorizationSet::erase(size_t index) {
     return true;
 }
 
-keymaster_key_param_t empty_set = {};
+keymaster_key_param_t empty_param = {KM_TAG_INVALID, {}};
 keymaster_key_param_t& AuthorizationSet::operator[](int at) {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    empty_set = {};
-    return empty_set;
+    empty_param = {KM_TAG_INVALID, {}};
+    return empty_param;
 }
 
 keymaster_key_param_t AuthorizationSet::operator[](int at) const {
     if (is_valid() == OK && at < (int)elems_size_) {
         return elems_[at];
     }
-    empty_set = {};
-    return empty_set;
+    empty_param = {KM_TAG_INVALID, {}};
+    return empty_param;
 }
 
 bool AuthorizationSet::push_back(const keymaster_key_param_set_t& set) {

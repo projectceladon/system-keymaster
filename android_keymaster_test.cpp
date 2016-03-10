@@ -50,6 +50,9 @@ int __android_log_print(int prio, const char* tag, const char* fmt) {
 namespace keymaster {
 namespace test {
 
+const uint32_t kOsVersion = 060000;
+const uint32_t kOsPatchLevel = 201603;
+
 StdoutLogger logger;
 
 template <typename T> vector<T> make_vector(const T* array, size_t len) {
@@ -90,18 +93,28 @@ class TestKeymasterContext : public SoftKeymasterContext {
 };
 
 /**
- * Test instance creator that builds a pure software keymaster1 implementations.
+ * Test instance creator that builds a pure software keymaster2 implementation.
  */
 class SoftKeymasterTestInstanceCreator : public Keymaster2TestInstanceCreator {
   public:
     keymaster2_device_t* CreateDevice() const override {
         std::cerr << "Creating software-only device" << std::endl;
-        SoftKeymasterDevice* device = new SoftKeymasterDevice(new TestKeymasterContext);
+        context_ = new TestKeymasterContext;
+        SoftKeymasterDevice* device = new SoftKeymasterDevice(context_);
+        AuthorizationSet version_info(AuthorizationSetBuilder()
+                                          .Authorization(TAG_OS_VERSION, kOsVersion)
+                                          .Authorization(TAG_OS_PATCHLEVEL, kOsPatchLevel));
+        device->keymaster2_device()->configure(device->keymaster2_device(), &version_info);
         return device->keymaster2_device();
     }
 
     bool algorithm_in_km0_hardware(keymaster_algorithm_t) const override { return false; }
     int keymaster0_calls() const override { return 0; }
+    bool is_keymaster1_hw() const override { return false; }
+    KeymasterContext* keymaster_context() const override { return context_; }
+
+  private:
+    mutable TestKeymasterContext* context_;
 };
 
 /**
@@ -130,8 +143,13 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreato
 
         counting_keymaster0_device_ = new Keymaster0CountingWrapper(keymaster0_device);
 
-        SoftKeymasterDevice* keymaster = new SoftKeymasterDevice(new TestKeymasterContext);
+        context_ = new TestKeymasterContext;
+        SoftKeymasterDevice* keymaster = new SoftKeymasterDevice(context_);
         keymaster->SetHardwareDevice(counting_keymaster0_device_);
+        AuthorizationSet version_info(AuthorizationSetBuilder()
+                                          .Authorization(TAG_OS_VERSION, kOsVersion)
+                                          .Authorization(TAG_OS_PATCHLEVEL, kOsPatchLevel));
+        keymaster->keymaster2_device()->configure(keymaster->keymaster2_device(), &version_info);
         return keymaster->keymaster2_device();
     }
 
@@ -146,8 +164,11 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreato
         }
     }
     int keymaster0_calls() const override { return counting_keymaster0_device_->count(); }
+    bool is_keymaster1_hw() const override { return false; }
+    KeymasterContext* keymaster_context() const override { return context_; }
 
   private:
+    mutable TestKeymasterContext* context_;
     mutable Keymaster0CountingWrapper* counting_keymaster0_device_;
     bool support_ec_;
 };
@@ -156,7 +177,7 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreato
  * Test instance creator that builds a SoftKeymasterDevice which wraps a fake hardware keymaster1
  * instance, with minimal digest support.
  */
-class Sha256OnlyKeymaster1TestInstanceCreator : public Keymaster2TestInstanceCreator {
+class Sha256OnlyKeymaster2TestInstanceCreator : public Keymaster2TestInstanceCreator {
     keymaster2_device_t* CreateDevice() const {
         std::cerr << "Creating keymaster1-backed device that supports only SHA256";
 
@@ -165,22 +186,32 @@ class Sha256OnlyKeymaster1TestInstanceCreator : public Keymaster2TestInstanceCre
             (new SoftKeymasterDevice(new TestKeymasterContext("PseudoHW")))->keymaster_device());
 
         // device doesn't leak; it's cleaned up by device->keymaster_device()->common.close().
-        SoftKeymasterDevice* device = new SoftKeymasterDevice(new TestKeymasterContext);
+        context_ = new TestKeymasterContext;
+        SoftKeymasterDevice* device = new SoftKeymasterDevice(context_);
         device->SetHardwareDevice(fake_device);
 
+        AuthorizationSet version_info(AuthorizationSetBuilder()
+                                          .Authorization(TAG_OS_VERSION, kOsVersion)
+                                          .Authorization(TAG_OS_PATCHLEVEL, kOsPatchLevel));
+        device->keymaster2_device()->configure(device->keymaster2_device(), &version_info);
         return device->keymaster2_device();
     }
 
     bool algorithm_in_km0_hardware(keymaster_algorithm_t) const override { return false; }
     int keymaster0_calls() const override { return 0; }
     int minimal_digest_set() const override { return true; }
+    bool is_keymaster1_hw() const override { return true; }
+    KeymasterContext* keymaster_context() const override { return context_; }
+
+  private:
+    mutable TestKeymasterContext* context_;
 };
 
 static auto test_params = testing::Values(
     InstanceCreatorPtr(new SoftKeymasterTestInstanceCreator),
     InstanceCreatorPtr(new Keymaster0AdapterTestInstanceCreator(true /* support_ec */)),
     InstanceCreatorPtr(new Keymaster0AdapterTestInstanceCreator(false /* support_ec */)),
-    InstanceCreatorPtr(new Sha256OnlyKeymaster1TestInstanceCreator));
+    InstanceCreatorPtr(new Sha256OnlyKeymaster2TestInstanceCreator));
 
 class NewKeyGeneration : public Keymaster2Test {
   protected:
@@ -206,6 +237,16 @@ class NewKeyGeneration : public Keymaster2Test {
 
         // Now check that unspecified, defaulted tags are correct.
         EXPECT_TRUE(contains(auths, KM_TAG_CREATION_DATETIME));
+        if (GetParam()->is_keymaster1_hw()) {
+            // If the underlying (faked) HW is KM1, it will not have version info.
+            EXPECT_FALSE(auths.Contains(TAG_OS_VERSION));
+            EXPECT_FALSE(auths.Contains(TAG_OS_PATCHLEVEL));
+        } else {
+            // In all othe cases; SoftKeymasterDevice keys, or keymaster0 keys wrapped by
+            // SoftKeymasterDevice, version information will be present and up to date.
+            EXPECT_TRUE(contains(auths, TAG_OS_VERSION, kOsVersion));
+            EXPECT_TRUE(contains(auths, TAG_OS_PATCHLEVEL, kOsPatchLevel));
+        }
     }
 };
 INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, NewKeyGeneration, test_params);
@@ -3619,6 +3660,150 @@ TEST_P(AttestationTest, EcAttestation) {
         expected_keymaster_security_level, cert_chain.entries[0]));
 
     keymaster_free_cert_chain(&cert_chain);
+}
+
+typedef Keymaster2Test KeyUpgradeTest;
+INSTANTIATE_TEST_CASE_P(AndroidKeymasterTest, KeyUpgradeTest, test_params);
+
+TEST_P(KeyUpgradeTest, AesVersionUpgrade) {
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
+                                           .AesEncryptionKey(128)
+                                           .Authorization(TAG_BLOCK_MODE, KM_MODE_ECB)
+                                           .Padding(KM_PAD_NONE)));
+
+    // Key should operate fine.
+    string message = "1234567890123456";
+    string ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    EXPECT_EQ(message, DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_NONE));
+
+    // Increase patch level.  Key usage should fail with KM_ERROR_KEY_REQUIRES_UPGRADE.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 2);
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_BLOCK_MODE, KM_MODE_ECB);
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    if (GetParam()->is_keymaster1_hw()) {
+        // Keymaster1 hardware can't support version binding.  The key will work regardless
+        // of system version.  Just abort the remainder of the test.
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+        EXPECT_EQ(KM_ERROR_OK, AbortOperation());
+        return;
+    }
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    // Getting characteristics should also fail
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, GetCharacteristics());
+
+    // Upgrade key.
+    EXPECT_EQ(KM_ERROR_OK, UpgradeKey(client_params()));
+
+    // Key should work again
+    ciphertext = EncryptMessage(message, KM_MODE_ECB, KM_PAD_NONE);
+    EXPECT_EQ(message, DecryptMessage(ciphertext, KM_MODE_ECB, KM_PAD_NONE));
+
+    // Decrease patch level.  Key usage should fail with KM_ERROR_INVALID_KEY_BLOB.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, GetCharacteristics());
+
+    // Upgrade should fail
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, UpgradeKey(client_params()));
+
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
+
+TEST_P(KeyUpgradeTest, RsaVersionUpgrade) {
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+
+    ASSERT_EQ(KM_ERROR_OK,
+              GenerateKey(AuthorizationSetBuilder().RsaEncryptionKey(128, 3).Padding(KM_PAD_NONE)));
+
+    // Key should operate fine.
+    string message = "1234567890123456";
+    string ciphertext = EncryptMessage(message, KM_PAD_NONE);
+    EXPECT_EQ(message, DecryptMessage(ciphertext, KM_PAD_NONE));
+
+    // Increase patch level.  Key usage should fail with KM_ERROR_KEY_REQUIRES_UPGRADE.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 2);
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
+    if (GetParam()->is_keymaster1_hw()) {
+        // Keymaster1 hardware can't support version binding.  The key will work regardless
+        // of system version.  Just abort the remainder of the test.
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+        EXPECT_EQ(KM_ERROR_OK, AbortOperation());
+        return;
+    }
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+
+    // Getting characteristics should also fail
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, GetCharacteristics());
+
+    // Upgrade key.
+    EXPECT_EQ(KM_ERROR_OK, UpgradeKey(client_params()));
+
+    // Key should work again
+    ciphertext = EncryptMessage(message, KM_PAD_NONE);
+    EXPECT_EQ(message, DecryptMessage(ciphertext, KM_PAD_NONE));
+
+    // Decrease patch level.  Key usage should fail with KM_ERROR_INVALID_KEY_BLOB.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, GetCharacteristics());
+
+    // Upgrade should fail
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, UpgradeKey(client_params()));
+
+    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
+        EXPECT_EQ(7, GetParam()->keymaster0_calls());
+}
+
+TEST_P(KeyUpgradeTest, EcVersionUpgrade) {
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+
+    ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(
+                               KM_DIGEST_SHA_2_256)));
+
+    // Key should operate fine.
+    string message = "1234567890123456";
+    string signature;
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+
+    // Increase patch level.  Key usage should fail with KM_ERROR_KEY_REQUIRES_UPGRADE.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 2);
+    AuthorizationSet begin_params(client_params());
+    begin_params.push_back(TAG_DIGEST, KM_DIGEST_SHA_2_256);
+    if (GetParam()->is_keymaster1_hw()) {
+        // Keymaster1 hardware can't support version binding.  The key will work regardless
+        // of system version.  Just abort the remainder of the test.
+        EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+        EXPECT_EQ(KM_ERROR_OK, AbortOperation());
+        return;
+    }
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, BeginOperation(KM_PURPOSE_SIGN, begin_params));
+
+    // Getting characteristics should also fail
+    EXPECT_EQ(KM_ERROR_KEY_REQUIRES_UPGRADE, GetCharacteristics());
+
+    // Upgrade key.
+    EXPECT_EQ(KM_ERROR_OK, UpgradeKey(client_params()));
+
+    // Key should work again
+    SignMessage(message, &signature, KM_DIGEST_SHA_2_256);
+    VerifyMessage(message, signature, KM_DIGEST_SHA_2_256);
+
+    // Decrease patch level.  Key usage should fail with KM_ERROR_INVALID_KEY_BLOB.
+    GetParam()->keymaster_context()->SetSystemVersion(1, 1);
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
+    EXPECT_EQ(KM_ERROR_INVALID_KEY_BLOB, GetCharacteristics());
+
+    // Upgrade should fail
+    EXPECT_EQ(KM_ERROR_INVALID_ARGUMENT, UpgradeKey(client_params()));
+
+    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_EC))
+        EXPECT_EQ(7, GetParam()->keymaster0_calls());
 }
 
 TEST(SoftKeymasterWrapperTest, CheckKeymaster2Device) {

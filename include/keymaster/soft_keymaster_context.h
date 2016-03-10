@@ -57,6 +57,9 @@ class SoftKeymasterContext : public KeymasterContext {
         return KM_SECURITY_LEVEL_SOFTWARE;
     }
 
+    keymaster_error_t SetSystemVersion(uint32_t os_version, uint32_t os_patchlevel) override;
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override;
+
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                           keymaster_purpose_t purpose) const override;
@@ -65,7 +68,9 @@ class SoftKeymasterContext : public KeymasterContext {
                                     const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
                                     AuthorizationSet* hw_enforced,
                                     AuthorizationSet* sw_enforced) const override;
-
+    keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                     const AuthorizationSet& upgrade_params,
+                                     KeymasterKeyBlob* upgraded_key) const override;
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
                                    KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
@@ -85,7 +90,10 @@ class SoftKeymasterContext : public KeymasterContext {
         return nullptr;
     }
 
+    void AddSystemVersionToSet(AuthorizationSet* auth_set) const;
+
   private:
+
     keymaster_error_t ParseOldSoftkeymasterBlob(const KeymasterKeyBlob& blob,
                                                 KeymasterKeyBlob* key_material,
                                                 AuthorizationSet* hw_enforced,
@@ -112,6 +120,8 @@ class SoftKeymasterContext : public KeymasterContext {
     std::unique_ptr<KeyFactory> hmac_factory_;
     keymaster1_device* km1_dev_;
     const std::string root_of_trust_;
+    uint32_t os_version_;
+    uint32_t os_patchlevel_;
 };
 
 }  // namespace keymaster

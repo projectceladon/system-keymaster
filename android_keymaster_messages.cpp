@@ -523,4 +523,42 @@ bool AttestKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8
     return true;
 }
 
+UpgradeKeyRequest::~UpgradeKeyRequest() {
+    delete[] key_blob.key_material;
+}
+
+void UpgradeKeyRequest::SetKeyMaterial(const void* key_material, size_t length) {
+    set_key_blob(&key_blob, key_material, length);
+}
+
+size_t UpgradeKeyRequest::SerializedSize() const {
+    return key_blob_size(key_blob) + upgrade_params.SerializedSize();
+}
+
+uint8_t* UpgradeKeyRequest::Serialize(uint8_t* buf, const uint8_t* end) const {
+    buf = serialize_key_blob(key_blob, buf, end);
+    return upgrade_params.Serialize(buf, end);
+}
+
+bool UpgradeKeyRequest::Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    return deserialize_key_blob(&key_blob, buf_ptr, end) &&
+           upgrade_params.Deserialize(buf_ptr, end);
+}
+
+UpgradeKeyResponse::~UpgradeKeyResponse() {
+    delete[] upgraded_key.key_material;
+}
+
+size_t UpgradeKeyResponse::NonErrorSerializedSize() const {
+    return key_blob_size(upgraded_key);
+}
+
+uint8_t* UpgradeKeyResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
+    return serialize_key_blob(upgraded_key, buf, end);
+}
+
+bool UpgradeKeyResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    return deserialize_key_blob(&upgraded_key, buf_ptr, end);
+}
+
 }  // namespace keymaster

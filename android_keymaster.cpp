@@ -38,9 +38,32 @@
 
 namespace keymaster {
 
+namespace {
+
 const uint8_t MAJOR_VER = 1;
 const uint8_t MINOR_VER = 1;
 const uint8_t SUBMINOR_VER = 0;
+
+keymaster_error_t CheckVersionInfo(const AuthorizationSet& tee_enforced,
+                                   const AuthorizationSet& sw_enforced,
+                                   const KeymasterContext& context) {
+    uint32_t os_version;
+    uint32_t os_patchlevel;
+    context.GetSystemVersion(&os_version, &os_patchlevel);
+
+    uint32_t key_os_patchlevel;
+    if (tee_enforced.GetTagValue(TAG_OS_PATCHLEVEL, &key_os_patchlevel) ||
+        sw_enforced.GetTagValue(TAG_OS_PATCHLEVEL, &key_os_patchlevel)) {
+        if (key_os_patchlevel < os_patchlevel)
+            return KM_ERROR_KEY_REQUIRES_UPGRADE;
+        else if (key_os_patchlevel > os_patchlevel)
+            return KM_ERROR_INVALID_KEY_BLOB;
+    }
+
+    return KM_ERROR_OK;
+}
+
+}  // anonymous namespace
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size)
     : context_(context), operation_table_(new OperationTable(operation_table_size)) {}
@@ -193,6 +216,8 @@ void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest&
                                &key_material, &response->enforced, &response->unenforced);
     if (response->error != KM_ERROR_OK)
         return;
+
+    response->error = CheckVersionInfo(response->enforced, response->unenforced, *context_);
 }
 
 static KeyFactory* GetKeyFactory(const KeymasterContext& context,
@@ -381,6 +406,18 @@ void AndroidKeymaster::AttestKey(const AttestKeyRequest& request, AttestKeyRespo
                                                sw_enforced, &response->certificate_chain);
 }
 
+void AndroidKeymaster::UpgradeKey(const UpgradeKeyRequest& request, UpgradeKeyResponse* response) {
+    if (!response)
+        return;
+
+    KeymasterKeyBlob upgraded_key;
+    response->error = context_->UpgradeKeyBlob(KeymasterKeyBlob(request.key_blob),
+                                               request.upgrade_params, &upgraded_key);
+    if (response->error != KM_ERROR_OK)
+        return;
+    response->upgraded_key = upgraded_key.release();
+}
+
 void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response) {
     if (response == NULL)
         return;
@@ -426,6 +463,10 @@ keymaster_error_t AndroidKeymaster::LoadKey(const keymaster_key_blob_t& key_blob
     KeymasterKeyBlob key_material;
     keymaster_error_t error = context_->ParseKeyBlob(KeymasterKeyBlob(key_blob), additional_params,
                                                      &key_material, hw_enforced, sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    error = CheckVersionInfo(*hw_enforced, *sw_enforced, *context_);
     if (error != KM_ERROR_OK)
         return error;
 

@@ -70,6 +70,23 @@ class KeymasterContext {
      */
     virtual keymaster_security_level_t GetSecurityLevel() const = 0;
 
+    /**
+     * Sets the system version as reported by the system *itself*.  This is used to verify that the
+     * system believes itself to be running the same version that is reported by the bootloader, in
+     * hardware implementations.  For SoftKeymasterDevice, this sets the version information used.
+     *
+     * If the specified values don't match the bootloader-provided values, this method must return
+     * KM_ERROR_INVALID_ARGUMENT;
+     */
+    virtual keymaster_error_t SetSystemVersion(uint32_t os_version, uint32_t os_patchlevel) = 0;
+
+    /**
+     * Returns the system version.  For hardware-based implementations this will be the value
+     * reported by the bootloader.  For SoftKeymasterDevice it will be the verion information set by
+     * SetSystemVersion above.
+     */
+    virtual void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const = 0;
+
     virtual KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const = 0;
     virtual OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                                   keymaster_purpose_t purpose) const = 0;
@@ -88,6 +105,14 @@ class KeymasterContext {
                                             const KeymasterKeyBlob& key_material,
                                             KeymasterKeyBlob* blob, AuthorizationSet* hw_enforced,
                                             AuthorizationSet* sw_enforced) const = 0;
+
+    /**
+     * UpgradeKeyBlob takes an existing blob, parses out key material and constructs a new blob with
+     * the current format and OS version info.
+     */
+    virtual keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                             const AuthorizationSet& upgrade_params,
+                                             KeymasterKeyBlob* upgraded_key) const = 0;
 
     /**
      * ParseKeyBlob takes a blob and extracts authorization sets and key material, returning an

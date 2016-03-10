@@ -180,7 +180,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
      * Removes the entry at the specified index. Returns true if successful, false if the index was
      * out of bounds.
      */
-    bool erase(size_t index);
+    bool erase(int index);
 
     /**
      * Returns iterator (pointer) to beginning of elems array, to enable STL-style iteration
