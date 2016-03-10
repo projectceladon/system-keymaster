@@ -20,6 +20,7 @@
 #include <time.h>
 
 #include <openssl/aes.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 
@@ -834,6 +835,13 @@ keymaster_cert_chain_t* SoftKeymasterContext::AttestationChain(keymaster_algorit
 
     *error = KM_ERROR_OK;
     return chain.release();
+}
+
+keymaster_error_t SoftKeymasterContext::GenerateUniqueId(
+    uint64_t /* creation_date_time */, const keymaster_blob_t& /* application_id */,
+    bool /* reset_since_rotation */, Buffer* /* unique_id */) const {
+    // SoftKeymasterDevice cannot generate unique IDs.
+    return KM_ERROR_UNIMPLEMENTED;
 }
 
 keymaster_error_t SoftKeymasterContext::ParseKeymaster1HwBlob(
