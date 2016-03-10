@@ -275,12 +275,12 @@ void SoftKeymasterDevice::initialize_device_struct(uint32_t flags) {
     km2_device_.common.module = reinterpret_cast<hw_module_t*>(&soft_keymaster2_device_module);
     km2_device_.common.close = &close_device;
 
+    km2_device_.configure = nullptr;
     km2_device_.add_rng_entropy = add_rng_entropy;
     km2_device_.generate_key = generate_key;
     km2_device_.get_key_characteristics = get_key_characteristics;
     km2_device_.import_key = import_key;
     km2_device_.export_key = export_key;
-    km2_device_.agree_key = nullptr;  // TODO(swillden) Implement ECDH
     km2_device_.attest_key = attest_key;
     km2_device_.upgrade_key = nullptr;  // TODO(swillden) Implement upgrade
     km2_device_.delete_key = delete_key;
