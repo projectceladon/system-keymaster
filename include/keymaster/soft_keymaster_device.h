@@ -79,6 +79,8 @@ class SoftKeymasterDevice {
         impl_->GetVersion(req, rsp);
     }
 
+    bool configured() const { return configured_; }
+
     typedef std::pair<keymaster_algorithm_t, keymaster_purpose_t> AlgPurposePair;
     typedef std::map<AlgPurposePair, std::vector<keymaster_digest_t>> DigestMap;
 
@@ -177,6 +179,8 @@ class SoftKeymasterDevice {
                                    keymaster_operation_handle_t operation_handle);
 
     // Keymaster2 methods
+    static keymaster_error_t configure(const keymaster2_device_t* dev,
+                                       const keymaster_key_param_set_t* params);
     static keymaster_error_t add_rng_entropy(const keymaster2_device_t* dev, const uint8_t* data,
                                              size_t data_length);
     static keymaster_error_t generate_key(const keymaster2_device_t* dev,
@@ -204,6 +208,10 @@ class SoftKeymasterDevice {
                                         const keymaster_key_blob_t* key_to_attest,
                                         const keymaster_key_param_set_t* attest_params,
                                         keymaster_cert_chain_t* cert_chain);
+    static keymaster_error_t upgrade_key(const keymaster2_device_t* dev,
+                                         const keymaster_key_blob_t* key_to_upgrade,
+                                         const keymaster_key_param_set_t* upgrade_params,
+                                         keymaster_key_blob_t* upgraded_key);
     static keymaster_error_t delete_key(const keymaster2_device_t* dev,
                                         const keymaster_key_blob_t* key);
     static keymaster_error_t delete_all_keys(const keymaster2_device_t* dev);
@@ -238,6 +246,7 @@ class SoftKeymasterDevice {
     UniquePtr<AndroidKeymaster> impl_;
     std::string module_name_;
     hw_module_t updated_module_;
+    bool configured_;
 };
 
 }  // namespace keymaster

@@ -338,6 +338,17 @@ keymaster_error_t Keymaster2Test::AttestKey(const string& attest_challenge,
     return device()->attest_key(device(), &blob_, &attest_params, cert_chain);
 }
 
+keymaster_error_t Keymaster2Test::UpgradeKey(const AuthorizationSet& upgrade_params) {
+    keymaster_key_blob_t upgraded_blob;
+    keymaster_error_t error =
+        device()->upgrade_key(device(), &blob_, &upgrade_params, &upgraded_blob);
+    if (error == KM_ERROR_OK) {
+        FreeKeyBlob();
+        blob_ = upgraded_blob;
+    }
+    return error;
+}
+
 string Keymaster2Test::ProcessMessage(keymaster_purpose_t purpose, const string& message) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(purpose, client_params(), NULL /* output_params */));
 

@@ -281,12 +281,34 @@ static uint8_t kEcAttestRootCert[] = {
 
 size_t kCertificateChainLength = 2;
 
+bool UpgradeIntegerTag(keymaster_tag_t tag, uint32_t value, AuthorizationSet* set,
+                       bool* set_changed) {
+    int index = set->find(tag);
+    if (index == -1) {
+        keymaster_key_param_t param;
+        param.tag = tag;
+        param.integer = value;
+        set->push_back(param);
+        *set_changed = true;
+        return true;
+    }
+
+    if (set->params[index].integer > value)
+        return false;
+
+    if (set->params[index].integer != value) {
+        set->params[index].integer = value;
+        *set_changed = true;
+    }
+    return true;
+}
+
 }  // anonymous namespace
 
 SoftKeymasterContext::SoftKeymasterContext(const std::string& root_of_trust)
     : rsa_factory_(new RsaKeyFactory(this)), ec_factory_(new EcKeyFactory(this)),
       aes_factory_(new AesKeyFactory(this)), hmac_factory_(new HmacKeyFactory(this)),
-      km1_dev_(nullptr), root_of_trust_(root_of_trust) {}
+      km1_dev_(nullptr), root_of_trust_(root_of_trust), os_version_(0), os_patchlevel_(0) {}
 
 SoftKeymasterContext::~SoftKeymasterContext() {}
 
@@ -324,6 +346,18 @@ keymaster_error_t SoftKeymasterContext::SetHardwareDevice(keymaster1_device_t* k
     hmac_factory_.reset(nullptr);
 
     return KM_ERROR_OK;
+}
+
+keymaster_error_t SoftKeymasterContext::SetSystemVersion(uint32_t os_version,
+                                                         uint32_t os_patchlevel) {
+    os_version_ = os_version;
+    os_patchlevel_ = os_patchlevel;
+    return KM_ERROR_OK;
+}
+
+void SoftKeymasterContext::GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {
+    *os_version = os_version_;
+    *os_patchlevel = os_patchlevel_;
 }
 
 KeyFactory* SoftKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
@@ -371,8 +405,8 @@ static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error 
 }
 
 static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
-                                           keymaster_key_origin_t origin,
-                                           AuthorizationSet* hw_enforced,
+                                           keymaster_key_origin_t origin, uint32_t os_version,
+                                           uint32_t os_patchlevel, AuthorizationSet* hw_enforced,
                                            AuthorizationSet* sw_enforced) {
     sw_enforced->Clear();
 
@@ -405,6 +439,9 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
 
     sw_enforced->push_back(TAG_CREATION_DATETIME, java_time(time(NULL)));
     sw_enforced->push_back(TAG_ORIGIN, origin);
+    sw_enforced->push_back(TAG_OS_VERSION, os_version);
+    sw_enforced->push_back(TAG_OS_PATCHLEVEL, os_patchlevel);
+
     return TranslateAuthorizationSetError(sw_enforced->is_valid());
 }
 
@@ -414,7 +451,8 @@ keymaster_error_t SoftKeymasterContext::CreateKeyBlob(const AuthorizationSet& ke
                                                       KeymasterKeyBlob* blob,
                                                       AuthorizationSet* hw_enforced,
                                                       AuthorizationSet* sw_enforced) const {
-    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
+    keymaster_error_t error = SetAuthorizations(key_description, origin, os_version_,
+                                                os_patchlevel_, hw_enforced, sw_enforced);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -424,6 +462,51 @@ keymaster_error_t SoftKeymasterContext::CreateKeyBlob(const AuthorizationSet& ke
         return error;
 
     return SerializeIntegrityAssuredBlob(key_material, hidden, *hw_enforced, *sw_enforced, blob);
+}
+
+keymaster_error_t SoftKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                                       const AuthorizationSet& upgrade_params,
+                                                       KeymasterKeyBlob* upgraded_key) const {
+    KeymasterKeyBlob key_material;
+    AuthorizationSet tee_enforced;
+    AuthorizationSet sw_enforced;
+    keymaster_error_t error =
+        ParseKeyBlob(key_to_upgrade, upgrade_params, &key_material, &tee_enforced, &sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    // Three cases here:
+    //
+    // 1. Software key blob.  Version info, if present, is in sw_enforced.  If not present, we
+    //    should add it.
+    //
+    // 2. Keymaster0 hardware key blob.  Version info, if present, is in sw_enforced.  If not
+    //    present we should add it.
+    //
+    // 3. Keymaster1 hardware key blob.  Version info is not present and we shouldn't have been
+    //    asked to upgrade.
+
+    // Handle case 3.
+    if (km1_dev_ && tee_enforced.Contains(TAG_PURPOSE) && !tee_enforced.Contains(TAG_OS_PATCHLEVEL))
+        return KM_ERROR_INVALID_ARGUMENT;
+
+    // Handle cases 1 & 2.
+    bool set_changed = false;
+    if (!UpgradeIntegerTag(TAG_OS_VERSION, os_version_, &sw_enforced, &set_changed) ||
+        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, os_patchlevel_, &sw_enforced, &set_changed))
+        // One of the version fields would have been a downgrade. Not allowed.
+        return KM_ERROR_INVALID_ARGUMENT;
+
+    if (!set_changed)
+        // Dont' need an upgrade.
+        return KM_ERROR_OK;
+
+    AuthorizationSet hidden;
+    error = BuildHiddenAuthorizations(upgrade_params, &hidden);
+    if (error != KM_ERROR_OK)
+        return error;
+    return SerializeIntegrityAssuredBlob(key_material, hidden, tee_enforced, sw_enforced,
+                                         upgraded_key);
 }
 
 static keymaster_error_t ParseOcbAuthEncryptedBlob(const KeymasterKeyBlob& blob,
@@ -651,6 +734,13 @@ keymaster_error_t SoftKeymasterContext::GenerateRandom(uint8_t* buf, size_t leng
     if (RAND_bytes(buf, length) != 1)
         return KM_ERROR_UNKNOWN_ERROR;
     return KM_ERROR_OK;
+}
+
+void SoftKeymasterContext::AddSystemVersionToSet(AuthorizationSet* auth_set) const {
+    if (!auth_set->Contains(TAG_OS_VERSION))
+        auth_set->push_back(TAG_OS_VERSION, os_version_);
+    if (!auth_set->Contains(TAG_OS_PATCHLEVEL))
+        auth_set->push_back(TAG_OS_PATCHLEVEL, os_patchlevel_);
 }
 
 EVP_PKEY* SoftKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm,

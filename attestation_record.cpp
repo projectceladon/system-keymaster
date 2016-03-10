@@ -429,7 +429,7 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
         !ASN1_ENUMERATED_set(key_desc->keymaster_security_level, keymaster_security_level))
         return TranslateLastOpenSslError();
 
-    keymaster_blob_t attestation_challenge = {};
+    keymaster_blob_t attestation_challenge = {nullptr, 0};
     if (!attestation_params.GetTagValue(TAG_ATTESTATION_CHALLENGE, &attestation_challenge))
         return KM_ERROR_ATTESTATION_CHALLENGE_MISSING;
     if (!ASN1_OCTET_STRING_set(key_desc->attestation_challenge, attestation_challenge.data,

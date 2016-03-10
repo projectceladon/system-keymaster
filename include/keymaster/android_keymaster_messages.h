@@ -45,6 +45,7 @@ enum AndroidKeymasterCommand {
     GET_SUPPORTED_EXPORT_FORMATS = 14,
     GET_KEY_CHARACTERISTICS = 15,
     ATTEST_KEY = 16,
+    UPGRADE_KEY = 17,
 };
 
 /**
@@ -619,6 +620,38 @@ struct AttestKeyResponse : public KeymasterResponse {
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override;
 
     keymaster_cert_chain_t certificate_chain;
+};
+
+struct UpgradeKeyRequest : public KeymasterMessage {
+    explicit UpgradeKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {
+        key_blob = {nullptr, 0};
+    }
+    ~UpgradeKeyRequest();
+
+    void SetKeyMaterial(const void* key_material, size_t length);
+    void SetKeyMaterial(const keymaster_key_blob_t& blob) {
+        SetKeyMaterial(blob.key_material, blob.key_material_size);
+    }
+
+    size_t SerializedSize() const override;
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override;
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override;
+
+    keymaster_key_blob_t key_blob;
+    AuthorizationSet upgrade_params;
+};
+
+struct UpgradeKeyResponse : public KeymasterResponse {
+    explicit UpgradeKeyResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {
+        upgraded_key = {nullptr, 0};
+    }
+    ~UpgradeKeyResponse();
+
+    size_t NonErrorSerializedSize() const override;
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override;
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override;
+
+    keymaster_key_blob_t upgraded_key;
 };
 
 }  // namespace keymaster
