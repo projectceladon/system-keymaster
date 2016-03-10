@@ -3500,9 +3500,11 @@ static ASN1_OCTET_STRING* get_attestation_record(X509* certificate) {
     return attest_rec;
 }
 
-static bool verify_attestation_record(const string& challenge, bool has_unique_id,
+static bool verify_attestation_record(const string& challenge,
                                       AuthorizationSet expected_sw_enforced,
                                       AuthorizationSet expected_tee_enforced,
+                                      uint32_t expected_keymaster_version,
+                                      keymaster_security_level_t expected_keymaster_security_level,
                                       const keymaster_blob_t& attestation_cert) {
 
     X509_Ptr cert(parse_cert_blob(attestation_cert));
@@ -3517,30 +3519,40 @@ static bool verify_attestation_record(const string& challenge, bool has_unique_i
 
     AuthorizationSet att_sw_enforced;
     AuthorizationSet att_tee_enforced;
+    uint32_t att_attestation_version;
     uint32_t att_keymaster_version;
+    keymaster_security_level_t att_attestation_security_level;
+    keymaster_security_level_t att_keymaster_security_level;
     keymaster_blob_t att_challenge = {};
     keymaster_blob_t att_unique_id = {};
-    EXPECT_EQ(KM_ERROR_OK,
-              parse_attestation_record(attest_rec->data, attest_rec->length, &att_keymaster_version,
-                                       &att_challenge, &att_sw_enforced, &att_tee_enforced,
-                                       &att_unique_id));
+    EXPECT_EQ(KM_ERROR_OK, parse_attestation_record(
+                               attest_rec->data, attest_rec->length, &att_attestation_version,
+                               &att_attestation_security_level, &att_keymaster_version,
+                               &att_keymaster_security_level, &att_challenge, &att_sw_enforced,
+                               &att_tee_enforced, &att_unique_id));
+
+    EXPECT_EQ(1U, att_attestation_version);
+    EXPECT_EQ(KM_SECURITY_LEVEL_SOFTWARE, att_attestation_security_level);
+    EXPECT_EQ(expected_keymaster_version, att_keymaster_version);
+    EXPECT_EQ(expected_keymaster_security_level, att_keymaster_security_level);
 
     EXPECT_EQ(challenge.length(), att_challenge.data_length);
     EXPECT_EQ(0, memcmp(challenge.data(), att_challenge.data, challenge.length()));
 
-    if (has_unique_id) {
-        EXPECT_LT(0U, att_unique_id.data_length);
-    } else {
-        EXPECT_EQ(0U, att_unique_id.data_length);
-    }
-
-    // Add TAG_USER_ID to the attestation sw-enforced list, because user IDs are not included in
+    // Add TAG_USER_ID to the relevant attestation list, because user IDs are not included in
     // attestations, since they're meaningless off-device.
     uint32_t user_id;
     if (expected_sw_enforced.GetTagValue(TAG_USER_ID, &user_id))
         att_sw_enforced.push_back(TAG_USER_ID, user_id);
     if (expected_tee_enforced.GetTagValue(TAG_USER_ID, &user_id))
         att_tee_enforced.push_back(TAG_USER_ID, user_id);
+
+    // Add TAG_INCLUDE_UNIQUE_ID to the relevant attestation list, because that tag is not included
+    // in the attestation.
+    if (expected_sw_enforced.GetTagValue(TAG_INCLUDE_UNIQUE_ID))
+        att_sw_enforced.push_back(TAG_INCLUDE_UNIQUE_ID);
+    if (expected_tee_enforced.GetTagValue(TAG_INCLUDE_UNIQUE_ID))
+        att_tee_enforced.push_back(TAG_INCLUDE_UNIQUE_ID);
 
     att_sw_enforced.Sort();
     expected_sw_enforced.Sort();
@@ -3564,18 +3576,21 @@ TEST_P(AttestationTest, RsaAttestation) {
     EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
     EXPECT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
-    EXPECT_TRUE(verify_attestation_record("challenge", true /* has_unique_id */, sw_enforced(),
-                                          hw_enforced(), cert_chain.entries[0]));
 
-    // Uncomment to write certificate files.  This is a convenient way to generate certs to test
-    // parsing with other tools.
+    uint32_t expected_keymaster_version;
+    keymaster_security_level_t expected_keymaster_security_level;
+    // TODO(swillden): Add a test KM1 that claims to be hardware.
+    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA)) {
+        expected_keymaster_version = 0;
+        expected_keymaster_security_level = KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+    } else {
+        expected_keymaster_version = 2;
+        expected_keymaster_security_level = KM_SECURITY_LEVEL_SOFTWARE;
+    }
 
-    // for (size_t i = 0; i < cert_chain.entry_count; ++i) {
-    //     ofstream out(string("cert_") + (char)('0' + i) + ".der", ofstream::out |
-    //     ofstream::trunc);
-    //     out.write(reinterpret_cast<const char*>(cert_chain.entries[i].data),
-    //               cert_chain.entries[i].data_length);
-    // }
+    EXPECT_TRUE(verify_attestation_record(
+        "challenge", sw_enforced(), hw_enforced(), expected_keymaster_version,
+        expected_keymaster_security_level, cert_chain.entries[0]));
 
     keymaster_free_cert_chain(&cert_chain);
 }
@@ -3584,12 +3599,24 @@ TEST_P(AttestationTest, EcAttestation) {
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(256).Digest(
                                KM_DIGEST_SHA_2_256)));
 
+    uint32_t expected_keymaster_version;
+    keymaster_security_level_t expected_keymaster_security_level;
+    // TODO(swillden): Add a test KM1 that claims to be hardware.
+    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_EC)) {
+        expected_keymaster_version = 0;
+        expected_keymaster_security_level = KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+    } else {
+        expected_keymaster_version = 2;
+        expected_keymaster_security_level = KM_SECURITY_LEVEL_SOFTWARE;
+    }
+
     keymaster_cert_chain_t cert_chain;
     EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
     EXPECT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
-    EXPECT_TRUE(verify_attestation_record("challenge", false /* has_unique_id */, sw_enforced(),
-                                          hw_enforced(), cert_chain.entries[0]));
+    EXPECT_TRUE(verify_attestation_record(
+        "challenge", sw_enforced(), hw_enforced(), expected_keymaster_version,
+        expected_keymaster_security_level, cert_chain.entries[0]));
 
     keymaster_free_cert_chain(&cert_chain);
 }
