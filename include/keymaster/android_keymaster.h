@@ -71,6 +71,7 @@ class AndroidKeymaster {
     void ImportKey(const ImportKeyRequest& request, ImportKeyResponse* response);
     void ExportKey(const ExportKeyRequest& request, ExportKeyResponse* response);
     void AttestKey(const AttestKeyRequest& request, AttestKeyResponse* response);
+    void UpgradeKey(const UpgradeKeyRequest& request, UpgradeKeyResponse* response);
     void DeleteKey(const DeleteKeyRequest& request, DeleteKeyResponse* response);
     void DeleteAllKeys(const DeleteAllKeysRequest& request, DeleteAllKeysResponse* response);
     void BeginOperation(const BeginOperationRequest& request, BeginOperationResponse* response);

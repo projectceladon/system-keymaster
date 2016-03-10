@@ -35,8 +35,10 @@
 #include <hardware/keymaster1.h>
 #include <hardware/keymaster2.h>
 #include <hardware/keymaster_defs.h>
+
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/authorization_set.h>
+#include <keymaster/keymaster_context.h>
 #include <keymaster/logger.h>
 
 std::ostream& operator<<(std::ostream& os, const keymaster_key_param_t& param);
@@ -162,6 +164,8 @@ class Keymaster2TestInstanceCreator {
     virtual bool algorithm_in_km0_hardware(keymaster_algorithm_t algorithm) const = 0;
     virtual int keymaster0_calls() const = 0;
     virtual int minimal_digest_set() const { return false; }
+    virtual bool is_keymaster1_hw() const = 0;
+    virtual KeymasterContext* keymaster_context() const = 0;
 };
 
 // Use a shared_ptr because it's copyable.
@@ -209,6 +213,8 @@ class Keymaster2Test : public testing::TestWithParam<InstanceCreatorPtr> {
     keymaster_error_t AbortOperation();
 
     keymaster_error_t AttestKey(const std::string& attest_challenge, keymaster_cert_chain_t* chain);
+
+    keymaster_error_t UpgradeKey(const AuthorizationSet& upgrade_params);
 
     keymaster_error_t GetVersion(uint8_t* major, uint8_t* minor, uint8_t* subminor);
 

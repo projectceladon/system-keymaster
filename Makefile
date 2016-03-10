@@ -49,11 +49,11 @@ CFLAGS += -fprofile-arcs -ftest-coverage
 endif
 
 LDFLAGS += $(ARCH_FLAGS)
-CPPFLAGS = $(INCLUDES) -g -O0 -MD -MP
+CPPFLAGS = $(INCLUDES) -g -O0 -MD -MP $(ARCH_FLAGS) -DKEYMASTER_UNIT_TEST_BUILD -DHOST_BUILD
 CXXFLAGS += -Wall -Werror -Wno-unused -Winit-self -Wpointer-arith -Wunused-parameter \
 	-Werror=sign-compare -Werror=return-type -fno-permissive \
 	-Wno-deprecated-declarations -fno-exceptions -DKEYMASTER_NAME_TAGS $(ARCH_FLAGS)
-CFLAGS += $(ARCH_FLAGS)
+CFLAGS += $(ARCH_FLAGS) -DKEYMASTER_UNIT_TEST_BUILD -DHOST_BUILD
 
 # Uncomment to enable debug logging.
 # CXXFLAGS += -DDEBUG
@@ -94,13 +94,15 @@ CPPSRCS=\
 	integrity_assured_key_blob.cpp \
 	iso18033kdf.cpp \
 	kdf.cpp \
-	kdf_test.cpp \
 	kdf1_test.cpp \
 	kdf2_test.cpp \
+	kdf_test.cpp \
 	key.cpp \
 	key_blob_test.cpp \
 	keymaster0_engine.cpp \
 	keymaster1_engine.cpp \
+	keymaster_configuration.cpp \
+	keymaster_configuration_test.cpp \
 	keymaster_enforcement.cpp \
 	keymaster_enforcement_test.cpp \
 	keymaster_tags.cpp \
@@ -137,10 +139,11 @@ BINARIES = \
 	ecies_kem_test \
 	hkdf_test \
 	hmac_test \
-	kdf_test \
 	kdf1_test \
 	kdf2_test \
+	kdf_test \
 	key_blob_test \
+	keymaster_configuration_test \
 	keymaster_enforcement_test \
 	nist_curve_key_exchange_test
 
@@ -190,6 +193,13 @@ memcheck: $(BINARIES:=.memcheck)
 massif: $(BINARIES:=.massif)
 
 GTEST_OBJS = $(GTEST)/src/gtest-all.o gtest_main.o
+
+keymaster_configuration_test: keymaster_configuration_test.o \
+	authorization_set.o \
+	serializable.o \
+	logger.o \
+	keymaster_configuration.o \
+	$(GTEST_OBJS)
 
 hmac_test: hmac_test.o \
 	android_keymaster_test_utils.o \
