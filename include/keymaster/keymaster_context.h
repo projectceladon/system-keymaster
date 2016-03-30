@@ -65,6 +65,11 @@ class KeymasterContext {
     KeymasterContext() {}
     virtual ~KeymasterContext(){};
 
+    /**
+     * Returns the security level (SW or TEE) of this keymaster implementation.
+     */
+    virtual keymaster_security_level_t GetSecurityLevel() const = 0;
+
     virtual KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const = 0;
     virtual OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                                   keymaster_purpose_t purpose) const = 0;

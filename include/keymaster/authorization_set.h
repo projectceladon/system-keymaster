@@ -203,6 +203,13 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     keymaster_key_param_t operator[](int n) const;
 
     /**
+     * Returns true if the set contains at least one instance of \p tag
+     */
+    bool Contains(keymaster_tag_t tag) const {
+        return find(tag) != -1;
+    }
+
+    /**
      * Returns the number of \p tag entries.
      */
     size_t GetTagCount(keymaster_tag_t tag) const;

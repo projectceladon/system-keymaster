@@ -24,6 +24,7 @@
 #include "openssl_utils.h"
 
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/keymaster_context.h>
 
 namespace keymaster {
 
@@ -43,14 +44,14 @@ struct ASN1_TYPE_Delete {
 
 typedef struct km_root_of_trust {
     ASN1_OCTET_STRING* verified_boot_key;
-    ASN1_INTEGER* os_version;
-    ASN1_INTEGER* os_patchlevel;
+    ASN1_BOOLEAN* device_locked;
+    ASN1_ENUMERATED* verified_boot_state;
 } KM_ROOT_OF_TRUST;
 
 ASN1_SEQUENCE(KM_ROOT_OF_TRUST) = {
     ASN1_SIMPLE(KM_ROOT_OF_TRUST, verified_boot_key, ASN1_OCTET_STRING),
-    ASN1_SIMPLE(KM_ROOT_OF_TRUST, os_version, ASN1_INTEGER),
-    ASN1_SIMPLE(KM_ROOT_OF_TRUST, os_patchlevel, ASN1_INTEGER),
+    ASN1_SIMPLE(KM_ROOT_OF_TRUST, device_locked, ASN1_BOOLEAN),
+    ASN1_SIMPLE(KM_ROOT_OF_TRUST, verified_boot_state, ASN1_ENUMERATED),
 } ASN1_SEQUENCE_END(KM_ROOT_OF_TRUST);
 IMPLEMENT_ASN1_FUNCTIONS(KM_ROOT_OF_TRUST);
 
@@ -58,66 +59,43 @@ typedef struct km_auth_list {
     ASN1_INTEGER_SET* purpose;
     ASN1_INTEGER* algorithm;
     ASN1_INTEGER* key_size;
-    ASN1_INTEGER_SET* block_mode;
     ASN1_INTEGER_SET* digest;
     ASN1_INTEGER_SET* padding;
-    ASN1_NULL* caller_nonce;
-    ASN1_INTEGER* min_mac_length;
     ASN1_INTEGER_SET* kdf;
     ASN1_INTEGER* ec_curve;
     ASN1_INTEGER* rsa_public_exponent;
-    ASN1_NULL* ecies_single_hash_mode;
-    ASN1_NULL* include_unique_id;
-    ASN1_INTEGER* blob_usage_requirement;
-    ASN1_NULL* bootloader_only;
     ASN1_INTEGER* active_date_time;
     ASN1_INTEGER* origination_expire_date_time;
     ASN1_INTEGER* usage_expire_date_time;
-    ASN1_INTEGER* min_seconds_between_ops;
-    ASN1_INTEGER* max_uses_per_boot;
     ASN1_NULL* no_auth_required;
     ASN1_INTEGER* user_auth_type;
     ASN1_INTEGER* auth_timeout;
     ASN1_NULL* allow_while_on_body;
     ASN1_NULL* all_applications;
     ASN1_OCTET_STRING* application_id;
-    ASN1_OCTET_STRING* application_data;
     ASN1_INTEGER* creation_date_time;
     ASN1_INTEGER* origin;
     ASN1_NULL* rollback_resistant;
     KM_ROOT_OF_TRUST* root_of_trust;
     ASN1_INTEGER* os_version;
     ASN1_INTEGER* os_patchlevel;
-    ASN1_OCTET_STRING* unique_id;
 } KM_AUTH_LIST;
 
 ASN1_SEQUENCE(KM_AUTH_LIST) = {
     ASN1_EXP_SET_OF_OPT(KM_AUTH_LIST, purpose, ASN1_INTEGER, TAG_PURPOSE.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, algorithm, ASN1_INTEGER, TAG_ALGORITHM.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, key_size, ASN1_INTEGER, TAG_KEY_SIZE.masked_tag()),
-    ASN1_EXP_SET_OF_OPT(KM_AUTH_LIST, block_mode, ASN1_INTEGER, TAG_BLOCK_MODE.masked_tag()),
     ASN1_EXP_SET_OF_OPT(KM_AUTH_LIST, digest, ASN1_INTEGER, TAG_DIGEST.masked_tag()),
     ASN1_EXP_SET_OF_OPT(KM_AUTH_LIST, padding, ASN1_INTEGER, TAG_PADDING.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, caller_nonce, ASN1_NULL, TAG_CALLER_NONCE.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, min_mac_length, ASN1_INTEGER, TAG_MIN_MAC_LENGTH.masked_tag()),
     ASN1_EXP_SET_OF_OPT(KM_AUTH_LIST, kdf, ASN1_INTEGER, TAG_KDF.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, ec_curve, ASN1_INTEGER, TAG_EC_CURVE.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, rsa_public_exponent, ASN1_INTEGER,
                  TAG_RSA_PUBLIC_EXPONENT.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, ecies_single_hash_mode, ASN1_NULL,
-                 TAG_ECIES_SINGLE_HASH_MODE.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, include_unique_id, ASN1_NULL, TAG_INCLUDE_UNIQUE_ID.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, blob_usage_requirement, ASN1_INTEGER,
-                 TAG_BLOB_USAGE_REQUIREMENTS.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, bootloader_only, ASN1_NULL, TAG_BOOTLOADER_ONLY.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, active_date_time, ASN1_INTEGER, TAG_ACTIVE_DATETIME.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, origination_expire_date_time, ASN1_INTEGER,
                  TAG_ORIGINATION_EXPIRE_DATETIME.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, usage_expire_date_time, ASN1_INTEGER,
                  TAG_USAGE_EXPIRE_DATETIME.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, min_seconds_between_ops, ASN1_INTEGER,
-                 TAG_MIN_SECONDS_BETWEEN_OPS.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, max_uses_per_boot, ASN1_INTEGER, TAG_MAX_USES_PER_BOOT.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, no_auth_required, ASN1_NULL, TAG_NO_AUTH_REQUIRED.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, user_auth_type, ASN1_INTEGER, TAG_USER_AUTH_TYPE.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, auth_timeout, ASN1_INTEGER, TAG_AUTH_TIMEOUT.masked_tag()),
@@ -125,18 +103,21 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
                  TAG_ALLOW_WHILE_ON_BODY.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, all_applications, ASN1_NULL, TAG_ALL_APPLICATIONS.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, application_id, ASN1_OCTET_STRING, TAG_APPLICATION_ID.masked_tag()),
-    ASN1_EXP_OPT(KM_AUTH_LIST, application_data, ASN1_OCTET_STRING,
-                 TAG_APPLICATION_DATA.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, creation_date_time, ASN1_INTEGER,
                  TAG_CREATION_DATETIME.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, origin, ASN1_INTEGER, TAG_ORIGIN.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, rollback_resistant, ASN1_NULL, TAG_ROLLBACK_RESISTANT.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, root_of_trust, KM_ROOT_OF_TRUST, TAG_ROOT_OF_TRUST.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, os_version, ASN1_INTEGER, TAG_OS_VERSION.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, os_patchlevel, ASN1_INTEGER, TAG_OS_PATCHLEVEL.masked_tag()),
 } ASN1_SEQUENCE_END(KM_AUTH_LIST);
 IMPLEMENT_ASN1_FUNCTIONS(KM_AUTH_LIST);
 
 typedef struct km_key_description {
+    ASN1_INTEGER* attestation_version;
+    ASN1_ENUMERATED* attestation_security_level;
     ASN1_INTEGER* keymaster_version;
+    ASN1_ENUMERATED* keymaster_security_level;
     ASN1_OCTET_STRING* attestation_challenge;
     KM_AUTH_LIST* software_enforced;
     KM_AUTH_LIST* tee_enforced;
@@ -144,11 +125,14 @@ typedef struct km_key_description {
 } KM_KEY_DESCRIPTION;
 
 ASN1_SEQUENCE(KM_KEY_DESCRIPTION) = {
+    ASN1_SIMPLE(KM_KEY_DESCRIPTION, attestation_version, ASN1_INTEGER),
+    ASN1_SIMPLE(KM_KEY_DESCRIPTION, attestation_security_level, ASN1_ENUMERATED),
     ASN1_SIMPLE(KM_KEY_DESCRIPTION, keymaster_version, ASN1_INTEGER),
+    ASN1_SIMPLE(KM_KEY_DESCRIPTION, keymaster_security_level, ASN1_ENUMERATED),
     ASN1_SIMPLE(KM_KEY_DESCRIPTION, attestation_challenge, ASN1_OCTET_STRING),
+    ASN1_SIMPLE(KM_KEY_DESCRIPTION, unique_id, ASN1_OCTET_STRING),
     ASN1_SIMPLE(KM_KEY_DESCRIPTION, software_enforced, KM_AUTH_LIST),
     ASN1_SIMPLE(KM_KEY_DESCRIPTION, tee_enforced, KM_AUTH_LIST),
-    ASN1_OPT(KM_KEY_DESCRIPTION, unique_id, ASN1_OCTET_STRING),
 } ASN1_SEQUENCE_END(KM_KEY_DESCRIPTION);
 IMPLEMENT_ASN1_FUNCTIONS(KM_KEY_DESCRIPTION);
 
@@ -203,8 +187,10 @@ static keymaster_error_t insert_integer(ASN1_INTEGER* value, ASN1_INTEGER** dest
 // Put the contents of the keymaster AuthorizationSet auth_list in to the ASN.1 record structure,
 // record.
 static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_AUTH_LIST* record) {
-
     assert(record);
+
+    if (auth_list.empty())
+        return KM_ERROR_OK;
 
     for (auto entry : auth_list) {
 
@@ -227,6 +213,18 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         case KM_TAG_EXPORTABLE:
         case KM_TAG_RESET_SINCE_ID_ROTATION:
         case KM_TAG_ATTESTATION_CHALLENGE:
+        case KM_TAG_BLOCK_MODE:
+        case KM_TAG_CALLER_NONCE:
+        case KM_TAG_MIN_MAC_LENGTH:
+        case KM_TAG_ECIES_SINGLE_HASH_MODE:
+        case KM_TAG_INCLUDE_UNIQUE_ID:
+        case KM_TAG_BLOB_USAGE_REQUIREMENTS:
+        case KM_TAG_BOOTLOADER_ONLY:
+        case KM_TAG_MIN_SECONDS_BETWEEN_OPS:
+        case KM_TAG_MAX_USES_PER_BOOT:
+        case KM_TAG_APPLICATION_DATA:
+        case KM_TAG_UNIQUE_ID:
+        case KM_TAG_ROOT_OF_TRUST:
             continue;
 
         /* Non-repeating enumerations */
@@ -235,9 +233,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
             break;
         case KM_TAG_EC_CURVE:
             integer_ptr = &record->ec_curve;
-            break;
-        case KM_TAG_BLOB_USAGE_REQUIREMENTS:
-            integer_ptr = &record->blob_usage_requirement;
             break;
         case KM_TAG_USER_AUTH_TYPE:
             integer_ptr = &record->user_auth_type;
@@ -249,9 +244,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         /* Repeating enumerations */
         case KM_TAG_PURPOSE:
             integer_set = &record->purpose;
-            break;
-        case KM_TAG_BLOCK_MODE:
-            integer_set = &record->block_mode;
             break;
         case KM_TAG_PADDING:
             integer_set = &record->padding;
@@ -267,17 +259,14 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         case KM_TAG_KEY_SIZE:
             integer_ptr = &record->key_size;
             break;
-        case KM_TAG_MIN_MAC_LENGTH:
-            integer_ptr = &record->min_mac_length;
-            break;
-        case KM_TAG_MIN_SECONDS_BETWEEN_OPS:
-            integer_ptr = &record->min_seconds_between_ops;
-            break;
-        case KM_TAG_MAX_USES_PER_BOOT:
-            integer_ptr = &record->max_uses_per_boot;
-            break;
         case KM_TAG_AUTH_TIMEOUT:
             integer_ptr = &record->auth_timeout;
+            break;
+        case KM_TAG_OS_VERSION:
+            integer_ptr = &record->os_version;
+            break;
+        case KM_TAG_OS_PATCHLEVEL:
+            integer_ptr = &record->os_patchlevel;
             break;
 
         /* Non-repeating long unsigned integers */
@@ -300,15 +289,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
             break;
 
         /* Booleans */
-        case KM_TAG_CALLER_NONCE:
-            bool_ptr = &record->caller_nonce;
-            break;
-        case KM_TAG_ECIES_SINGLE_HASH_MODE:
-            bool_ptr = &record->ecies_single_hash_mode;
-            break;
-        case KM_TAG_BOOTLOADER_ONLY:
-            bool_ptr = &record->bootloader_only;
-            break;
         case KM_TAG_NO_AUTH_REQUIRED:
             bool_ptr = &record->no_auth_required;
             break;
@@ -318,9 +298,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         case KM_TAG_ROLLBACK_RESISTANT:
             bool_ptr = &record->rollback_resistant;
             break;
-        case KM_TAG_INCLUDE_UNIQUE_ID:
-            bool_ptr = &record->include_unique_id;
-            break;
         case KM_TAG_ALLOW_WHILE_ON_BODY:
             bool_ptr = &record->allow_while_on_body;
             break;
@@ -328,35 +305,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         /* Byte arrays*/
         case KM_TAG_APPLICATION_ID:
             string_ptr = &record->application_id;
-            break;
-        case KM_TAG_APPLICATION_DATA:
-            string_ptr = &record->application_data;
-            break;
-        case KM_TAG_UNIQUE_ID:
-            string_ptr = &record->unique_id;
-            break;
-
-        /* Root of Trust components */
-        case KM_TAG_OS_VERSION:
-        case KM_TAG_OS_PATCHLEVEL:
-        case KM_TAG_ROOT_OF_TRUST:
-            if (!record->root_of_trust)
-                record->root_of_trust = KM_ROOT_OF_TRUST_new();
-            if (!record->root_of_trust)
-                return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-            switch (entry.tag) {
-            case KM_TAG_OS_VERSION:
-                integer_ptr = &record->root_of_trust->os_version;
-                break;
-            case KM_TAG_OS_PATCHLEVEL:
-                integer_ptr = &record->root_of_trust->os_patchlevel;
-                break;
-            case KM_TAG_ROOT_OF_TRUST:
-                string_ptr = &record->root_of_trust->verified_boot_key;
-                break;
-            default:
-                assert(false);  // Can't get here.
-            }
             break;
         }
 
@@ -438,6 +386,7 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
 keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_params,
                                            const AuthorizationSet& sw_enforced,
                                            const AuthorizationSet& tee_enforced,
+                                           const KeymasterContext& context,
                                            UniquePtr<uint8_t[]>* asn1_key_desc,
                                            size_t* asn1_key_desc_len) {
     assert(asn1_key_desc && asn1_key_desc_len);
@@ -446,9 +395,38 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     if (!key_desc.get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    keymaster_error_t error;
+    keymaster_security_level_t keymaster_security_level;
+    uint32_t keymaster_version = UINT32_MAX;
+    if (tee_enforced.empty()) {
+        // Software key.
+        keymaster_security_level = KM_SECURITY_LEVEL_SOFTWARE;
+        keymaster_version = 2;
+    } else {
+        keymaster_security_level = KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+        switch (context.GetSecurityLevel()) {
+        case KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT:
+            // We're running in a TEE, so the key is KM2.
+            keymaster_version = 2;
+            break;
 
-    if (!ASN1_INTEGER_set(key_desc->keymaster_version, 2))
+        case KM_SECURITY_LEVEL_SOFTWARE:
+            // We're running in software, wrapping some KM hardware.  Is it KM0 or KM1?  KM1 keys
+            // have the purpose in the tee_enforced list.  It's possible that a key could be created
+            // without a purpose, which would fool this test into reporting it's a KM0 key.  That
+            // corner case doesn't matter much, because purpose-less keys are not usable anyway.
+            // Also, KM1 TEEs should disappear rapidly.
+            keymaster_version = tee_enforced.Contains(TAG_PURPOSE) ? 1 : 0;
+            break;
+        }
+
+        if (keymaster_version == UINT32_MAX)
+            return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    if (!ASN1_INTEGER_set(key_desc->attestation_version, 1) ||
+        !ASN1_ENUMERATED_set(key_desc->attestation_security_level, context.GetSecurityLevel()) ||
+        !ASN1_INTEGER_set(key_desc->keymaster_version, keymaster_version) ||
+        !ASN1_ENUMERATED_set(key_desc->keymaster_security_level, keymaster_security_level))
         return TranslateLastOpenSslError();
 
     keymaster_blob_t attestation_challenge = {};
@@ -458,7 +436,7 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
                                attestation_challenge.data_length))
         return TranslateLastOpenSslError();
 
-    error = build_auth_list(sw_enforced, key_desc->software_enforced);
+    keymaster_error_t error = build_auth_list(sw_enforced, key_desc->software_enforced);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -528,6 +506,9 @@ static bool get_ulong(const ASN1_INTEGER* asn1_int, keymaster_tag_t tag,
 // Extract the values from the specified ASN.1 record and place them in auth_list.
 static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
                                            AuthorizationSet* auth_list) {
+    if (!record)
+        return KM_ERROR_OK;
+
     // Purpose
     if (!get_repeated_enums(record->purpose, TAG_PURPOSE, auth_list))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -540,10 +521,6 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
     if (record->key_size && !auth_list->push_back(TAG_KEY_SIZE, ASN1_INTEGER_get(record->key_size)))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    // Block mode
-    if (!get_repeated_enums(record->block_mode, TAG_BLOCK_MODE, auth_list))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     // Digest
     if (!get_repeated_enums(record->digest, TAG_DIGEST, auth_list))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -552,37 +529,12 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
     if (!get_repeated_enums(record->padding, TAG_PADDING, auth_list))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    // Caller NONCE
-    if (record->caller_nonce && !auth_list->push_back(TAG_CALLER_NONCE))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Min MAC length
-    if (record->min_mac_length &&
-        !auth_list->push_back(TAG_MIN_MAC_LENGTH, ASN1_INTEGER_get(record->min_mac_length)))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     // EC curve
     if (!get_enum(record->ec_curve, TAG_EC_CURVE, auth_list))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     // RSA public exponent
     if (!get_ulong(record->rsa_public_exponent, TAG_RSA_PUBLIC_EXPONENT, auth_list))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // ECIES single hash mode
-    if (record->ecies_single_hash_mode && !auth_list->push_back(TAG_ECIES_SINGLE_HASH_MODE))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Include unique ID
-    if (record->include_unique_id && !auth_list->push_back(TAG_INCLUDE_UNIQUE_ID))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Blob usage requirement
-    if (!get_enum(record->blob_usage_requirement, TAG_BLOB_USAGE_REQUIREMENTS, auth_list))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Bootloader only
-    if (record->bootloader_only && !auth_list->push_back(TAG_BOOTLOADER_ONLY))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     // Active date time
@@ -596,17 +548,6 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
 
     // Usage Expire date time
     if (!get_ulong(record->usage_expire_date_time, TAG_USAGE_EXPIRE_DATETIME, auth_list))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Min seconds between ops
-    if (record->min_seconds_between_ops &&
-        !auth_list->push_back(TAG_MIN_SECONDS_BETWEEN_OPS,
-                              ASN1_INTEGER_get(record->min_seconds_between_ops)))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
-    // Max uses per boot
-    if (record->max_uses_per_boot &&
-        !auth_list->push_back(TAG_MAX_USES_PER_BOOT, ASN1_INTEGER_get(record->max_uses_per_boot)))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     // No auth required
@@ -632,12 +573,6 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
                               record->application_id->length))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    // Application data
-    if (record->application_data &&
-        !auth_list->push_back(TAG_APPLICATION_DATA, record->application_data->data,
-                              record->application_data->length))
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
-
     // Creation date time
     if (!get_ulong(record->creation_date_time, TAG_CREATION_DATETIME, auth_list))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
@@ -653,15 +588,21 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
     // Root of trust
     if (record->root_of_trust) {
         KM_ROOT_OF_TRUST* rot = record->root_of_trust;
-        if (!rot->verified_boot_key || !rot->os_version || !rot->os_patchlevel)
+        if (!rot->verified_boot_key)
             return KM_ERROR_INVALID_KEY_BLOB;
 
-        if (!auth_list->push_back(TAG_OS_VERSION, ASN1_INTEGER_get(rot->os_version)) ||
-            !auth_list->push_back(TAG_OS_PATCHLEVEL, ASN1_INTEGER_get(rot->os_patchlevel)) ||
-            !auth_list->push_back(TAG_ROOT_OF_TRUST, rot->verified_boot_key->data,
-                                  rot->verified_boot_key->length))
-            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        // Other root of trust fields are not mapped to auth set entries.
     }
+
+    // OS Version
+    if (record->os_version &&
+        !auth_list->push_back(TAG_OS_VERSION, ASN1_INTEGER_get(record->os_version)))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // OS Patch level
+    if (record->os_patchlevel &&
+        !auth_list->push_back(TAG_OS_PATCHLEVEL, ASN1_INTEGER_get(record->os_patchlevel)))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     return KM_ERROR_OK;
 }
@@ -669,7 +610,10 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
 // Parse the DER-encoded attestation record, placing the results in keymaster_version,
 // attestation_challenge, software_enforced, tee_enforced and unique_id.
 keymaster_error_t parse_attestation_record(const uint8_t* asn1_key_desc, size_t asn1_key_desc_len,
+                                           uint32_t* attestation_version,  //
+                                           keymaster_security_level_t* attestation_security_level,
                                            uint32_t* keymaster_version,
+                                           keymaster_security_level_t* keymaster_security_level,
                                            keymaster_blob_t* attestation_challenge,
                                            AuthorizationSet* software_enforced,
                                            AuthorizationSet* tee_enforced,
@@ -680,17 +624,19 @@ keymaster_error_t parse_attestation_record(const uint8_t* asn1_key_desc, size_t 
     if (!record.get())
         return TranslateLastOpenSslError();
 
+    *attestation_version = ASN1_INTEGER_get(record->attestation_version);
+    *attestation_security_level = static_cast<keymaster_security_level_t>(
+        ASN1_ENUMERATED_get(record->attestation_security_level));
     *keymaster_version = ASN1_INTEGER_get(record->keymaster_version);
+    *keymaster_security_level = static_cast<keymaster_security_level_t>(
+        ASN1_ENUMERATED_get(record->keymaster_security_level));
+
     attestation_challenge->data =
         dup_buffer(record->attestation_challenge->data, record->attestation_challenge->length);
     attestation_challenge->data_length = record->attestation_challenge->length;
 
-    if (record->unique_id) {
-        unique_id->data = dup_buffer(record->unique_id->data, record->unique_id->length);
-        unique_id->data_length = record->unique_id->length;
-    } else {
-        *unique_id = {};
-    }
+    unique_id->data = dup_buffer(record->unique_id->data, record->unique_id->length);
+    unique_id->data_length = record->unique_id->length;
 
     keymaster_error_t error = extract_auth_list(record->software_enforced, software_enforced);
     if (error != KM_ERROR_OK)
