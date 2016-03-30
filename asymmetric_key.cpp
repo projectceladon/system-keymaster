@@ -32,7 +32,7 @@ namespace {
 template <typename T> T min(T a, T b) {
     return (a < b) ? a : b;
 }
-} // anonymous namespace
+}  // anonymous namespace
 
 keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t format,
                                                         UniquePtr<uint8_t[]>* material,
@@ -68,6 +68,7 @@ keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t f
 static keymaster_error_t build_attestation_extension(const AuthorizationSet& attest_params,
                                                      const AuthorizationSet& tee_enforced,
                                                      const AuthorizationSet& sw_enforced,
+                                                     const KeymasterContext& context,
                                                      X509_EXTENSION_Ptr* extension) {
     ASN1_OBJECT_Ptr oid(
         OBJ_txt2obj(kAttestionRecordOid, 1 /* accept numerical dotted string form only */));
@@ -77,7 +78,7 @@ static keymaster_error_t build_attestation_extension(const AuthorizationSet& att
     UniquePtr<uint8_t[]> attest_bytes;
     size_t attest_bytes_len;
     keymaster_error_t error = build_attestation_record(attest_params, sw_enforced, tee_enforced,
-                                                       &attest_bytes, &attest_bytes_len);
+                                                       context, &attest_bytes, &attest_bytes_len);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -104,11 +105,12 @@ static bool add_public_key(EVP_PKEY* key, X509* certificate, keymaster_error_t* 
 
 static bool add_attestation_extension(const AuthorizationSet& attest_params,
                                       const AuthorizationSet& tee_enforced,
-                                      const AuthorizationSet& sw_enforced, X509* certificate,
+                                      const AuthorizationSet& sw_enforced,
+                                      const KeymasterContext& context, X509* certificate,
                                       keymaster_error_t* error) {
     X509_EXTENSION_Ptr attest_extension;
-    *error =
-        build_attestation_extension(attest_params, tee_enforced, sw_enforced, &attest_extension);
+    *error = build_attestation_extension(attest_params, tee_enforced, sw_enforced, context,
+                                         &attest_extension);
     if (*error != KM_ERROR_OK)
         return false;
 
@@ -207,11 +209,7 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
         return TranslateLastOpenSslError();
 
     ASN1_INTEGER_Ptr serialNumber(ASN1_INTEGER_new());
-    if (!serialNumber.get() ||
-        !ASN1_INTEGER_set(
-            serialNumber.get(),
-            10000 /* TODO(swillden): Figure out what should go in serial number; probably a random
-                   * value */) ||
+    if (!serialNumber.get() || !ASN1_INTEGER_set(serialNumber.get(), 1) ||
         !X509_set_serialNumber(certificate.get(), serialNumber.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
@@ -232,7 +230,6 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
         !X509_set_subject_name(certificate.get(), subjectName.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
-    // TODO(swillden): Use key activity and expiration dates for notBefore and notAfter.
     ASN1_TIME_Ptr notBefore(ASN1_TIME_new());
     uint64_t activeDateTime = 0;
     authorizations().GetTagValue(TAG_ACTIVE_DATETIME, &activeDateTime);
@@ -256,8 +253,8 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
 
     if (!sign_key.get() ||  //
         !add_public_key(pkey.get(), certificate.get(), &error) ||
-        !add_attestation_extension(attest_params, tee_enforced, sw_enforced, certificate.get(),
-                                   &error))
+        !add_attestation_extension(attest_params, tee_enforced, sw_enforced, context,
+                                   certificate.get(), &error))
         return error;
 
     if (!X509_sign(certificate.get(), sign_key.get(), EVP_sha256()))

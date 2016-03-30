@@ -53,6 +53,10 @@ class SoftKeymasterContext : public KeymasterContext {
      */
     keymaster_error_t SetHardwareDevice(keymaster1_device_t* keymaster1_device);
 
+    keymaster_security_level_t GetSecurityLevel() const override {
+        return KM_SECURITY_LEVEL_SOFTWARE;
+    }
+
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                           keymaster_purpose_t purpose) const override;
