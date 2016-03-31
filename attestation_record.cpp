@@ -444,15 +444,32 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     if (error != KM_ERROR_OK)
         return error;
 
-    if (sw_enforced.GetTagValue(TAG_INCLUDE_UNIQUE_ID) ||
-        tee_enforced.GetTagValue(TAG_INCLUDE_UNIQUE_ID)) {
+    // Only check tee_enforced for TAG_INCLUDE_UNIQUE_ID.  If we don't have hardware we can't
+    // generate unique IDs.
+    if (tee_enforced.GetTagValue(TAG_INCLUDE_UNIQUE_ID)) {
+        uint64_t creation_datetime;
+        // Only check sw_enforced for TAG_CREATION_DATETIME, since it shouldn't be in tee_enforced,
+        // since this implementation has no secure wall clock.
+        if (!sw_enforced.GetTagValue(TAG_CREATION_DATETIME, &creation_datetime)) {
+            LOG_E("Unique ID cannot be created without creation datetime", 0);
+            return KM_ERROR_INVALID_KEY_BLOB;
+        }
+
+        keymaster_blob_t application_id = {};
+        sw_enforced.GetTagValue(TAG_APPLICATION_ID, &application_id);
+
+        Buffer unique_id;
+        error = context.GenerateUniqueId(
+            creation_datetime, application_id,
+            attestation_params.GetTagValue(TAG_RESET_SINCE_ID_ROTATION), &unique_id);
+        if (error != KM_ERROR_OK)
+            return error;
+
         key_desc->unique_id = ASN1_OCTET_STRING_new();
-        if (!key_desc->unique_id)
+        if (!key_desc->unique_id ||
+            !ASN1_OCTET_STRING_set(key_desc->unique_id, unique_id.peek_read(),
+                                   unique_id.available_read()))
             return TranslateLastOpenSslError();
-        // TODO(swillden): Calculate actual unique ID
-        const char* non_unique_id = "non-unique ID";
-        ASN1_OCTET_STRING_set(key_desc->unique_id, reinterpret_cast<const uint8_t*>(non_unique_id),
-                              strlen(non_unique_id));
     }
 
     int len = i2d_KM_KEY_DESCRIPTION(key_desc.get(), nullptr);
