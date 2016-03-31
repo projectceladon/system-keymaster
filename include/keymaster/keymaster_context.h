@@ -161,17 +161,26 @@ class KeymasterContext {
 
     /**
      * Return the attestation signing key of the specified algorithm (KM_ALGORITHM_RSA or
-     * KM_ALGORITHM_EC).
+     * KM_ALGORITHM_EC).  Caller does not acquire ownership and should not delete.
      */
     virtual EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
                                      keymaster_error_t* error) const = 0;
 
     /**
      * Return the certificate chain of the attestation signing key of the specified algorithm
-     * (KM_ALGORITHM_RSA or KM_ALGORITHM_EC).
+     * (KM_ALGORITHM_RSA or KM_ALGORITHM_EC).  Caller does not acquire ownership and should not
+     * delete.
      */
     virtual keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
                                                      keymaster_error_t* error) const = 0;
+
+    /**
+     * Generate the current unique ID.
+     */
+    virtual keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
+                                               const keymaster_blob_t& application_id,
+                                               bool reset_since_rotation,
+                                               Buffer* unique_id) const = 0;
 
   private:
     // Uncopyable.
