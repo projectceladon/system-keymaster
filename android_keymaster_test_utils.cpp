@@ -678,7 +678,7 @@ void Keymaster2Test::corrupt_key_blob() {
 
 class Sha256OnlyWrapper {
   public:
-    Sha256OnlyWrapper(const keymaster1_device_t* wrapped_device) : wrapped_device_(wrapped_device) {
+    explicit Sha256OnlyWrapper(const keymaster1_device_t* wrapped_device) : wrapped_device_(wrapped_device) {
 
         new_module = *wrapped_device_->common.module;
         new_module_name = std::string("SHA 256-only ") + wrapped_device_->common.module->name;
