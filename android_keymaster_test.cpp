@@ -81,7 +81,7 @@ class TestKeymasterEnforcement : public KeymasterEnforcement {
 class TestKeymasterContext : public SoftKeymasterContext {
   public:
     TestKeymasterContext() {}
-    TestKeymasterContext(const string& root_of_trust) : SoftKeymasterContext(root_of_trust) {}
+    explicit TestKeymasterContext(const string& root_of_trust) : SoftKeymasterContext(root_of_trust) {}
 
     KeymasterEnforcement* enforcement_policy() override { return &test_policy_; }
 
@@ -110,7 +110,7 @@ class SoftKeymasterTestInstanceCreator : public Keymaster2TestInstanceCreator {
  */
 class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreator {
   public:
-    Keymaster0AdapterTestInstanceCreator(bool support_ec) : support_ec_(support_ec) {}
+    explicit Keymaster0AdapterTestInstanceCreator(bool support_ec) : support_ec_(support_ec) {}
 
     keymaster2_device_t* CreateDevice() const {
         std::cerr << "Creating keymaster0-backed device (with ec: " << std::boolalpha << support_ec_
