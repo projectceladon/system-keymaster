@@ -378,6 +378,27 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         }
     }
 
+    keymaster_ec_curve_t ec_curve;
+    uint32_t key_size;
+    if (auth_list.Contains(TAG_ALGORITHM, KM_ALGORITHM_EC) &&  //
+        !auth_list.Contains(TAG_EC_CURVE) &&                   //
+        auth_list.GetTagValue(TAG_KEY_SIZE, &key_size)) {
+        // This must be a keymaster1 key. It's an EC key with no curve.  Insert the curve.
+
+        keymaster_error_t error = EcKeySizeToCurve(key_size, &ec_curve);
+        if (error != KM_ERROR_OK)
+            return error;
+
+        UniquePtr<ASN1_INTEGER, ASN1_INTEGER_Delete> value(ASN1_INTEGER_new());
+        if (!value.get())
+            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+        if (!ASN1_INTEGER_set(value.get(), ec_curve))
+            return TranslateLastOpenSslError();
+
+        insert_integer(value.release(), &record->ec_curve, nullptr);
+    }
+
     return KM_ERROR_OK;
 }
 
@@ -455,7 +476,7 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
             return KM_ERROR_INVALID_KEY_BLOB;
         }
 
-        keymaster_blob_t application_id = {};
+        keymaster_blob_t application_id = {nullptr, 0};
         sw_enforced.GetTagValue(TAG_APPLICATION_ID, &application_id);
 
         Buffer unique_id;

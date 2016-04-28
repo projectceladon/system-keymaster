@@ -334,17 +334,17 @@ TEST_P(NewKeyGeneration, EcdsaDefaultSize) {
 }
 
 TEST_P(NewKeyGeneration, EcdsaInvalidSize) {
-    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_EC))
-        ASSERT_EQ(
-            KM_ERROR_UNKNOWN_ERROR,
-            GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190).Digest(KM_DIGEST_NONE)));
-    else
-        ASSERT_EQ(
-            KM_ERROR_UNSUPPORTED_KEY_SIZE,
-            GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190).Digest(KM_DIGEST_NONE)));
+    ASSERT_EQ(KM_ERROR_UNSUPPORTED_KEY_SIZE,
+              GenerateKey(AuthorizationSetBuilder().EcdsaSigningKey(190).Digest(KM_DIGEST_NONE)));
+    EXPECT_EQ(0, GetParam()->keymaster0_calls());
+}
 
-    if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_EC))
-        EXPECT_EQ(1, GetParam()->keymaster0_calls());
+TEST_P(NewKeyGeneration, EcdsaMismatchKeySize) {
+    ASSERT_EQ(KM_ERROR_INVALID_ARGUMENT,
+              GenerateKey(AuthorizationSetBuilder()
+                              .EcdsaSigningKey(224)
+                              .Authorization(TAG_EC_CURVE, KM_EC_CURVE_P_256)
+                              .Digest(KM_DIGEST_NONE)));
 }
 
 TEST_P(NewKeyGeneration, EcdsaAllValidSizes) {
