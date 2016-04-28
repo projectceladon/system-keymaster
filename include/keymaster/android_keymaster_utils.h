@@ -325,6 +325,9 @@ struct CertificateChainDelete {
     }
 };
 
+keymaster_error_t EcKeySizeToCurve(uint32_t key_size_bits, keymaster_ec_curve_t* curve);
+keymaster_error_t EcCurveToKeySize(keymaster_ec_curve_t curve, uint32_t* key_size_bits);
+
 }  // namespace keymaster
 
 #endif  // SYSTEM_KEYMASTER_ANDROID_KEYMASTER_UTILS_H_

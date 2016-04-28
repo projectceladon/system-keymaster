@@ -40,6 +40,37 @@ OperationFactory* EcKeyFactory::GetOperationFactory(keymaster_purpose_t purpose)
     }
 }
 
+/* static */
+keymaster_error_t EcKeyFactory::GetCurveAndSize(const AuthorizationSet& key_description,
+                                                keymaster_ec_curve_t* curve,
+                                                uint32_t* key_size_bits) {
+    if (!key_description.GetTagValue(TAG_EC_CURVE, curve)) {
+        // Curve not specified. Fall back to deducing curve from key size.
+        if (!key_description.GetTagValue(TAG_KEY_SIZE, key_size_bits)) {
+            LOG_E("%s", "No curve or key size specified for EC key generation");
+            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        }
+        keymaster_error_t error = EcKeySizeToCurve(*key_size_bits, curve);
+        if (error != KM_ERROR_OK) {
+            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        }
+    } else {
+        keymaster_error_t error = EcCurveToKeySize(*curve, key_size_bits);
+        if (error != KM_ERROR_OK) {
+            return error;
+        }
+        uint32_t tag_key_size_bits;
+        if (key_description.GetTagValue(TAG_KEY_SIZE, &tag_key_size_bits) &&
+            *key_size_bits != tag_key_size_bits) {
+            LOG_E("Curve key size %d and specified key size %d don't match", key_size_bits,
+                  tag_key_size_bits);
+            return KM_ERROR_INVALID_ARGUMENT;
+        }
+    }
+
+    return KM_ERROR_OK;
+}
+
 keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_description,
                                             KeymasterKeyBlob* key_blob,
                                             AuthorizationSet* hw_enforced,
@@ -49,10 +80,15 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
 
     AuthorizationSet authorizations(key_description);
 
+    keymaster_ec_curve_t ec_curve;
     uint32_t key_size;
-    if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
-        LOG_E("%s", "No key size specified for EC key generation");
-        return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+    keymaster_error_t error = GetCurveAndSize(authorizations, &ec_curve, &key_size);
+    if (error != KM_ERROR_OK) {
+        return error;
+    } else if (!authorizations.Contains(TAG_KEY_SIZE, key_size)) {
+        authorizations.push_back(TAG_KEY_SIZE, key_size);
+    } else if (!authorizations.Contains(TAG_EC_CURVE, ec_curve)) {
+        authorizations.push_back(TAG_EC_CURVE, ec_curve);
     }
 
     UniquePtr<EC_KEY, EC_KEY_Delete> ec_key(EC_KEY_new());
@@ -60,9 +96,9 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
     if (ec_key.get() == NULL || pkey.get() == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    UniquePtr<EC_GROUP, EC_GROUP_Delete> group(choose_group(key_size));
+    UniquePtr<EC_GROUP, EC_GROUP_Delete> group(ChooseGroup(ec_curve));
     if (group.get() == NULL) {
-        LOG_E("Unable to get EC group for key of size %d", key_size);
+        LOG_E("Unable to get EC group for curve %d", ec_curve);
         return KM_ERROR_UNSUPPORTED_KEY_SIZE;
     }
 
@@ -80,7 +116,7 @@ keymaster_error_t EcKeyFactory::GenerateKey(const AuthorizationSet& key_descript
         return TranslateLastOpenSslError();
 
     KeymasterKeyBlob key_material;
-    keymaster_error_t error = EvpKeyToKeyMaterial(pkey.get(), &key_material);
+    error = EvpKeyToKeyMaterial(pkey.get(), &key_material);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -149,7 +185,7 @@ keymaster_error_t EcKeyFactory::UpdateImportKeyDescription(const AuthorizationSe
 }
 
 /* static */
-EC_GROUP* EcKeyFactory::choose_group(size_t key_size_bits) {
+EC_GROUP* EcKeyFactory::ChooseGroup(size_t key_size_bits) {
     switch (key_size_bits) {
     case 224:
         return EC_GROUP_new_by_curve_name(NID_secp224r1);
@@ -165,6 +201,27 @@ EC_GROUP* EcKeyFactory::choose_group(size_t key_size_bits) {
         break;
     default:
         return NULL;
+        break;
+    }
+}
+
+/* static */
+EC_GROUP* EcKeyFactory::ChooseGroup(keymaster_ec_curve_t ec_curve) {
+    switch (ec_curve) {
+    case KM_EC_CURVE_P_224:
+        return EC_GROUP_new_by_curve_name(NID_secp224r1);
+        break;
+    case KM_EC_CURVE_P_256:
+        return EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+        break;
+    case KM_EC_CURVE_P_384:
+        return EC_GROUP_new_by_curve_name(NID_secp384r1);
+        break;
+    case KM_EC_CURVE_P_521:
+        return EC_GROUP_new_by_curve_name(NID_secp521r1);
+        break;
+    default:
+        return nullptr;
         break;
     }
 }
