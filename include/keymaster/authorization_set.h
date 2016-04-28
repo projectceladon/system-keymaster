@@ -231,6 +231,14 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     }
 
     /**
+     * Returns true if the set contains the specified tag and value.
+     */
+    template <keymaster_tag_t Tag>
+    bool Contains(TypedTag<KM_UINT, Tag> tag, uint32_t val) const {
+        return ContainsIntValue(tag, val);
+    }
+
+    /**
      * If the specified integer-typed \p tag exists, places its value in \p val and returns true.
      * If \p tag is not present, leaves \p val unmodified and returns false.
      */
@@ -442,6 +450,7 @@ class AuthorizationSet : public Serializable, public keymaster_key_param_set_t {
     bool GetTagValueBool(keymaster_tag_t tag) const;
 
     bool ContainsEnumValue(keymaster_tag_t tag, uint32_t val) const;
+    bool ContainsIntValue(keymaster_tag_t tag, uint32_t val) const;
 
     // Define elems_ and elems_size_ as aliases to params and length, respectively.  This is to
     // avoid using the variables without the trailing underscore in the implementation.

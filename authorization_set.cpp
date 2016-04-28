@@ -630,4 +630,11 @@ bool AuthorizationSet::ContainsEnumValue(keymaster_tag_t tag, uint32_t value) co
     return false;
 }
 
+bool AuthorizationSet::ContainsIntValue(keymaster_tag_t tag, uint32_t value) const {
+    for (auto& entry : *this)
+        if (entry.tag == tag && entry.integer == value)
+            return true;
+    return false;
+}
+
 }  // namespace keymaster
