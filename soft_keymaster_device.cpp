@@ -73,6 +73,7 @@ struct keystore_module soft_keymaster2_device_module = {
 
 namespace keymaster {
 
+const size_t kMaximumAttestationChallengeLength = 128;
 const size_t kOperationTableSize = 16;
 
 template <typename T> std::vector<T> make_vector(const T* array, size_t len) {
@@ -1059,6 +1060,14 @@ keymaster_error_t SoftKeymasterDevice::attest_key(const keymaster2_device_t* dev
     AttestKeyRequest request;
     request.SetKeyMaterial(*key_to_attest);
     request.attest_params.Reinitialize(*attest_params);
+
+    keymaster_blob_t attestation_challenge = {};
+    request.attest_params.GetTagValue(TAG_ATTESTATION_CHALLENGE, &attestation_challenge);
+    if (attestation_challenge.data_length > kMaximumAttestationChallengeLength) {
+        LOG_E("%d-byte attestation challenge; only %d bytes allowed",
+              attestation_challenge.data_length, kMaximumAttestationChallengeLength);
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
 
     AttestKeyResponse response;
     convert_device(dev)->impl_->AttestKey(request, &response);
