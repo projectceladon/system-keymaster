@@ -30,9 +30,85 @@
 namespace keymaster {
 
 namespace {
+
+constexpr int kDigitalSignatureKeyUsageBit = 0;
+constexpr int kKeyEnciphermentKeyUsageBit = 2;
+constexpr int kDataEnciphermentKeyUsageBit = 3;
+constexpr int kMaxKeyUsageBit = 8;
+
 template <typename T> T min(T a, T b) {
     return (a < b) ? a : b;
 }
+
+static keymaster_error_t add_key_usage_extension(const AuthorizationSet& tee_enforced,
+                                                 const AuthorizationSet& sw_enforced,
+                                                 X509* certificate) {
+    // Build BIT_STRING with correct contents.
+    ASN1_BIT_STRING_Ptr key_usage(ASN1_BIT_STRING_new());
+
+    for (size_t i = 0; i <= kMaxKeyUsageBit; ++i) {
+        if (!ASN1_BIT_STRING_set_bit(key_usage.get(), i, 0)) {
+            return TranslateLastOpenSslError();
+        }
+    }
+
+    if (tee_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_SIGN) ||
+        tee_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_VERIFY) ||
+        sw_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_SIGN) ||
+        sw_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_VERIFY)) {
+        if (!ASN1_BIT_STRING_set_bit(key_usage.get(), kDigitalSignatureKeyUsageBit, 1)) {
+            return TranslateLastOpenSslError();
+        }
+    }
+
+    if (tee_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_ENCRYPT) ||
+        tee_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_DECRYPT) ||
+        sw_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_ENCRYPT) ||
+        sw_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_DECRYPT)) {
+        if (!ASN1_BIT_STRING_set_bit(key_usage.get(), kKeyEnciphermentKeyUsageBit, 1) ||
+            !ASN1_BIT_STRING_set_bit(key_usage.get(), kDataEnciphermentKeyUsageBit, 1)) {
+            return TranslateLastOpenSslError();
+        }
+    }
+
+    // Convert to octets
+    int len = i2d_ASN1_BIT_STRING(key_usage.get(), nullptr);
+    if (len < 0) {
+        return TranslateLastOpenSslError();
+    }
+    UniquePtr<uint8_t[]> asn1_key_usage(new uint8_t[len]);
+    if (!asn1_key_usage.get()) {
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+    uint8_t* p = asn1_key_usage.get();
+    len = i2d_ASN1_BIT_STRING(key_usage.get(), &p);
+    if (len < 0) {
+        return TranslateLastOpenSslError();
+    }
+
+    // Build OCTET_STRING
+    ASN1_OCTET_STRING_Ptr key_usage_str(ASN1_OCTET_STRING_new());
+    if (!key_usage_str.get() ||
+        !ASN1_OCTET_STRING_set(key_usage_str.get(), asn1_key_usage.get(), len)) {
+        return TranslateLastOpenSslError();
+    }
+
+    X509_EXTENSION_Ptr key_usage_extension(X509_EXTENSION_create_by_NID(nullptr,        //
+                                                                        NID_key_usage,  //
+                                                                        false /* critical */,
+                                                                        key_usage_str.get()));
+    if (!key_usage_extension.get()) {
+        return TranslateLastOpenSslError();
+    }
+
+    if (!X509_add_ext(certificate, key_usage_extension.get() /* Don't release; copied */,
+                      -1 /* insert at end */)) {
+        return TranslateLastOpenSslError();
+    }
+
+    return KM_ERROR_OK;
+}
+
 }  // anonymous namespace
 
 keymaster_error_t AsymmetricKey::formatted_key_material(keymaster_key_format_t format,
@@ -249,7 +325,11 @@ keymaster_error_t AsymmetricKey::GenerateAttestation(const KeymasterContext& con
         !X509_set_notAfter(certificate.get(), notAfter.get() /* Don't release; copied */))
         return TranslateLastOpenSslError();
 
-    keymaster_error_t error = KM_ERROR_OK;
+    keymaster_error_t error = add_key_usage_extension(tee_enforced, sw_enforced, certificate.get());
+    if (error != KM_ERROR_OK) {
+        return error;
+    }
+
     EVP_PKEY_Ptr sign_key(context.AttestationKey(sign_algorithm, &error));
 
     if (!sign_key.get() ||  //
