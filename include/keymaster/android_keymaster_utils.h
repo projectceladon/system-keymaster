@@ -36,7 +36,7 @@ inline int64_t java_time(time_t time) {
     // The exact meaning of a time_t value is implementation-dependent.  If this code is ported to a
     // platform that doesn't define it as "seconds since Jan 1, 1970 UTC", this function will have
     // to be revised.
-    return time * 1000;
+    return static_cast<int64_t>(time) * 1000;
 }
 
 /*
