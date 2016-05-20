@@ -101,6 +101,7 @@ typedef struct km_auth_list {
     KM_ROOT_OF_TRUST* root_of_trust;
     ASN1_INTEGER* os_version;
     ASN1_INTEGER* os_patchlevel;
+    ASN1_OCTET_STRING* attestation_application_id;
 } KM_AUTH_LIST;
 
 ASN1_SEQUENCE(KM_AUTH_LIST) = {
@@ -132,6 +133,8 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
     ASN1_EXP_OPT(KM_AUTH_LIST, root_of_trust, KM_ROOT_OF_TRUST, TAG_ROOT_OF_TRUST.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, os_version, ASN1_INTEGER, TAG_OS_VERSION.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, os_patchlevel, ASN1_INTEGER, TAG_OS_PATCHLEVEL.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_application_id, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_APPLICATION_ID.masked_tag()),
 } ASN1_SEQUENCE_END(KM_AUTH_LIST);
 IMPLEMENT_ASN1_FUNCTIONS(KM_AUTH_LIST);
 
@@ -261,6 +264,9 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
             break;
         case KM_TAG_ORIGIN:
             integer_ptr = &record->origin;
+            break;
+        case KM_TAG_ATTESTATION_APPLICATION_ID:
+            string_ptr = &record->attestation_application_id;
             break;
 
         /* Repeating enumerations */

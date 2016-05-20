@@ -402,6 +402,19 @@ void AndroidKeymaster::AttestKey(const AttestKeyRequest& request, AttestKeyRespo
     if (response->error != KM_ERROR_OK)
         return;
 
+    keymaster_blob_t attestation_application_id;
+    if (request.attest_params.GetTagValue(TAG_ATTESTATION_APPLICATION_ID,
+                                          &attestation_application_id)) {
+        switch(context_->GetSecurityLevel()) {
+        case KM_SECURITY_LEVEL_SOFTWARE:
+            sw_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_application_id);
+            break;
+        case KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT:
+            tee_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_application_id);
+            break;
+        }
+    }
+
     response->error = key->GenerateAttestation(*context_, request.attest_params, tee_enforced,
                                                sw_enforced, &response->certificate_chain);
 }
