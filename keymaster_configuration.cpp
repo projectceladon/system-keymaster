@@ -89,7 +89,10 @@ uint32_t GetOsVersion(const char* version_str) {
     }
 
     regmatch_t matches[kPlatformVersionMatchCount];
-    if (regexec(&regex, version_str, kPlatformVersionMatchCount, matches, 0 /* flags */)) {
+    int not_match
+        = regexec(&regex, version_str, kPlatformVersionMatchCount, matches, 0 /* flags */);
+    regfree(&regex);
+    if (not_match) {
         ALOGI("Platform version string does not match expected format.  Using version 0.");
         return 0;
     }
@@ -109,7 +112,10 @@ uint32_t GetOsPatchlevel(const char* patchlevel_str) {
     }
 
     regmatch_t matches[kPlatformPatchlevelMatchCount];
-    if (regexec(&regex, patchlevel_str, kPlatformPatchlevelMatchCount, matches, 0 /* flags */)) {
+    int not_match
+        = regexec(&regex, patchlevel_str, kPlatformPatchlevelMatchCount, matches, 0 /* flags */);
+    regfree(&regex);
+    if (not_match) {
         ALOGI("Platform patchlevel string does not match expected format.  Using patchlevel 0");
         return 0;
     }
