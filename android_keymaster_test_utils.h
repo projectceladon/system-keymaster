@@ -320,7 +320,7 @@ class Keymaster2Test : public testing::TestWithParam<InstanceCreatorPtr> {
 };
 
 struct Keymaster0CountingWrapper : public keymaster0_device_t {
-    Keymaster0CountingWrapper(keymaster0_device_t* device) : device_(device), counter_(0) {
+    explicit Keymaster0CountingWrapper(keymaster0_device_t* device) : device_(device), counter_(0) {
         common = device_->common;
         common.close = counting_close_device;
         client_version = device_->client_version;
