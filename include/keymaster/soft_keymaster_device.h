@@ -50,7 +50,7 @@ class SoftKeymasterDevice {
     SoftKeymasterDevice();
 
     // Public only for testing.
-    SoftKeymasterDevice(SoftKeymasterContext* context);
+    explicit SoftKeymasterDevice(SoftKeymasterContext* context);
 
     /**
      * Set SoftKeymasterDevice to wrap the speicified HW keymaster0 device.  Takes ownership of the
