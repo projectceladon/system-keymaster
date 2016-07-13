@@ -25,7 +25,7 @@ const size_t kMinHmacLengthBits = 64;
 
 class HmacKeyFactory : public SymmetricKeyFactory {
   public:
-    HmacKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
+    explicit HmacKeyFactory(const KeymasterContext* context) : SymmetricKeyFactory(context) {}
 
     keymaster_error_t LoadKey(const KeymasterKeyBlob& key_material,
                               const AuthorizationSet& additional_params,
