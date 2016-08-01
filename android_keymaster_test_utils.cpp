@@ -622,7 +622,7 @@ keymaster_error_t Keymaster2Test::ExportKey(keymaster_key_format_t format, strin
     return error;
 }
 
-void Keymaster2Test::CheckHmacTestVector(string key, string message, keymaster_digest_t digest,
+void Keymaster2Test::CheckHmacTestVector(const string& key, const string& message, keymaster_digest_t digest,
                                          string expected_mac) {
     ASSERT_EQ(KM_ERROR_OK, ImportKey(AuthorizationSetBuilder()
                                          .HmacKey(key.size() * 8)
