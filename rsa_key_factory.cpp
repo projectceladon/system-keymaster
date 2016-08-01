@@ -56,7 +56,7 @@ keymaster_error_t RsaKeyFactory::GenerateKey(const AuthorizationSet& key_descrip
     if (!key_blob || !hw_enforced || !sw_enforced)
         return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
-    AuthorizationSet authorizations(key_description);
+    const AuthorizationSet& authorizations(key_description);
 
     uint64_t public_exponent;
     if (!authorizations.GetTagValue(TAG_RSA_PUBLIC_EXPONENT, &public_exponent)) {

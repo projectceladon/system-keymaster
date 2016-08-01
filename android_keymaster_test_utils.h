@@ -274,7 +274,7 @@ class Keymaster2Test : public testing::TestWithParam<InstanceCreatorPtr> {
                                keymaster_block_mode_t block_mode, keymaster_padding_t padding,
                                const std::string& nonce);
 
-    void CheckHmacTestVector(std::string key, std::string message, keymaster_digest_t digest,
+    void CheckHmacTestVector(const std::string& key, const std::string& message, keymaster_digest_t digest,
                              std::string expected_mac);
     void CheckAesOcbTestVector(const std::string& key, const std::string& nonce,
                                const std::string& associated_data, const std::string& message,
