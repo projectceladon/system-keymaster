@@ -103,7 +103,7 @@ static keymaster_error_t map_digests(keymaster1_device_t* dev,
                                      SoftKeymasterDevice::DigestMap* map) {
     map->clear();
 
-    keymaster_algorithm_t sig_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC};
+    keymaster_algorithm_t sig_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC, KM_ALGORITHM_HMAC};
     keymaster_purpose_t sig_purposes[] = {KM_PURPOSE_SIGN, KM_PURPOSE_VERIFY};
     for (auto algorithm : sig_algorithms)
         for (auto purpose : sig_purposes) {
@@ -336,42 +336,15 @@ template <typename T> SoftKeymasterDevice* convert_device(const T* dev) {
     return reinterpret_cast<SoftKeymasterDevice*>(dev->context);
 }
 
-bool FindAlgorithm(const keymaster_key_param_set_t& params, keymaster_algorithm_t* algorithm) {
+template <keymaster_tag_t Tag, keymaster_tag_type_t Type, typename KeymasterEnum>
+bool FindTagValue(const keymaster_key_param_set_t& params,
+                  TypedEnumTag<Type, Tag, KeymasterEnum> tag, KeymasterEnum* value) {
     for (size_t i = 0; i < params.length; ++i)
-        if (params.params[i].tag == KM_TAG_ALGORITHM) {
-            *algorithm = static_cast<keymaster_algorithm_t>(params.params[i].enumerated);
+        if (params.params[i].tag == tag) {
+            *value = static_cast<KeymasterEnum>(params.params[i].enumerated);
             return true;
         }
     return false;
-}
-
-keymaster_error_t GetAlgorithm(const keymaster1_device_t* dev, const keymaster_key_blob_t& key,
-                               const AuthorizationSet& in_params,
-                               keymaster_algorithm_t* algorithm) {
-    keymaster_blob_t client_id = {nullptr, 0};
-    keymaster_blob_t app_data = {nullptr, 0};
-    keymaster_blob_t* client_id_ptr = nullptr;
-    keymaster_blob_t* app_data_ptr = nullptr;
-    if (in_params.GetTagValue(TAG_APPLICATION_ID, &client_id))
-        client_id_ptr = &client_id;
-    if (in_params.GetTagValue(TAG_APPLICATION_DATA, &app_data))
-        app_data_ptr = &app_data;
-
-    keymaster_key_characteristics_t* characteristics;
-    keymaster_error_t error =
-        dev->get_key_characteristics(dev, &key, client_id_ptr, app_data_ptr, &characteristics);
-    if (error != KM_ERROR_OK)
-        return error;
-    std::unique_ptr<keymaster_key_characteristics_t, Characteristics_Delete>
-        characteristics_deleter(characteristics);
-
-    if (FindAlgorithm(characteristics->hw_enforced, algorithm))
-        return KM_ERROR_OK;
-
-    if (FindAlgorithm(characteristics->sw_enforced, algorithm))
-        return KM_ERROR_OK;
-
-    return KM_ERROR_INVALID_KEY_BLOB;
 }
 
 }  // unnamed namespaced
@@ -687,9 +660,9 @@ bool SoftKeymasterDevice::RequiresSoftwareDigesting(keymaster_algorithm_t algori
 
     switch (algorithm) {
     case KM_ALGORITHM_AES:
-    case KM_ALGORITHM_HMAC:
-        LOG_D("Not performing software digesting for algorithm %d", algorithm);
+        LOG_D("Not performing software digesting for AES keys", algorithm);
         return false;
+    case KM_ALGORITHM_HMAC:
     case KM_ALGORITHM_RSA:
     case KM_ALGORITHM_EC:
         break;
@@ -840,8 +813,13 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
 
     const keymaster1_device_t* km1_dev = convert_device(dev)->wrapped_km1_device_;
     if (km1_dev) {
-        return km1_dev->get_key_characteristics(km1_dev, key_blob, client_id, app_data,
-                                                characteristics);
+        keymaster_error_t error = km1_dev->get_key_characteristics(km1_dev, key_blob, client_id,
+                                                                   app_data, characteristics);
+        if (error != KM_ERROR_INVALID_KEY_BLOB) {
+            return error;
+        }
+        // If we got "invalid blob", continue to try with the software device. This might be a
+        // software key blob.
     }
 
     GetKeyCharacteristicsRequest request;
@@ -891,7 +869,12 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
             *characteristics = *tmp_characteristics;
             free(tmp_characteristics);
         }
-        return error;
+
+        if (error != KM_ERROR_INVALID_KEY_BLOB) {
+            return error;
+        }
+        // If we got "invalid blob", continue to try with the software device. This might be a
+        // software key blob.
     }
 
     GetKeyCharacteristicsRequest request;
@@ -1193,9 +1176,39 @@ keymaster_error_t SoftKeymasterDevice::begin(const keymaster1_device_t* dev,
         AuthorizationSet in_params_set(*in_params);
 
         keymaster_algorithm_t algorithm = KM_ALGORITHM_AES;
-        keymaster_error_t error = GetAlgorithm(km1_dev, *key, in_params_set, &algorithm);
+
+        keymaster_blob_t client_id = {nullptr, 0};
+        keymaster_blob_t app_data = {nullptr, 0};
+        keymaster_blob_t* client_id_ptr = nullptr;
+        keymaster_blob_t* app_data_ptr = nullptr;
+        if (in_params_set.GetTagValue(TAG_APPLICATION_ID, &client_id))
+            client_id_ptr = &client_id;
+        if (in_params_set.GetTagValue(TAG_APPLICATION_DATA, &app_data))
+            app_data_ptr = &app_data;
+
+        keymaster_key_characteristics_t* characteristics;
+        keymaster_error_t error =
+            dev->get_key_characteristics(dev, key, client_id_ptr, app_data_ptr, &characteristics);
         if (error != KM_ERROR_OK)
             return error;
+        std::unique_ptr<keymaster_key_characteristics_t, Characteristics_Delete>
+            characteristics_deleter(characteristics);
+
+        if (!FindTagValue(characteristics->hw_enforced, TAG_ALGORITHM, &algorithm) &&
+            !FindTagValue(characteristics->sw_enforced, TAG_ALGORITHM, &algorithm)) {
+            return KM_ERROR_INVALID_KEY_BLOB;
+        }
+
+        if (algorithm == KM_ALGORITHM_HMAC) {
+            // Because HMAC keys can have only one digest, in_params_set doesn't contain it.  We
+            // need to get the digest from the key and add it to in_params_set.
+            keymaster_digest_t digest;
+            if (!FindTagValue(characteristics->hw_enforced, TAG_DIGEST, &digest) &&
+                !FindTagValue(characteristics->sw_enforced, TAG_DIGEST, &digest)) {
+                return KM_ERROR_INVALID_KEY_BLOB;
+            }
+            in_params_set.push_back(TAG_DIGEST, digest);
+        }
 
         if (!convert_device(dev)->RequiresSoftwareDigesting(algorithm, purpose, in_params_set)) {
             LOG_D("Operation supported by %s, passing through to keymaster1 module",

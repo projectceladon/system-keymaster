@@ -757,10 +757,6 @@ TEST_P(SigningOperationsTest, AesEcbSign) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha1Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate other digests for HMAC.
-        return;
-
     GenerateKey(AuthorizationSetBuilder()
                     .HmacKey(128)
                     .Digest(KM_DIGEST_SHA1)
@@ -774,10 +770,6 @@ TEST_P(SigningOperationsTest, HmacSha1Success) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha224Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate other digests for HMAC.
-        return;
-
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
                                            .Digest(KM_DIGEST_SHA_2_224)
@@ -791,10 +783,6 @@ TEST_P(SigningOperationsTest, HmacSha224Success) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha256Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate other digests for HMAC.
-        return;
-
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
                                            .Digest(KM_DIGEST_SHA_2_256)
@@ -808,10 +796,6 @@ TEST_P(SigningOperationsTest, HmacSha256Success) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha384Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate other digests for HMAC.
-        return;
-
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
                                            .Digest(KM_DIGEST_SHA_2_384)
@@ -826,10 +810,6 @@ TEST_P(SigningOperationsTest, HmacSha384Success) {
 }
 
 TEST_P(SigningOperationsTest, HmacSha512Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate other digests for HMAC.
-        return;
-
     ASSERT_EQ(KM_ERROR_OK, GenerateKey(AuthorizationSetBuilder()
                                            .HmacKey(128)
                                            .Digest(KM_DIGEST_SHA_2_512)
@@ -960,13 +940,10 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase3) {
         0xbe, 0xe8, 0x94, 0x26, 0x74, 0x27, 0x88, 0x59, 0xe1, 0x32, 0x92, 0xfb,
     };
 
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-    if (!GetParam()->minimal_digest_set()) {
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
-    }
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1001,13 +978,10 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase4) {
         0x12, 0x0c, 0x4f, 0x2d, 0xe2, 0xad, 0xeb, 0xeb, 0x10, 0xa2, 0x98, 0xdd,
     };
 
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-    if (!GetParam()->minimal_digest_set()) {
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
-    }
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1033,12 +1007,10 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase5) {
         0x1d, 0x41, 0x79, 0xbc, 0x89, 0x1d, 0x87, 0xa6,
     };
 
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-    if (!GetParam()->minimal_digest_set()) {
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
-    }
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1070,12 +1042,10 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase6) {
         0xf6, 0x3f, 0x0a, 0xec, 0x8b, 0x91, 0x5a, 0x98, 0x5d, 0x78, 0x65, 0x98,
     };
 
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-    if (!GetParam()->minimal_digest_set()) {
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
-    }
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1109,12 +1079,10 @@ TEST_P(SigningOperationsTest, HmacRfc4231TestCase7) {
         0x6d, 0xe0, 0x44, 0x60, 0x65, 0xc9, 0x74, 0x40, 0xfa, 0x8c, 0x6a, 0x58,
     };
 
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
     CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_256, make_string(sha_256_expected));
-    if (!GetParam()->minimal_digest_set()) {
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_224, make_string(sha_224_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
-        CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
-    }
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_384, make_string(sha_384_expected));
+    CheckHmacTestVector(key, message, KM_DIGEST_SHA_2_512, make_string(sha_512_expected));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1579,10 +1547,6 @@ TEST_P(VerificationOperationsTest, EcdsaAllDigestsAndKeySizes) {
 }
 
 TEST_P(VerificationOperationsTest, HmacSha1Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate missing digests for HMAC.
-        return;
-
     GenerateKey(AuthorizationSetBuilder()
                     .HmacKey(128)
                     .Digest(KM_DIGEST_SHA1)
@@ -1596,10 +1560,6 @@ TEST_P(VerificationOperationsTest, HmacSha1Success) {
 }
 
 TEST_P(VerificationOperationsTest, HmacSha224Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate missing digests for HMAC.
-        return;
-
     GenerateKey(AuthorizationSetBuilder()
                     .HmacKey(128)
                     .Digest(KM_DIGEST_SHA_2_224)
@@ -1652,10 +1612,6 @@ TEST_P(VerificationOperationsTest, HmacSha256TooShortMac) {
 }
 
 TEST_P(VerificationOperationsTest, HmacSha384Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate missing digests for HMAC.
-        return;
-
     GenerateKey(AuthorizationSetBuilder()
                     .HmacKey(128)
                     .Digest(KM_DIGEST_SHA_2_384)
@@ -1669,10 +1625,6 @@ TEST_P(VerificationOperationsTest, HmacSha384Success) {
 }
 
 TEST_P(VerificationOperationsTest, HmacSha512Success) {
-    if (GetParam()->minimal_digest_set())
-        // Can't emulate missing digests for HMAC.
-        return;
-
     GenerateKey(AuthorizationSetBuilder()
                     .HmacKey(128)
                     .Digest(KM_DIGEST_SHA_2_512)

@@ -340,11 +340,12 @@ keymaster_error_t SoftKeymasterContext::SetHardwareDevice(keymaster1_device_t* k
     rsa_factory_.reset(new RsaKeymaster1KeyFactory(this, km1_engine_.get()));
     ec_factory_.reset(new EcdsaKeymaster1KeyFactory(this, km1_engine_.get()));
 
-    // All AES and HMAC operations should be passed directly to the keymaster1 device.  Explicitly
-    // do not handle them, to provoke errors in case the higher layers fail to send them to the
-    // device.
+    // All AES operations should be passed directly to the keymaster1 device.  Explicitly do not
+    // handle them, to provoke errors in case the higher layers fail to send them to the device.
     aes_factory_.reset(nullptr);
-    hmac_factory_.reset(nullptr);
+
+    // Use default HMAC key factory. Higher layers will pass HMAC keys/ops that are supported by the
+    // hardware to it and other ones to the software-only factory.
 
     return KM_ERROR_OK;
 }
@@ -684,7 +685,6 @@ keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blo
     else if (km0_engine_)
         return ParseKeymaster0HwBlob(blob, key_material, hw_enforced, sw_enforced);
 
-    LOG_E("Failed to parse key; not a valid software blob, no hardware module configured", 0);
     return KM_ERROR_INVALID_KEY_BLOB;
 }
 
