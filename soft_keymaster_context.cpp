@@ -17,6 +17,7 @@
 #include <keymaster/soft_keymaster_context.h>
 
 #include <memory>
+
 #include <time.h>
 
 #include <openssl/aes.h>
@@ -690,13 +691,18 @@ keymaster_error_t SoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blo
 
 keymaster_error_t SoftKeymasterContext::DeleteKey(const KeymasterKeyBlob& blob) const {
     if (km1_engine_) {
-        keymaster_error_t error = km1_engine_->DeleteKey(blob);
-        if (error == KM_ERROR_INVALID_KEY_BLOB) {
-            // Note that we succeed on invalid blob, because it probably just indicates that the
-            // blob is a software blob, not a hardware blob.
-            error = KM_ERROR_OK;
+        // HACK. Due to a bug with Qualcomm's Keymaster implementation, which causes the device to
+        // reboot if we pass it a key blob it doesn't understand, we need to check for software
+        // keys.  If it looks like a software key there's nothing to do so we just return.
+        KeymasterKeyBlob key_material;
+        AuthorizationSet hw_enforced, sw_enforced;
+        keymaster_error_t error = DeserializeIntegrityAssuredBlob_NoHmacCheck(
+            blob, &key_material, &hw_enforced, &sw_enforced);
+        if (error == KM_ERROR_OK) {
+            return KM_ERROR_OK;
         }
-        return error;
+
+        return km1_engine_->DeleteKey(blob);
     }
 
     if (km0_engine_) {

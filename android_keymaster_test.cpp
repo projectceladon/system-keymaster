@@ -112,13 +112,14 @@ class SoftKeymasterTestInstanceCreator : public Keymaster2TestInstanceCreator {
     int keymaster0_calls() const override { return 0; }
     bool is_keymaster1_hw() const override { return false; }
     KeymasterContext* keymaster_context() const override { return context_; }
+    string name() const override { return "Soft Keymaster2"; }
 
   private:
     mutable TestKeymasterContext* context_;
 };
 
 /**
- * Test instance creator that builds keymaster1 instances which wrap a faked hardware keymaster0
+ * Test instance creator that builds keymaster2 instances which wrap a faked hardware keymaster0
  * instance, with or without EC support.
  */
 class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreator {
@@ -166,6 +167,10 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreato
     int keymaster0_calls() const override { return counting_keymaster0_device_->count(); }
     bool is_keymaster1_hw() const override { return false; }
     KeymasterContext* keymaster_context() const override { return context_; }
+    string name() const override {
+        return string("Wrapped fake keymaster0 ") + (support_ec_ ? "with" : "without") +
+               " EC support";
+    }
 
   private:
     mutable TestKeymasterContext* context_;
@@ -177,7 +182,7 @@ class Keymaster0AdapterTestInstanceCreator : public Keymaster2TestInstanceCreato
  * Test instance creator that builds a SoftKeymasterDevice which wraps a fake hardware keymaster1
  * instance, with minimal digest support.
  */
-class Sha256OnlyKeymaster2TestInstanceCreator : public Keymaster2TestInstanceCreator {
+class Sha256OnlyKeymaster1TestInstanceCreator : public Keymaster2TestInstanceCreator {
     keymaster2_device_t* CreateDevice() const {
         std::cerr << "Creating keymaster1-backed device that supports only SHA256";
 
@@ -202,6 +207,42 @@ class Sha256OnlyKeymaster2TestInstanceCreator : public Keymaster2TestInstanceCre
     int minimal_digest_set() const override { return true; }
     bool is_keymaster1_hw() const override { return true; }
     KeymasterContext* keymaster_context() const override { return context_; }
+    string name() const override { return "Wrapped fake keymaster1 w/minimal digests"; }
+
+  private:
+    mutable TestKeymasterContext* context_;
+};
+
+/**
+ * Test instance creator that builds a SoftKeymasterDevice which wraps a fake hardware keymaster1
+ * instance, with full digest support
+ */
+class Keymaster1TestInstanceCreator : public Keymaster2TestInstanceCreator {
+    keymaster2_device_t* CreateDevice() const {
+        std::cerr << "Creating keymaster1-backed device";
+
+        // fake_device doesn't leak because device (below) takes ownership of it.
+        keymaster1_device_t* fake_device =
+            (new SoftKeymasterDevice(new TestKeymasterContext("PseudoHW")))->keymaster_device();
+
+        // device doesn't leak; it's cleaned up by device->keymaster_device()->common.close().
+        context_ = new TestKeymasterContext;
+        SoftKeymasterDevice* device = new SoftKeymasterDevice(context_);
+        device->SetHardwareDevice(fake_device);
+
+        AuthorizationSet version_info(AuthorizationSetBuilder()
+                                          .Authorization(TAG_OS_VERSION, kOsVersion)
+                                          .Authorization(TAG_OS_PATCHLEVEL, kOsPatchLevel));
+        device->keymaster2_device()->configure(device->keymaster2_device(), &version_info);
+        return device->keymaster2_device();
+    }
+
+    bool algorithm_in_km0_hardware(keymaster_algorithm_t) const override { return false; }
+    int keymaster0_calls() const override { return 0; }
+    int minimal_digest_set() const override { return false; }
+    bool is_keymaster1_hw() const override { return true; }
+    KeymasterContext* keymaster_context() const override { return context_; }
+    string name() const override { return "Wrapped fake keymaster1 w/full digests"; }
 
   private:
     mutable TestKeymasterContext* context_;
@@ -211,7 +252,8 @@ static auto test_params = testing::Values(
     InstanceCreatorPtr(new SoftKeymasterTestInstanceCreator),
     InstanceCreatorPtr(new Keymaster0AdapterTestInstanceCreator(true /* support_ec */)),
     InstanceCreatorPtr(new Keymaster0AdapterTestInstanceCreator(false /* support_ec */)),
-    InstanceCreatorPtr(new Sha256OnlyKeymaster2TestInstanceCreator));
+    InstanceCreatorPtr(new Keymaster1TestInstanceCreator),
+    InstanceCreatorPtr(new Sha256OnlyKeymaster1TestInstanceCreator));
 
 class NewKeyGeneration : public Keymaster2Test {
   protected:
@@ -521,10 +563,8 @@ TEST_P(SigningOperationsTest, RsaPkcs1NoDigestTooLarge) {
     begin_params.push_back(TAG_PADDING, KM_PAD_RSA_PKCS1_1_5_SIGN);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_SIGN, begin_params));
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
     string signature;
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&signature));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(message, "", &signature));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(2, GetParam()->keymaster0_calls());
@@ -1201,10 +1241,7 @@ TEST_P(VerificationOperationsTest, RsaPssSha256CorruptSignature) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
@@ -1227,10 +1264,7 @@ TEST_P(VerificationOperationsTest, RsaPssSha256CorruptInput) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
@@ -1301,10 +1335,7 @@ TEST_P(VerificationOperationsTest, RsaPkcs1Sha256CorruptSignature) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
@@ -1327,10 +1358,7 @@ TEST_P(VerificationOperationsTest, RsaPkcs1Sha256CorruptInput) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
@@ -1488,10 +1516,7 @@ TEST_P(VerificationOperationsTest, EcdsaSha256Success) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 }
 
 TEST_P(VerificationOperationsTest, EcdsaSha224Success) {
@@ -1512,10 +1537,7 @@ TEST_P(VerificationOperationsTest, EcdsaSha224Success) {
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
 
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_VERIFICATION_FAILED, FinishOperation(message, signature, &result));
 }
 
 TEST_P(VerificationOperationsTest, EcdsaAllDigestsAndKeySizes) {
@@ -1604,9 +1626,7 @@ TEST_P(VerificationOperationsTest, HmacSha256TooShortMac) {
     AuthorizationSet begin_params(client_params());
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_VERIFY, begin_params));
     string result;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_INVALID_MAC_LENGTH, FinishOperation(signature, &result));
+    EXPECT_EQ(KM_ERROR_INVALID_MAC_LENGTH, FinishOperation(message, signature, &result));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }
@@ -1985,8 +2005,7 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingLargerThanModulus) {
     BN_bn2bin(rsa->n, modulus_buf.get());
     message = string(reinterpret_cast<const char*>(modulus_buf.get()), modulus_len);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &result, &input_consumed));
-    EXPECT_EQ(KM_ERROR_OK, FinishOperation(&result));
+    EXPECT_EQ(KM_ERROR_OK, FinishOperation(message, "", &result));
 
     if (GetParam()->algorithm_in_km0_hardware(KM_ALGORITHM_RSA))
         EXPECT_EQ(4, GetParam()->keymaster0_calls());
@@ -2377,10 +2396,7 @@ TEST_P(EncryptionOperationsTest, AesEcbNoPaddingWrongInputSize) {
     begin_params.push_back(TAG_PADDING, KM_PAD_NONE);
     EXPECT_EQ(KM_ERROR_OK, BeginOperation(KM_PURPOSE_ENCRYPT, begin_params));
     string ciphertext;
-    size_t input_consumed;
-    EXPECT_EQ(KM_ERROR_OK, UpdateOperation(message, &ciphertext, &input_consumed));
-    EXPECT_EQ(message.size(), input_consumed);
-    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(&ciphertext));
+    EXPECT_EQ(KM_ERROR_INVALID_INPUT_LENGTH, FinishOperation(message, "", &ciphertext));
 
     EXPECT_EQ(0, GetParam()->keymaster0_calls());
 }

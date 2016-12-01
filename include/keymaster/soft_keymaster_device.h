@@ -49,7 +49,6 @@ class SoftKeymasterDevice {
   public:
     SoftKeymasterDevice();
 
-    // Public only for testing.
     explicit SoftKeymasterDevice(SoftKeymasterContext* context);
 
     /**
@@ -105,7 +104,7 @@ class SoftKeymasterDevice {
      * keymaster_device.
      */
 
-    // Keymaster1 methods
+    // Keymaster1 methods -- needed for testing.
     static keymaster_error_t get_supported_algorithms(const keymaster1_device_t* dev,
                                                       keymaster_algorithm_t** algorithms,
                                                       size_t* algorithms_length);

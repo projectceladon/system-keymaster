@@ -65,7 +65,7 @@ bool AuthorizationSet::reserve_elems(size_t count) {
     if (is_valid() != OK)
         return false;
 
-    if (count >= elems_capacity_) {
+    if (count > elems_capacity_) {
         keymaster_key_param_t* new_elems = new (std::nothrow) keymaster_key_param_t[count];
         if (new_elems == NULL) {
             set_invalid(ALLOCATION_FAILURE);
