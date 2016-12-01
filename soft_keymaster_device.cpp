@@ -36,6 +36,7 @@
 
 #include <keymaster/android_keymaster.h>
 #include <keymaster/android_keymaster_messages.h>
+#include <keymaster/android_keymaster_utils.h>
 #include <keymaster/authorization_set.h>
 #include <keymaster/soft_keymaster_context.h>
 #include <keymaster/soft_keymaster_logger.h>
@@ -767,8 +768,28 @@ SoftKeymasterDevice::generate_key(const keymaster2_device_t* dev,  //
 
     keymaster1_device_t* km1_dev = sk_dev->wrapped_km1_device_;
     if (km1_dev && !sk_dev->KeyRequiresSoftwareDigesting(request.key_description)) {
+        keymaster_ec_curve_t curve;
+        if (request.key_description.Contains(TAG_ALGORITHM, KM_ALGORITHM_EC) &&
+            request.key_description.GetTagValue(TAG_EC_CURVE, &curve)) {
+            // Keymaster1 doesn't know about EC curves. We need to translate to key size.
+            uint32_t key_size_from_curve;
+            keymaster_error_t error = EcCurveToKeySize(curve, &key_size_from_curve);
+            if (error != KM_ERROR_OK) {
+                return error;
+            }
+
+            uint32_t key_size_from_desc;
+            if (request.key_description.GetTagValue(TAG_KEY_SIZE, &key_size_from_desc)) {
+                if (key_size_from_desc != key_size_from_curve) {
+                    return KM_ERROR_INVALID_ARGUMENT;
+                }
+            } else {
+                request.key_description.push_back(TAG_KEY_SIZE, key_size_from_curve);
+            }
+        }
+
         keymaster_key_characteristics_t* chars_ptr;
-        keymaster_error_t error = km1_dev->generate_key(km1_dev, params, key_blob,
+        keymaster_error_t error = km1_dev->generate_key(km1_dev, &request.key_description, key_blob,
                                                         characteristics ? &chars_ptr : nullptr);
         if (error != KM_ERROR_OK)
             return error;
