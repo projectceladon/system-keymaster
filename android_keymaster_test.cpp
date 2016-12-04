@@ -3603,6 +3603,9 @@ static bool verify_attestation_record(const string& challenge,
     expected_tee_enforced.Sort();
     EXPECT_EQ(expected_tee_enforced, att_tee_enforced);
 
+    delete[] att_challenge.data;
+    delete[] att_unique_id.data;
+
     return true;
 }
 
