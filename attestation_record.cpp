@@ -28,28 +28,6 @@
 
 namespace keymaster {
 
-namespace {
-
-bool Uint64ToBignum(uint64_t value, BIGNUM* bn) {
-    static_assert(sizeof(unsigned long) == sizeof(uint64_t) ||
-                      sizeof(unsigned long) == sizeof(uint32_t),
-                  "Only 32 and 64-bit platforms supported");
-
-    if (sizeof(unsigned long) == sizeof(uint64_t)) {
-        return BN_set_word(bn, value);
-    } else if (sizeof(unsigned long) == sizeof(uint32_t)) {
-        uint32_t low_order = value & 0xFFFFFFFF;
-        uint32_t high_order = value >> 32;
-        return BN_set_word(bn, high_order) &&  //
-               BN_lshift(bn, bn, 32) &&        //
-               BN_add_word(bn, low_order);
-    } else {
-        return false;
-    }
-}
-
-}  // anonymous namespace
-
 struct stack_st_ASN1_TYPE_Delete {
     void operator()(stack_st_ASN1_TYPE* p) { sk_ASN1_TYPE_free(p); }
 };
@@ -360,11 +338,11 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
                 return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
             if (type == KM_DATE) {
-                if (!Uint64ToBignum(entry.date_time, bn_value.get())) {
+                if (!BN_set_u64(bn_value.get(), entry.date_time)) {
                     return TranslateLastOpenSslError();
                 }
             } else {
-                if (!Uint64ToBignum(entry.long_integer, bn_value.get())) {
+                if (!BN_set_u64(bn_value.get(), entry.long_integer)) {
                     return TranslateLastOpenSslError();
                 }
             }
