@@ -389,7 +389,6 @@ RSA_METHOD Keymaster1Engine::BuildRsaMethod() {
     method.common.is_static = 1;
     method.sign_raw = Keymaster1Engine::rsa_sign_raw;
     method.decrypt = Keymaster1Engine::rsa_decrypt;
-    method.bn_mod_exp = BN_mod_exp_mont;
     method.flags = RSA_FLAG_OPAQUE;
 
     return method;
