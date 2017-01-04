@@ -135,6 +135,7 @@ OperationFactory* RsaKeymaster1KeyFactory::GetOperationFactory(keymaster_purpose
         return encrypt_factory_.get();
     case KM_PURPOSE_DECRYPT:
         return decrypt_factory_.get();
+    case KM_PURPOSE_WRAP_KEY:
     case KM_PURPOSE_DERIVE_KEY:
         break;
     }
