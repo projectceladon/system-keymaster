@@ -882,23 +882,6 @@ keymaster_error_t SoftKeymasterDevice::get_key_characteristics(
 
     SoftKeymasterDevice* sk_dev = convert_device(dev);
 
-    const keymaster1_device_t* km1_dev = sk_dev->wrapped_km1_device_;
-    if (km1_dev) {
-        keymaster_key_characteristics_t* tmp_characteristics;
-        keymaster_error_t error = km1_dev->get_key_characteristics(km1_dev, key_blob, client_id,
-                                                                   app_data, &tmp_characteristics);
-        if (error == KM_ERROR_OK) {
-            *characteristics = *tmp_characteristics;
-            free(tmp_characteristics);
-        }
-
-        if (error != KM_ERROR_INVALID_KEY_BLOB) {
-            return error;
-        }
-        // If we got "invalid blob", continue to try with the software device. This might be a
-        // software key blob.
-    }
-
     GetKeyCharacteristicsRequest request;
     request.SetKeyMaterial(*key_blob);
     AddClientAndAppData(client_id, app_data, &request);
