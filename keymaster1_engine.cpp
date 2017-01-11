@@ -153,10 +153,8 @@ RSA* Keymaster1Engine::BuildRsaKey(const KeymasterKeyBlob& blob,
     // Copy public key into new RSA key
     unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(
         GetKeymaster1PublicKey(key_data->key_material, key_data->begin_params, error));
-    if (!pkey) {
-        *error = TranslateLastOpenSslError();
+    if (*error != KM_ERROR_OK)
         return nullptr;
-    }
 
     unique_ptr<RSA, RSA_Delete> public_rsa(EVP_PKEY_get1_RSA(pkey.get()));
     if (!public_rsa) {
@@ -195,10 +193,8 @@ EC_KEY* Keymaster1Engine::BuildEcKey(const KeymasterKeyBlob& blob,
     // Copy public key into new EC key
     unique_ptr<EVP_PKEY, EVP_PKEY_Delete> pkey(
         GetKeymaster1PublicKey(blob, additional_params, error));
-    if (!pkey) {
-        *error = TranslateLastOpenSslError();
+    if (*error != KM_ERROR_OK)
         return nullptr;
-    }
 
     unique_ptr<EC_KEY, EC_KEY_Delete> public_ec_key(EVP_PKEY_get1_EC_KEY(pkey.get()));
     if (!public_ec_key) {
@@ -380,7 +376,11 @@ EVP_PKEY* Keymaster1Engine::GetKeymaster1PublicKey(const KeymasterKeyBlob& blob,
     unique_ptr<uint8_t, Malloc_Delete> pub_key(const_cast<uint8_t*>(export_data.data));
 
     const uint8_t* p = export_data.data;
-    return d2i_PUBKEY(nullptr /* allocate new struct */, &p, export_data.data_length);
+    auto result = d2i_PUBKEY(nullptr /* allocate new struct */, &p, export_data.data_length);
+    if (!result) {
+        *error = TranslateLastOpenSslError();
+    }
+    return result;
 }
 
 RSA_METHOD Keymaster1Engine::BuildRsaMethod() {
