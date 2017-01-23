@@ -80,6 +80,12 @@ typedef struct km_auth_list {
     ASN1_INTEGER* os_version;
     ASN1_INTEGER* os_patchlevel;
     ASN1_OCTET_STRING* attestation_application_id;
+    ASN1_OCTET_STRING* attestation_id_brand;
+    ASN1_OCTET_STRING* attestation_id_device;
+    ASN1_OCTET_STRING* attestation_id_product;
+    ASN1_OCTET_STRING* attestation_id_serial;
+    ASN1_OCTET_STRING* attestation_id_imei;
+    ASN1_OCTET_STRING* attestation_id_meid;
 } KM_AUTH_LIST;
 
 ASN1_SEQUENCE(KM_AUTH_LIST) = {
@@ -113,6 +119,18 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
     ASN1_EXP_OPT(KM_AUTH_LIST, os_patchlevel, ASN1_INTEGER, TAG_OS_PATCHLEVEL.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, attestation_application_id, ASN1_OCTET_STRING,
                  TAG_ATTESTATION_APPLICATION_ID.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_brand, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_BRAND.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_device, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_DEVICE.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_product, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_PRODUCT.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_serial, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_SERIAL.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_imei, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_IMEI.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_meid, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_MEID.masked_tag()),
 } ASN1_SEQUENCE_END(KM_AUTH_LIST);
 IMPLEMENT_ASN1_FUNCTIONS(KM_AUTH_LIST);
 
@@ -243,9 +261,6 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         case KM_TAG_ORIGIN:
             integer_ptr = &record->origin;
             break;
-        case KM_TAG_ATTESTATION_APPLICATION_ID:
-            string_ptr = &record->attestation_application_id;
-            break;
 
         /* Repeating enumerations */
         case KM_TAG_PURPOSE:
@@ -311,6 +326,27 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
         /* Byte arrays*/
         case KM_TAG_APPLICATION_ID:
             string_ptr = &record->application_id;
+            break;
+        case KM_TAG_ATTESTATION_APPLICATION_ID:
+            string_ptr = &record->attestation_application_id;
+            break;
+        case KM_TAG_ATTESTATION_ID_BRAND:
+            string_ptr = &record->attestation_id_brand;
+            break;
+        case KM_TAG_ATTESTATION_ID_DEVICE:
+            string_ptr = &record->attestation_id_device;
+            break;
+        case KM_TAG_ATTESTATION_ID_PRODUCT:
+            string_ptr = &record->attestation_id_product;
+            break;
+        case KM_TAG_ATTESTATION_ID_SERIAL:
+            string_ptr = &record->attestation_id_serial;
+            break;
+        case KM_TAG_ATTESTATION_ID_IMEI:
+            string_ptr = &record->attestation_id_imei;
+            break;
+        case KM_TAG_ATTESTATION_ID_MEID:
+            string_ptr = &record->attestation_id_meid;
             break;
         }
 
@@ -650,6 +686,42 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
         !auth_list->push_back(TAG_OS_PATCHLEVEL, ASN1_INTEGER_get(record->os_patchlevel)))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
+    // Brand name
+    if (record->attestation_id_brand &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_BRAND, record->attestation_id_brand->data,
+                              record->attestation_id_brand->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // Device name
+    if (record->attestation_id_device &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_DEVICE, record->attestation_id_device->data,
+                              record->attestation_id_device->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // Product name
+    if (record->attestation_id_product &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_PRODUCT, record->attestation_id_product->data,
+                              record->attestation_id_product->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // Serial number
+    if (record->attestation_id_serial &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_SERIAL, record->attestation_id_serial->data,
+                              record->attestation_id_serial->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // IMEI
+    if (record->attestation_id_imei &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_IMEI, record->attestation_id_imei->data,
+                              record->attestation_id_imei->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // MEID
+    if (record->attestation_id_meid &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_MEID, record->attestation_id_meid->data,
+                              record->attestation_id_meid->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
     return KM_ERROR_OK;
 }
 
@@ -692,3 +764,4 @@ keymaster_error_t parse_attestation_record(const uint8_t* asn1_key_desc, size_t 
 }
 
 }  // namepace keymaster
+
