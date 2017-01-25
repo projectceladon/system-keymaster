@@ -127,12 +127,11 @@ keymaster_error_t KeymasterEnforcement::AuthorizeOperation(const keymaster_purpo
         case KM_PURPOSE_VERIFY:
             /* Public key operations are always authorized. */
             return KM_ERROR_OK;
+
         case KM_PURPOSE_DECRYPT:
         case KM_PURPOSE_SIGN:
         case KM_PURPOSE_DERIVE_KEY:
             break;
-        case KM_PURPOSE_WRAP_KEY:
-            return KM_ERROR_INCOMPATIBLE_PURPOSE;
         };
     };
 

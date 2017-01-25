@@ -69,12 +69,6 @@ static keymaster_error_t add_key_usage_extension(const AuthorizationSet& tee_enf
             !ASN1_BIT_STRING_set_bit(key_usage.get(), kDataEnciphermentKeyUsageBit, 1)) {
             return TranslateLastOpenSslError();
         }
-    } else if (tee_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_WRAP_KEY) ||
-        sw_enforced.Contains(TAG_PURPOSE, KM_PURPOSE_WRAP_KEY)) {
-        if (!ASN1_BIT_STRING_set_bit(key_usage.get(), kKeyEnciphermentKeyUsageBit, 1) ||
-            !ASN1_BIT_STRING_set_bit(key_usage.get(), kDataEnciphermentKeyUsageBit, 0)) {
-            return TranslateLastOpenSslError();
-        }
     }
 
     // Convert to octets

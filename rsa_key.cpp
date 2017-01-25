@@ -45,7 +45,6 @@ bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_padding_t padd
         return padding == KM_PAD_RSA_OAEP || padding == KM_PAD_RSA_PKCS1_1_5_ENCRYPT;
 
     case KM_PURPOSE_DERIVE_KEY:
-    case KM_PURPOSE_WRAP_KEY:
         return false;
     };
     return false;
@@ -62,7 +61,6 @@ bool RsaKey::SupportedMode(keymaster_purpose_t purpose, keymaster_digest_t diges
         /* Don't care */
         break;
 
-    case KM_PURPOSE_WRAP_KEY:
     case KM_PURPOSE_DERIVE_KEY:
         return false;
     };
