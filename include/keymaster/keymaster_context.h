@@ -161,15 +161,14 @@ class KeymasterContext {
 
     /**
      * Return the attestation signing key of the specified algorithm (KM_ALGORITHM_RSA or
-     * KM_ALGORITHM_EC).  Caller does not acquire ownership and should not delete.
+     * KM_ALGORITHM_EC).  Caller acquires ownership and should free using EVP_PKEY_free.
      */
     virtual EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
                                      keymaster_error_t* error) const = 0;
 
     /**
      * Return the certificate chain of the attestation signing key of the specified algorithm
-     * (KM_ALGORITHM_RSA or KM_ALGORITHM_EC).  Caller does not acquire ownership and should not
-     * delete.
+     * (KM_ALGORITHM_RSA or KM_ALGORITHM_EC).  Caller acquires ownership and should free.
      */
     virtual keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
                                                      keymaster_error_t* error) const = 0;
