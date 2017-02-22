@@ -58,7 +58,7 @@ template <keymaster_tag_t Tag, typename KeymasterEnum>
 bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM, Tag, KeymasterEnum> tag,
               KeymasterEnum val) {
     int pos = set.find(tag);
-    return pos != -1 && set[pos].enumerated == val;
+    return pos != -1 && static_cast<KeymasterEnum>(set[pos].enumerated) == val;
 }
 
 template <keymaster_tag_t Tag, typename KeymasterEnum>
@@ -66,7 +66,7 @@ bool contains(const AuthorizationSet& set, TypedEnumTag<KM_ENUM_REP, Tag, Keymas
               KeymasterEnum val) {
     int pos = -1;
     while ((pos = set.find(tag, pos)) != -1)
-        if (set[pos].enumerated == val)
+        if (static_cast<KeymasterEnum>(set[pos].enumerated) == val)
             return true;
     return false;
 }
