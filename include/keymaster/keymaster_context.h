@@ -181,6 +181,18 @@ class KeymasterContext {
                                                bool reset_since_rotation,
                                                Buffer* unique_id) const = 0;
 
+    /**
+     * Returns verified boot parameters for the Attestation Extension.  For hardware-based
+     * implementations, these will be the values reported by the bootloader. By default,  verified
+     * boot state is unknown, and KM_ERROR_UNIMPLEMENTED is returned.
+     */
+    virtual keymaster_error_t
+    GetVerifiedBootParams(keymaster_blob_t* /* verified_boot_key */,
+                          keymaster_verified_boot_t* /* verified_boot_state */,
+                          bool* /* device_locked */) const {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
   private:
     // Uncopyable.
     KeymasterContext(const KeymasterContext&);

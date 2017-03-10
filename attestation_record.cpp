@@ -427,11 +427,30 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     } else {
         keymaster_security_level = KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
         switch (context.GetSecurityLevel()) {
-        case KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT:
+        case KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT: {
             // We're running in a TEE, so the key is KM2.
             keymaster_version = 2;
-            break;
 
+            // Root of trust is only available in TEE
+            KM_AUTH_LIST* tee_record = key_desc->tee_enforced;
+            tee_record->root_of_trust = KM_ROOT_OF_TRUST_new();
+            keymaster_blob_t verified_boot_key;
+            keymaster_verified_boot_t verified_boot_state;
+            bool device_locked;
+            keymaster_error_t error = context.GetVerifiedBootParams(
+                &verified_boot_key, &verified_boot_state, &device_locked);
+            if (error != KM_ERROR_OK)
+                return error;
+            if (verified_boot_key.data_length &&
+                !ASN1_OCTET_STRING_set(tee_record->root_of_trust->verified_boot_key,
+                                       verified_boot_key.data, verified_boot_key.data_length))
+                return TranslateLastOpenSslError();
+            tee_record->root_of_trust->device_locked = (int*)device_locked;
+            if (!ASN1_ENUMERATED_set(tee_record->root_of_trust->verified_boot_state,
+                                     verified_boot_state))
+                return TranslateLastOpenSslError();
+            break;
+        }
         case KM_SECURITY_LEVEL_SOFTWARE:
             // We're running in software, wrapping some KM hardware.  Is it KM0 or KM1?  KM1 keys
             // have the purpose in the tee_enforced list.  It's possible that a key could be created
