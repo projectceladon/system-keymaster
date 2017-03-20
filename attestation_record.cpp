@@ -86,6 +86,8 @@ typedef struct km_auth_list {
     ASN1_OCTET_STRING* attestation_id_serial;
     ASN1_OCTET_STRING* attestation_id_imei;
     ASN1_OCTET_STRING* attestation_id_meid;
+    ASN1_OCTET_STRING* attestation_id_manufacturer;
+    ASN1_OCTET_STRING* attestation_id_model;
 } KM_AUTH_LIST;
 
 ASN1_SEQUENCE(KM_AUTH_LIST) = {
@@ -131,6 +133,10 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
                  TAG_ATTESTATION_ID_IMEI.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_meid, ASN1_OCTET_STRING,
                  TAG_ATTESTATION_ID_MEID.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_manufacturer, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_MANUFACTURER.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_model, ASN1_OCTET_STRING,
+                 TAG_ATTESTATION_ID_MODEL.masked_tag()),
 } ASN1_SEQUENCE_END(KM_AUTH_LIST);
 IMPLEMENT_ASN1_FUNCTIONS(KM_AUTH_LIST);
 
@@ -347,6 +353,12 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
             break;
         case KM_TAG_ATTESTATION_ID_MEID:
             string_ptr = &record->attestation_id_meid;
+            break;
+        case KM_TAG_ATTESTATION_ID_MANUFACTURER:
+            string_ptr = &record->attestation_id_manufacturer;
+            break;
+        case KM_TAG_ATTESTATION_ID_MODEL:
+            string_ptr = &record->attestation_id_model;
             break;
         }
 
@@ -720,6 +732,19 @@ static keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record,
     if (record->attestation_id_meid &&
         !auth_list->push_back(TAG_ATTESTATION_ID_MEID, record->attestation_id_meid->data,
                               record->attestation_id_meid->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // Manufacturer name
+    if (record->attestation_id_manufacturer &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_MANUFACTURER,
+                              record->attestation_id_manufacturer->data,
+                              record->attestation_id_manufacturer->length))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    // Model name
+    if (record->attestation_id_model &&
+        !auth_list->push_back(TAG_ATTESTATION_ID_MODEL, record->attestation_id_model->data,
+                              record->attestation_id_model->length))
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     return KM_ERROR_OK;
