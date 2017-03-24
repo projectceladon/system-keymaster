@@ -82,9 +82,32 @@ template <typename T> std::vector<T> make_vector(const T* array, size_t len) {
     return std::vector<T>(array, array + len);
 }
 
+// This helper class implements just enough of the C++ standard collection interface to be able to
+// accept push_back calls, and it does nothing but count them.  It's useful when you want to count
+// insertions but not actually store anything.  It's used in digest_set_is_full below to count the
+// size of a set intersection.
+struct PushbackCounter {
+    struct value_type {
+        template <typename T> value_type(const T&) {}
+    };
+    void push_back(const value_type&) { ++count; }
+    size_t count = 0;
+};
+
+static std::vector<keymaster_digest_t> full_digest_list = {
+    KM_DIGEST_MD5,       KM_DIGEST_SHA1,      KM_DIGEST_SHA_2_224,
+    KM_DIGEST_SHA_2_256, KM_DIGEST_SHA_2_384, KM_DIGEST_SHA_2_512};
+
+template <typename Iter> static bool digest_set_is_full(Iter begin, Iter end) {
+    PushbackCounter counter;
+    std::set_intersection(begin, end, full_digest_list.begin(), full_digest_list.end(),
+                          std::back_inserter(counter));
+    return counter.count == full_digest_list.size();
+}
+
 static keymaster_error_t add_digests(keymaster1_device_t* dev, keymaster_algorithm_t algorithm,
                                      keymaster_purpose_t purpose,
-                                     SoftKeymasterDevice::DigestMap* map) {
+                                     SoftKeymasterDevice::DigestMap* map, bool* supports_all) {
     auto key = std::make_pair(algorithm, purpose);
 
     keymaster_digest_t* digests;
@@ -97,30 +120,39 @@ static keymaster_error_t add_digests(keymaster1_device_t* dev, keymaster_algorit
     }
     std::unique_ptr<keymaster_digest_t, Malloc_Delete> digests_deleter(digests);
 
-    (*map)[key] = make_vector(digests, digests_length);
-    return KM_ERROR_OK;
+    auto digest_vec = make_vector(digests, digests_length);
+    *supports_all = digest_set_is_full(digest_vec.begin(), digest_vec.end());
+    (*map)[key] = std::move(digest_vec);
+    return error;
 }
 
-static keymaster_error_t map_digests(keymaster1_device_t* dev,
-                                     SoftKeymasterDevice::DigestMap* map) {
+static keymaster_error_t map_digests(keymaster1_device_t* dev, SoftKeymasterDevice::DigestMap* map,
+                                     bool* supports_all) {
     map->clear();
+    *supports_all = true;
 
     keymaster_algorithm_t sig_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC, KM_ALGORITHM_HMAC};
     keymaster_purpose_t sig_purposes[] = {KM_PURPOSE_SIGN, KM_PURPOSE_VERIFY};
     for (auto algorithm : sig_algorithms)
         for (auto purpose : sig_purposes) {
-            keymaster_error_t error = add_digests(dev, algorithm, purpose, map);
+            bool alg_purpose_supports_all;
+            keymaster_error_t error =
+                add_digests(dev, algorithm, purpose, map, &alg_purpose_supports_all);
             if (error != KM_ERROR_OK)
                 return error;
+            *supports_all &= alg_purpose_supports_all;
         }
 
     keymaster_algorithm_t crypt_algorithms[] = {KM_ALGORITHM_RSA};
     keymaster_purpose_t crypt_purposes[] = {KM_PURPOSE_ENCRYPT, KM_PURPOSE_DECRYPT};
     for (auto algorithm : crypt_algorithms)
         for (auto purpose : crypt_purposes) {
-            keymaster_error_t error = add_digests(dev, algorithm, purpose, map);
+            bool alg_purpose_supports_all;
+            keymaster_error_t error =
+                add_digests(dev, algorithm, purpose, map, &alg_purpose_supports_all);
             if (error != KM_ERROR_OK)
                 return error;
+            *supports_all &= alg_purpose_supports_all;
         }
 
     return KM_ERROR_OK;
@@ -154,6 +186,7 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster0_device_t* ke
     if (!context_)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
+    supports_all_digests_ = false;
     keymaster_error_t error = context_->SetHardwareDevice(keymaster0_device);
     if (error != KM_ERROR_OK)
         return error;
@@ -182,7 +215,8 @@ keymaster_error_t SoftKeymasterDevice::SetHardwareDevice(keymaster1_device_t* ke
     if (!context_)
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
-    keymaster_error_t error = map_digests(keymaster1_device, &km1_device_digests_);
+    keymaster_error_t error =
+        map_digests(keymaster1_device, &km1_device_digests_, &supports_all_digests_);
     if (error != KM_ERROR_OK)
         return error;
 
