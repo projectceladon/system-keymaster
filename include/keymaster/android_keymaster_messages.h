@@ -329,7 +329,7 @@ struct BeginOperationRequest : public KeymasterMessage {
         SetKeyMaterial(blob.key_material, blob.key_material_size);
     }
 
-    size_t SerializedSize() const;
+    size_t SerializedSize() const override;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override;
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override;
 
