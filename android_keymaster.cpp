@@ -451,6 +451,12 @@ void AndroidKeymaster::DeleteAllKeys(const DeleteAllKeysRequest&, DeleteAllKeysR
     response->error = context_->DeleteAllKeys();
 }
 
+void AndroidKeymaster::Configure(const ConfigureRequest& request, ConfigureResponse* response) {
+    if (!response)
+        return;
+    response->error = context_->SetSystemVersion(request.os_version, request.os_patchlevel);
+}
+
 bool AndroidKeymaster::has_operation(keymaster_operation_handle_t op_handle) const {
     return operation_table_->Find(op_handle) != nullptr;
 }
