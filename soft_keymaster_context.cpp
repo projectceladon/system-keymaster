@@ -283,6 +283,17 @@ static uint8_t kEcAttestRootCert[] = {
 
 size_t kCertificateChainLength = 2;
 
+static const keymaster_tag_t kDeviceAttestationTags[] = {
+    KM_TAG_ATTESTATION_ID_BRAND,
+    KM_TAG_ATTESTATION_ID_DEVICE,
+    KM_TAG_ATTESTATION_ID_PRODUCT,
+    KM_TAG_ATTESTATION_ID_SERIAL,
+    KM_TAG_ATTESTATION_ID_IMEI,
+    KM_TAG_ATTESTATION_ID_MEID,
+    KM_TAG_ATTESTATION_ID_MANUFACTURER,
+    KM_TAG_ATTESTATION_ID_MODEL,
+};
+
 bool UpgradeIntegerTag(keymaster_tag_t tag, uint32_t value, AuthorizationSet* set,
                        bool* set_changed) {
     int index = set->find(tag);
@@ -993,6 +1004,18 @@ keymaster_error_t SoftKeymasterContext::BuildHiddenAuthorizations(const Authoriz
                       root_of_trust_.size());
 
     return TranslateAuthorizationSetError(hidden->is_valid());
+}
+
+keymaster_error_t SoftKeymasterContext::VerifyAndCopyDeviceIds(
+    const AuthorizationSet& attestation_params, AuthorizationSet*) const {
+    for (const auto& tag : kDeviceAttestationTags) {
+        if (attestation_params.find(tag) != -1) {
+            // This implementation does not know the device's actual IDs and thus, cannot verify
+            // them.
+            return KM_ERROR_CANNOT_ATTEST_IDS;
+        }
+    }
+    return KM_ERROR_OK;
 }
 
 }  // namespace keymaster
