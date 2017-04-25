@@ -16,6 +16,7 @@
 // AndroidKeymaster implementation, e.g. one running in TrustZone.
 cc_library_shared {
     name: "libkeymaster_messages",
+    vendor_available: true,
     srcs: [
         "android_keymaster_messages.cpp",
         "android_keymaster_utils.cpp",
@@ -45,6 +46,7 @@ cc_library_shared {
 // the function-based keymaster HAL API to the message-based AndroidKeymaster API.
 cc_library_shared {
     name: "libkeymaster1",
+    vendor_available: true,
     srcs: [
         "aes_key.cpp",
         "aes_operation.cpp",
@@ -108,6 +110,7 @@ cc_library_shared {
 // not support the request.
 cc_library_shared {
     name: "libsoftkeymasterdevice",
+    vendor_available: true,
     srcs: [
         "ec_keymaster0_key.cpp",
         "ec_keymaster1_key.cpp",
