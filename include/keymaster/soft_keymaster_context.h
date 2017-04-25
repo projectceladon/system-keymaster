@@ -87,6 +87,8 @@ class SoftKeymasterContext : public KeymasterContext {
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
                                        const keymaster_blob_t& application_id,
                                        bool reset_since_rotation, Buffer* unique_id) const override;
+    keymaster_error_t VerifyAndCopyDeviceIds(const AuthorizationSet& attestation_params,
+                                             AuthorizationSet* attestation) const override;
 
     KeymasterEnforcement* enforcement_policy() override {
         // SoftKeymaster does no enforcement; it's all done by Keystore.

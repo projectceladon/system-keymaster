@@ -43,7 +43,7 @@ static const char kAttestionRecordOid[] = "1.3.6.1.4.1.11129.2.1.17";
 
 keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_params,
                                            AuthorizationSet software_enforced,
-                                           const AuthorizationSet& tee_enforced,
+                                           AuthorizationSet tee_enforced,
                                            const KeymasterContext& context,
                                            UniquePtr<uint8_t[]>* asn1_key_desc,
                                            size_t* asn1_key_desc_len);
