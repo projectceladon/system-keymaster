@@ -93,10 +93,6 @@ class TestContext : public KeymasterContext {
         unique_id->Reinitialize("foo", 3);
         return KM_ERROR_OK;
     }
-    keymaster_error_t VerifyAndCopyDeviceIds(const AuthorizationSet& /* attestation_params */,
-                                             AuthorizationSet* /* attestation */) const {
-        return KM_ERROR_UNIMPLEMENTED;
-    }
 };
 
 TEST(AttestTest, Simple) {
