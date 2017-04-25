@@ -462,7 +462,7 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
 // tee_enforced.
 keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_params,
                                            AuthorizationSet sw_enforced,
-                                           AuthorizationSet tee_enforced,
+                                           const AuthorizationSet& tee_enforced,
                                            const KeymasterContext& context,
                                            UniquePtr<uint8_t[]>* asn1_key_desc,
                                            size_t* asn1_key_desc_len) {
@@ -513,20 +513,14 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
                                attestation_challenge.data_length))
         return TranslateLastOpenSslError();
 
+    keymaster_error_t error = build_auth_list(sw_enforced, key_desc->software_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
     keymaster_blob_t attestation_app_id;
     if (!attestation_params.GetTagValue(TAG_ATTESTATION_APPLICATION_ID, &attestation_app_id))
         return KM_ERROR_ATTESTATION_APPLICATION_ID_MISSING;
     sw_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_app_id);
-
-    keymaster_error_t error;
-    error = context.VerifyAndCopyDeviceIds(attestation_params,
-            keymaster_security_level == KM_SECURITY_LEVEL_SOFTWARE ? &sw_enforced : &tee_enforced);
-    if (error != KM_ERROR_OK)
-        return error;
-
-    error = build_auth_list(sw_enforced, key_desc->software_enforced);
-    if (error != KM_ERROR_OK)
-        return error;
 
     error = build_auth_list(tee_enforced, key_desc->tee_enforced);
     if (error != KM_ERROR_OK)
