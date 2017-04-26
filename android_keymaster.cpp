@@ -19,12 +19,12 @@
 #include <assert.h>
 #include <string.h>
 
-#include <cstddef>
+#include <stddef.h>
 
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 
-#include <UniquePtr.h>
+#include <keymaster/UniquePtr.h>
 
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/key_factory.h>
@@ -66,7 +66,7 @@ keymaster_error_t CheckVersionInfo(const AuthorizationSet& tee_enforced,
 }  // anonymous namespace
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size)
-    : context_(context), operation_table_(new OperationTable(operation_table_size)) {}
+    : context_(context), operation_table_(new(std::nothrow) OperationTable(operation_table_size)) {}
 
 AndroidKeymaster::~AndroidKeymaster() {}
 
