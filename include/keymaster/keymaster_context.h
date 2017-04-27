@@ -181,6 +181,21 @@ class KeymasterContext {
                                                bool reset_since_rotation,
                                                Buffer* unique_id) const = 0;
 
+    /**
+     * Verify that the device IDs provided in the attestation_params match the device's actual IDs
+     * and copy them to attestation. If *any* of the IDs do not match or verification is not
+     * possible, return KM_ERROR_CANNOT_ATTEST_IDS. If *all* IDs provided are successfully verified
+     * or no IDs were provided, return KM_ERROR_OK.
+     *
+     * If you do not support device ID attestation, ignore all arguments and return
+     * KM_ERROR_UNIMPLEMENTED.
+     */
+    virtual keymaster_error_t VerifyAndCopyDeviceIds(
+        const AuthorizationSet& /* attestation_params */,
+        AuthorizationSet* /* attestation */) const {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
   private:
     // Uncopyable.
     KeymasterContext(const KeymasterContext&);

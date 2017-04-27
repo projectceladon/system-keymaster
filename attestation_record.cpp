@@ -163,6 +163,17 @@ ASN1_SEQUENCE(KM_KEY_DESCRIPTION) = {
 } ASN1_SEQUENCE_END(KM_KEY_DESCRIPTION);
 IMPLEMENT_ASN1_FUNCTIONS(KM_KEY_DESCRIPTION);
 
+static const keymaster_tag_t kDeviceAttestationTags[] = {
+    KM_TAG_ATTESTATION_ID_BRAND,
+    KM_TAG_ATTESTATION_ID_DEVICE,
+    KM_TAG_ATTESTATION_ID_PRODUCT,
+    KM_TAG_ATTESTATION_ID_SERIAL,
+    KM_TAG_ATTESTATION_ID_IMEI,
+    KM_TAG_ATTESTATION_ID_MEID,
+    KM_TAG_ATTESTATION_ID_MANUFACTURER,
+    KM_TAG_ATTESTATION_ID_MODEL,
+};
+
 struct KM_AUTH_LIST_Delete {
     void operator()(KM_AUTH_LIST* p) { KM_AUTH_LIST_free(p); }
 };
@@ -462,7 +473,7 @@ static keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_A
 // tee_enforced.
 keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_params,
                                            AuthorizationSet sw_enforced,
-                                           const AuthorizationSet& tee_enforced,
+                                           AuthorizationSet tee_enforced,
                                            const KeymasterContext& context,
                                            UniquePtr<uint8_t[]>* asn1_key_desc,
                                            size_t* asn1_key_desc_len) {
@@ -513,14 +524,28 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
                                attestation_challenge.data_length))
         return TranslateLastOpenSslError();
 
-    keymaster_error_t error = build_auth_list(sw_enforced, key_desc->software_enforced);
-    if (error != KM_ERROR_OK)
-        return error;
-
     keymaster_blob_t attestation_app_id;
     if (!attestation_params.GetTagValue(TAG_ATTESTATION_APPLICATION_ID, &attestation_app_id))
         return KM_ERROR_ATTESTATION_APPLICATION_ID_MISSING;
     sw_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_app_id);
+
+    keymaster_error_t error = context.VerifyAndCopyDeviceIds(attestation_params,
+            keymaster_security_level == KM_SECURITY_LEVEL_SOFTWARE ? &sw_enforced : &tee_enforced);
+    if (error == KM_ERROR_UNIMPLEMENTED) {
+        // The KeymasterContext implementation does not support device ID attestation. Bail out if
+        // device ID attestation is being attempted.
+        for (const auto& tag : kDeviceAttestationTags) {
+            if (attestation_params.find(tag) != -1) {
+                return KM_ERROR_CANNOT_ATTEST_IDS;
+            }
+        }
+    } else if (error != KM_ERROR_OK) {
+        return error;
+    }
+
+    error = build_auth_list(sw_enforced, key_desc->software_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
 
     error = build_auth_list(tee_enforced, key_desc->tee_enforced);
     if (error != KM_ERROR_OK)
