@@ -16,7 +16,7 @@
 
 #include "operation_table.h"
 
-#include <keymaster/new>
+#include <new>
 
 #include <openssl/rand.h>
 

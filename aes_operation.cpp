@@ -18,9 +18,9 @@
 
 #include <stdio.h>
 
-#include <keymaster/new>
+#include <new>
 
-#include <keymaster/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <openssl/aes.h>
 #include <openssl/err.h>

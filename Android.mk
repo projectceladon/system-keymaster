@@ -43,8 +43,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymasterdevice \
 	libkeymaster_messages \
-	libkeymaster_portable \
-	libkeymaster \
+	libkeymaster1 \
 	libcrypto \
 	libsoftkeymaster
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk

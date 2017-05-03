@@ -24,7 +24,6 @@ cc_library_shared {
         "keymaster_tags.cpp",
         "logger.cpp",
         "serializable.cpp",
-        "keymaster_stl.cpp",
     ],
     cflags: [
         "-Wall",
@@ -32,7 +31,6 @@ cc_library_shared {
         "-Wunused",
         "-DKEYMASTER_NAME_TAGS",
     ],
-    stl: "none",
     clang: true,
     // TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
     // Currently, if enabled, these flags will cause an internal error in Clang.
@@ -42,12 +40,13 @@ cc_library_shared {
 
 }
 
-// libkeymaster_portable contains almost everything needed for a keymaster
+// libkeymaster1 contains almost everything needed for a keymaster1
 // implementation, lacking only a subclass of the (abstract) KeymasterContext
 // class to provide environment-specific services and a wrapper to translate from
 // the function-based keymaster HAL API to the message-based AndroidKeymaster API.
 cc_library_shared {
-    name: "libkeymaster_portable",
+    name: "libkeymaster1",
+    vendor_available: true,
     srcs: [
         "aes_key.cpp",
         "aes_operation.cpp",
@@ -58,16 +57,20 @@ cc_library_shared {
         "asymmetric_key_factory.cpp",
         "attestation_record.cpp",
         "auth_encrypted_key_blob.cpp",
-        "authorization_set.cpp",
-        "ecdsa_operation.cpp",
         "ec_key.cpp",
         "ec_key_factory.cpp",
+        "ecdsa_operation.cpp",
+        "ecies_kem.cpp",
+        "hkdf.cpp",
+        "hmac.cpp",
         "hmac_key.cpp",
         "hmac_operation.cpp",
+        "integrity_assured_key_blob.cpp",
+        "iso18033kdf.cpp",
+        "kdf.cpp",
         "key.cpp",
         "keymaster_enforcement.cpp",
-        "keymaster_tags.cpp",
-        "logger.cpp",
+        "nist_curve_key_exchange.cpp",
         "ocb.c",
         "ocb_utils.cpp",
         "openssl_err.cpp",
@@ -77,59 +80,11 @@ cc_library_shared {
         "rsa_key.cpp",
         "rsa_key_factory.cpp",
         "rsa_operation.cpp",
-        "serializable.cpp",
         "symmetric_key.cpp",
-        "keymaster_stl.cpp",
     ],
 
     shared_libs: [
         "libcrypto",
-        "libkeymaster_messages",
-    ],
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wunused",
-        "-DBORINGSSL_NO_CXX",
-    ],
-    // NOTE: libkeymaster_portable must run unchanged in the trusty runtime environment.
-    // Therefore, it must not link against any c++ stl library. keymaster_stl.cpp
-    // weakly defines the subset of stl symbols required for this library to work
-    // and which are also available in the trusty context.
-    stl: "none",
-    clang: true,
-    clang_cflags: [
-        "-Wno-error=unused-const-variable",
-        "-Wno-error=unused-private-field",
-        // TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
-        // Currently, if enabled, these flags will cause an internal error in Clang.
-        "-fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp"
-    ],
-
-    export_include_dirs: ["include"],
-
-}
-
-// libkeymaster adds to libkeymaster_portable code that is needed by the softkeymaster device
-// to implement keymaster. This is sort of a staging area for functionality that may move
-// to libkeymaster_portalbe eventually. Unlike libkeymaster_portable, this library can use c++ stl
-// headers, but modules should avoid it if they are to be moved to libkeymaster_portable.
-cc_library_shared {
-    name: "libkeymaster",
-    vendor_available: true,
-    srcs: [
-        "ecies_kem.cpp",
-        "hkdf.cpp",
-        "hmac.cpp",
-        "integrity_assured_key_blob.cpp",
-        "iso18033kdf.cpp",
-        "kdf.cpp",
-        "nist_curve_key_exchange.cpp",
-    ],
-
-    shared_libs: [
-        "libcrypto",
-        "libkeymaster_portable",
         "libkeymaster_messages",
     ],
     cflags: [
@@ -187,8 +142,7 @@ cc_library_shared {
 
     shared_libs: [
         "libkeymaster_messages",
-        "libkeymaster_portable",
-        "libkeymaster",
+        "libkeymaster1",
         "liblog",
         "libcrypto",
         "libcutils",

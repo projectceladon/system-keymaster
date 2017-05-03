@@ -583,7 +583,7 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     if (len < 0)
         return TranslateLastOpenSslError();
     *asn1_key_desc_len = len;
-    asn1_key_desc->reset(new(std::nothrow) uint8_t[*asn1_key_desc_len]);
+    asn1_key_desc->reset(new uint8_t[*asn1_key_desc_len]);
     if (!asn1_key_desc->get())
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     uint8_t* p = asn1_key_desc->get();

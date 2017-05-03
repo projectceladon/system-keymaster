@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <keymaster/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <gtest/gtest.h>
 

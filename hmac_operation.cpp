@@ -16,7 +16,7 @@
 
 #include "hmac_operation.h"
 
-#include <keymaster/new>
+#include <new>
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
