@@ -17,7 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_KEY_H_
 #define SYSTEM_KEYMASTER_KEY_H_
 
-#include <keymaster/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <hardware/keymaster_defs.h>
 

@@ -18,7 +18,7 @@
 
 #include <assert.h>
 
-#include <keymaster/new>
+#include <new>
 
 #include <keymaster/android_keymaster_utils.h>
 

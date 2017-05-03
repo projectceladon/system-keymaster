@@ -16,7 +16,7 @@
 
 #include "hmac_key.h"
 
-#include <keymaster/new>
+#include <new>
 
 #include <openssl/err.h>
 #include <openssl/rand.h>
