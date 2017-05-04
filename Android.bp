@@ -111,12 +111,12 @@ cc_library_shared {
 
 }
 
-// libkeymaster adds to libkeymaster_portable code that is needed by the softkeymaster device
+// libkeymaster_staging adds to libkeymaster_portable code that is needed by the softkeymaster device
 // to implement keymaster. This is sort of a staging area for functionality that may move
 // to libkeymaster_portalbe eventually. Unlike libkeymaster_portable, this library can use c++ stl
 // headers, but modules should avoid it if they are to be moved to libkeymaster_portable.
 cc_library_shared {
-    name: "libkeymaster",
+    name: "libkeymaster_staging",
     vendor_available: true,
     srcs: [
         "ecies_kem.cpp",
@@ -189,7 +189,7 @@ cc_library_shared {
     shared_libs: [
         "libkeymaster_messages",
         "libkeymaster_portable",
-        "libkeymaster",
+        "libkeymaster_staging",
         "liblog",
         "libcrypto",
         "libcutils",

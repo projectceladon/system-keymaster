@@ -44,7 +44,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymasterdevice \
 	libkeymaster_messages \
 	libkeymaster_portable \
-	libkeymaster \
+	libkeymaster_staging \
 	libcrypto \
 	libsoftkeymaster
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
