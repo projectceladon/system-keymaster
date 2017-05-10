@@ -3529,7 +3529,7 @@ TEST_P(AttestationTest, RsaAttestation) {
                                            .Authorization(TAG_INCLUDE_UNIQUE_ID)));
 
     keymaster_cert_chain_t cert_chain;
-    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
+    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", "attest_app_id", &cert_chain));
     ASSERT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
 
@@ -3567,7 +3567,7 @@ TEST_P(AttestationTest, EcAttestation) {
     }
 
     keymaster_cert_chain_t cert_chain;
-    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", &cert_chain));
+    EXPECT_EQ(KM_ERROR_OK, AttestKey("challenge", "attest_app_id", &cert_chain));
     ASSERT_EQ(3U, cert_chain.entry_count);
     EXPECT_TRUE(verify_chain(cert_chain));
     EXPECT_TRUE(verify_attestation_record(
