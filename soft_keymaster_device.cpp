@@ -1075,8 +1075,7 @@ keymaster_error_t SoftKeymasterDevice::attest_key(const keymaster2_device_t* dev
     if (!convert_device(dev)->configured())
         return KM_ERROR_KEYMASTER_NOT_CONFIGURED;
 
-    cert_chain->entry_count = 0;
-    cert_chain->entries = nullptr;
+    *cert_chain = {};
 
     AttestKeyRequest request;
     request.SetKeyMaterial(*key_to_attest);
