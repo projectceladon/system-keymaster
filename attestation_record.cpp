@@ -28,6 +28,9 @@
 
 namespace keymaster {
 
+constexpr uint kCurrentKeymasterVersion = 3;
+constexpr uint kCurrentAttestationVersion = 2;
+
 struct stack_st_ASN1_TYPE_Delete {
     void operator()(stack_st_ASN1_TYPE* p) { sk_ASN1_TYPE_free(p); }
 };
@@ -488,13 +491,12 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     if (tee_enforced.empty()) {
         // Software key.
         keymaster_security_level = KM_SECURITY_LEVEL_SOFTWARE;
-        keymaster_version = 2;
+        keymaster_version = kCurrentKeymasterVersion;
     } else {
         keymaster_security_level = KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
         switch (context.GetSecurityLevel()) {
         case KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT:
-            // We're running in a TEE, so the key is KM2.
-            keymaster_version = 2;
+            keymaster_version = kCurrentKeymasterVersion;
             break;
 
         case KM_SECURITY_LEVEL_SOFTWARE:
@@ -511,7 +513,7 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
             return KM_ERROR_UNKNOWN_ERROR;
     }
 
-    if (!ASN1_INTEGER_set(key_desc->attestation_version, 1) ||
+    if (!ASN1_INTEGER_set(key_desc->attestation_version, kCurrentAttestationVersion) ||
         !ASN1_ENUMERATED_set(key_desc->attestation_security_level, context.GetSecurityLevel()) ||
         !ASN1_INTEGER_set(key_desc->keymaster_version, keymaster_version) ||
         !ASN1_ENUMERATED_set(key_desc->keymaster_security_level, keymaster_security_level))
