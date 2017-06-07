@@ -88,6 +88,8 @@ cc_library_shared {
         "libcrypto",
         "libkeymaster_messages",
     ],
+    header_libs: ["libhardware_headers"],
+    export_header_lib_headers: ["libhardware_headers"],
     cflags: [
         "-Wall",
         "-Werror",
