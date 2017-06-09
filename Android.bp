@@ -26,6 +26,7 @@ cc_library_shared {
         "serializable.cpp",
         "keymaster_stl.cpp",
     ],
+    header_libs: ["libhardware_headers"],
     cflags: [
         "-Wall",
         "-Werror",
