@@ -28,7 +28,7 @@
 #include <keymaster/android_keymaster.h>
 #include <keymaster/soft_keymaster_context.h>
 
-#include <UniquePtr.h>
+#include <nativehelper/UniquePtr.h>
 
 namespace keymaster {
 
