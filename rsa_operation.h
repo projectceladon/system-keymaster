@@ -17,7 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_RSA_OPERATION_H_
 #define SYSTEM_KEYMASTER_RSA_OPERATION_H_
 
-#include <UniquePtr.h>
+#include <nativehelper/UniquePtr.h>
 
 #include <openssl/evp.h>
 #include <openssl/rsa.h>

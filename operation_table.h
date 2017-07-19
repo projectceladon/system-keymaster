@@ -17,7 +17,7 @@
 #ifndef SYSTEM_KEYMASTER_OPERATION_TABLE_H
 #define SYSTEM_KEYMASTER_OPERATION_TABLE_H
 
-#include <UniquePtr.h>
+#include <nativehelper/UniquePtr.h>
 
 #include <hardware/keymaster_defs.h>
 
