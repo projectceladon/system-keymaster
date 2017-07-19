@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <UniquePtr.h>
+#include <nativehelper/UniquePtr.h>
 
 #include <gtest/gtest.h>
 
