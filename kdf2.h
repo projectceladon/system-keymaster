@@ -23,7 +23,7 @@
 
 #include <keymaster/serializable.h>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 namespace keymaster {
 

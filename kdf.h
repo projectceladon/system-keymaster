@@ -21,7 +21,7 @@
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/serializable.h>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 namespace keymaster {
 
