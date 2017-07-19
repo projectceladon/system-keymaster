@@ -20,7 +20,7 @@
 #include <openssl/ec.h>
 #include <openssl/evp.h>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include "operation.h"
 

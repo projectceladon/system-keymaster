@@ -21,7 +21,7 @@
 #include <string.h>
 #include <time.h>  // for time_t.
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <hardware/keymaster_defs.h>
 #include <keymaster/serializable.h>
