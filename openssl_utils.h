@@ -24,7 +24,7 @@
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <hardware/keymaster_defs.h>
 

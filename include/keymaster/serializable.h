@@ -24,7 +24,7 @@
 #include <cstddef>
 #include <new>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 namespace keymaster {
 

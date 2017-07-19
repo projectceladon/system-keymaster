@@ -20,7 +20,7 @@
 
 #include <new>
 
-#include <nativehelper/UniquePtr.h>
+#include <UniquePtr.h>
 
 #include <openssl/aes.h>
 #include <openssl/err.h>
