@@ -157,7 +157,7 @@ cc_library_shared {
 // libsoftkeymaster provides a software-based keymaster HAL implementation.
 // This is used by keystore as a fallback for when the hardware keymaster does
 // not support the request.
-cc_library_shared {
+cc_library {
     name: "libsoftkeymasterdevice",
     vendor_available: true,
     srcs: [
