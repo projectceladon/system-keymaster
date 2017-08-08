@@ -17,6 +17,9 @@
 cc_library_shared {
     name: "libkeymaster_messages",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     srcs: [
         "android_keymaster_messages.cpp",
         "android_keymaster_utils.cpp",
@@ -50,6 +53,9 @@ cc_library_shared {
 cc_library_shared {
     name: "libkeymaster_portable",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     srcs: [
         "aes_key.cpp",
         "aes_operation.cpp",
@@ -121,6 +127,9 @@ cc_library_shared {
 cc_library_shared {
     name: "libkeymaster_staging",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     srcs: [
         "ecies_kem.cpp",
         "hkdf.cpp",
@@ -160,6 +169,9 @@ cc_library_shared {
 cc_library_shared {
     name: "libsoftkeymasterdevice",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     srcs: [
         "ec_keymaster0_key.cpp",
         "ec_keymaster1_key.cpp",
