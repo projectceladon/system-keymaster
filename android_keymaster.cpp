@@ -283,7 +283,7 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
         return;
 
     operation->SetAuthorizations(key->authorizations());
-    response->error = operation_table_->Add(operation.release(), &response->op_handle);
+    response->error = operation_table_->Add(operation.release(), *context_, &response->op_handle);
 }
 
 void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
